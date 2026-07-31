@@ -117,8 +117,11 @@
   event trigger 仍启用；当前 advisor 只剩已解释的 INFO；
 - S3 推荐算法已完成并通过专项及全量回归；本阶段没有连接或修改 Supabase，也没有
   新增迁移、seed、Repository、Router、正式 API 或 Vue 页面。
-- 未获得用户对 S4 的明确授权前，不实现 Repository、推荐事务、业务 API 或正式页面，
-  不修改远端数据库。
+- 用户已明确授权 S4 后端 API 阶段。S4 只实现 Repository、事务型 Service、Router、
+  API Schema 和测试；不实现 Vue 正式页面，不修改远端数据库。
 - 后续 API 接入必须把 ORM 数据一次性转换为 `RecommendationUser`、
   `RecommendationFruit` 和 `RecommendationContext`，不得让纯算法持有 Session 或
   产生 N+1 查询。
+- S4 不新增迁移；如实现中发现必须改变 schema，立即停止并先更新设计与授权门禁。
+- S4 数据库集成测试只使用精确名为 `daily_fruit_test` 的本地 PostgreSQL，任务顺序以
+  `docs/luna-stage-4-task-list.md` 为准。
