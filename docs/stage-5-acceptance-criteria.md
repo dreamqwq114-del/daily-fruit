@@ -57,10 +57,10 @@
 
 ## 2026-07-31 验收结果
 
-- 前端工具测试：`6 passed`，覆盖 user ID、偏好映射、成功响应、409、网络失败和
-  Sites HTML fallback；
-- 前端组件测试：`7 passed`，覆盖路由门禁、反馈按钮、onboarding 部分失败恢复、
-  今日两卡、刷新/反馈防重复和历史空状态；
+- 前端工具测试：`7 passed`，覆盖 user ID、偏好映射、成功响应、409、网络失败、
+  请求超时和 Sites HTML fallback；
+- 前端组件测试：`9 passed`，覆盖路由门禁、反馈按钮、onboarding 部分失败恢复、
+  今日两卡、刷新/反馈防重复、用户 404、数据库 503 和历史空状态；
 - `npm run build` 成功；
 - 生产依赖 `npm audit --omit=dev` 返回 0 vulnerabilities；
 - 后端在精确本地 `daily_fruit_test` 上全量 `165 passed`；

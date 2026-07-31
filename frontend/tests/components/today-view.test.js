@@ -7,17 +7,20 @@ const recommendationApi = vi.hoisted(() => ({
   submitFeedback: vi.fn(),
 }))
 const userApi = vi.hoisted(() => ({ getUser: vi.fn() }))
+const sessionApi = vi.hoisted(() => ({
+  getUserId: vi.fn(() => 1),
+  clearUserId: vi.fn(),
+}))
+const routerApi = vi.hoisted(() => ({ replace: vi.fn() }))
 
 vi.mock('../../src/api/recommendation.js', () => recommendationApi)
 vi.mock('../../src/api/user.js', () => userApi)
-vi.mock('../../src/utils/user-session.js', () => ({
-  getUserId: () => 1,
-  clearUserId: vi.fn(),
-}))
+vi.mock('../../src/utils/user-session.js', () => sessionApi)
 vi.mock('vue-router', () => ({
-  useRouter: () => ({ replace: vi.fn() }),
+  useRouter: () => routerApi,
 }))
 
+import { ApiError } from '../../src/api/http.js'
 import TodayView from '../../src/views/TodayView.vue'
 
 function makeRecommendation(id = 10, refreshNumber = 0) {
@@ -151,5 +154,29 @@ describe('TodayView', () => {
       comment: '',
     })
     await flushPromises()
+  })
+
+  it('clears the stored id and redirects when the user is missing', async () => {
+    userApi.getUser.mockRejectedValueOnce(
+      new ApiError('请求的资源不存在', { status: 404, code: 'http_error' }),
+    )
+    const wrapper = mountToday()
+    await flushPromises()
+
+    expect(sessionApi.clearUserId).toHaveBeenCalledTimes(1)
+    expect(routerApi.replace).toHaveBeenCalledWith('/onboarding')
+    expect(wrapper.find('.state-card--error').exists()).toBe(false)
+  })
+
+  it('keeps the stored id for temporary database failures', async () => {
+    userApi.getUser.mockRejectedValueOnce(
+      new ApiError('数据库服务暂时不可用', { status: 503, code: 'http_error' }),
+    )
+    const wrapper = mountToday()
+    await flushPromises()
+
+    expect(sessionApi.clearUserId).not.toHaveBeenCalled()
+    expect(routerApi.replace).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('数据库服务暂时不可用')
   })
 })

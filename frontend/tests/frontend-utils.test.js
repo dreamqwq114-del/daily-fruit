@@ -138,3 +138,22 @@ test('apiRequest rejects successful html fallbacks as invalid responses', async 
     },
   )
 })
+
+test('apiRequest aborts requests that exceed the timeout', async () => {
+  globalThis.fetch = async (_url, options) =>
+    new Promise((_resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        reject(new DOMException('aborted', 'AbortError'))
+      })
+    })
+
+  await assert.rejects(
+    () => apiRequest('/api/fruits', { timeoutMs: 5 }),
+    (error) => {
+      assert.ok(error instanceof ApiError)
+      assert.equal(error.code, 'timeout')
+      assert.equal(error.message, '请求超时，请检查网络后重试。')
+      return true
+    },
+  )
+})
