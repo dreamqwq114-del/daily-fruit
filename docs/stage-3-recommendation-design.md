@@ -112,3 +112,12 @@ second_score = base_score * 0.70 + complement_score * 0.30
 - 月份非法、ID 重复或候选不足时抛出明确领域错误；
 - 所有输出分数限制在 `[0, 1]`。
 
+## 9. 实现审查结论
+
+- `recommendation_service.py` 只处理纯计算，没有 Session、SQLAlchemy 查询、网络或
+  环境变量访问；
+- 输入类型位于 `recommendation_types.py`，与 ORM 和 HTTP Schema 的职责保持分离；
+- 结构化理由复用已有 `RecommendationReason` 契约，后续可稳定序列化到 JSONB；
+- 相同输入顺序无关；只有显式传入 `random_seed` 时才在近似最高分窗口内选择；
+- 缺失营养使用中性轮廓，相同营养维度不会除零；损坏的月份、分数和 ID 会明确失败；
+- 现有演示数据已离线贯通，但数据库加载和持久化必须留给后续 Repository/API 阶段。

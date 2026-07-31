@@ -115,9 +115,10 @@
   重复、孤立和非法范围记录均为 0，行为表均为空；
 - `public.rls_auto_enable()` 的两项 security advisor WARN 已修复，
   event trigger 仍启用；当前 advisor 只剩已解释的 INFO；
-- S2 已完成。用户已明确授权 S3 推荐算法阶段；S3 只允许实现纯 Python 算法、
-  输入对象、结构化理由和单元测试。
-- S3 不连接或修改 Supabase，不创建迁移，不修改 seed，不实现 Repository、Router、
-  正式 API 或 Vue 页面。
-- S3 任务边界和顺序以 `docs/luna-stage-3-task-list.md` 为准；完成当前小任务并提交后
-  才进入下一项。
+- S3 推荐算法已完成并通过专项及全量回归；本阶段没有连接或修改 Supabase，也没有
+  新增迁移、seed、Repository、Router、正式 API 或 Vue 页面。
+- 未获得用户对 S4 的明确授权前，不实现 Repository、推荐事务、业务 API 或正式页面，
+  不修改远端数据库。
+- 后续 API 接入必须把 ORM 数据一次性转换为 `RecommendationUser`、
+  `RecommendationFruit` 和 `RecommendationContext`，不得让纯算法持有 Session 或
+  产生 N+1 查询。
