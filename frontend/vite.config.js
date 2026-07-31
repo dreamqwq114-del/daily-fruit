@@ -1,10 +1,18 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { sites } from './build/sites-vite-plugin.js'
 
-export default defineConfig({
-  plugins: [vue()],
-  server: {
-    port: 5173,
-  },
+export default defineConfig(async () => {
+  process.env.WRANGLER_WRITE_LOGS ??= 'false'
+  process.env.WRANGLER_LOG_PATH ??= '.wrangler/logs'
+  process.env.MINIFLARE_REGISTRY_PATH ??= '.wrangler/registry'
+
+  const { cloudflare } = await import('@cloudflare/vite-plugin')
+
+  return {
+    plugins: [vue(), sites(), cloudflare()],
+    server: {
+      port: 5173,
+    },
+  }
 })
-
