@@ -55,3 +55,21 @@
 
 高优先级问题必须修复并重新验证后才能部署。
 
+## 2026-07-31 验收结果
+
+- 前端工具测试：`6 passed`，覆盖 user ID、偏好映射、成功响应、409、网络失败和
+  Sites HTML fallback；
+- 前端组件测试：`7 passed`，覆盖路由门禁、反馈按钮、onboarding 部分失败恢复、
+  今日两卡、刷新/反馈防重复和历史空状态；
+- `npm run build` 成功；
+- 生产依赖 `npm audit --omit=dev` 返回 0 vulnerabilities；
+- 后端在精确本地 `daily_fruit_test` 上全量 `165 passed`；
+- 本地 `/` 和 `/history` SPA 路由均返回 200；
+- 秘密扫描只命中明确的测试假凭据和安全文档术语，没有真实凭据或被跟踪 `.env`；
+- 独立 subagent 审计发现的非 JSON 2xx、操作错误样式和 320px 反馈区问题已修复；
+- 独立审计指出的前端流程测试缺口已补充为工具层与组件层两组测试；
+- 本阶段没有修改 Supabase、Alembic、ORM 或后端业务代码。
+
+当前唯一跨阶段限制：Sites 只能部署为私有 UI 预览。公开 FastAPI 地址、
+`VITE_API_BASE_URL`、生产 CORS 和线上端到端验证属于 S6；完成前不得宣称线上业务链路
+已经可用。

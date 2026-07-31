@@ -120,3 +120,21 @@ test('apiRequest turns fetch failures into friendly network errors', async () =>
     },
   )
 })
+
+test('apiRequest rejects successful html fallbacks as invalid responses', async () => {
+  globalThis.fetch = async () =>
+    new Response('<!doctype html><div id="app"></div>', {
+      status: 200,
+      headers: { 'Content-Type': 'text/html' },
+    })
+
+  await assert.rejects(
+    () => apiRequest('/api/fruits'),
+    (error) => {
+      assert.ok(error instanceof ApiError)
+      assert.equal(error.code, 'invalid_response')
+      assert.equal(error.message, '服务返回了无法识别的内容，请稍后重试。')
+      return true
+    },
+  )
+})

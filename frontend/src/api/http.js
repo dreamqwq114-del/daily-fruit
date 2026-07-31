@@ -34,12 +34,28 @@ function getResponseMessage(status, payload) {
 
 async function readPayload(response) {
   const contentType = response.headers.get('content-type') ?? ''
+  const text = await response.text()
 
   if (contentType.includes('application/json')) {
-    return response.json()
+    if (!text) return null
+
+    try {
+      return JSON.parse(text)
+    } catch {
+      throw new ApiError('服务返回的数据格式不正确，请稍后重试。', {
+        status: response.status,
+        code: 'invalid_response',
+      })
+    }
   }
 
-  const text = await response.text()
+  if (response.ok) {
+    throw new ApiError('服务返回了无法识别的内容，请稍后重试。', {
+      status: response.status,
+      code: 'invalid_response',
+    })
+  }
+
   return text ? { detail: text } : null
 }
 

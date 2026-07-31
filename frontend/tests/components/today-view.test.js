@@ -1,0 +1,155 @@
+import { flushPromises, mount } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const recommendationApi = vi.hoisted(() => ({
+  getTodayRecommendation: vi.fn(),
+  refreshRecommendation: vi.fn(),
+  submitFeedback: vi.fn(),
+}))
+const userApi = vi.hoisted(() => ({ getUser: vi.fn() }))
+
+vi.mock('../../src/api/recommendation.js', () => recommendationApi)
+vi.mock('../../src/api/user.js', () => userApi)
+vi.mock('../../src/utils/user-session.js', () => ({
+  getUserId: () => 1,
+  clearUserId: vi.fn(),
+}))
+vi.mock('vue-router', () => ({
+  useRouter: () => ({ replace: vi.fn() }),
+}))
+
+import TodayView from '../../src/views/TodayView.vue'
+
+function makeRecommendation(id = 10, refreshNumber = 0) {
+  const fruit = (fruitId, name) => ({
+    id: fruitId,
+    name,
+    category: '演示水果',
+    taste: '清甜',
+    sweet_score: 0.5,
+    sour_score: 0.5,
+    soft_score: 0.5,
+    crisp_score: 0.5,
+    convenience_score: 0.8,
+    average_price_level: 2,
+    default_portion: '1份',
+    image_url: null,
+    description: `${name}说明`,
+    is_active: true,
+    nutrition: null,
+    seasons: [],
+  })
+
+  return {
+    id,
+    user_id: 1,
+    recommendation_date: '2026-07-31',
+    refresh_number: refreshNumber,
+    total_score: 0.8,
+    status: 'active',
+    items: [
+      {
+        id: id * 10 + 1,
+        recommendation_id: id,
+        fruit_id: 1,
+        score: 0.8,
+        rank: 1,
+        fruit: fruit(1, '苹果'),
+        reasons: [
+          { code: 'in_season', component: 'season_score', message: '当前处于适宜购买月份' },
+          { code: 'price_match', component: 'price_match_score', message: '符合你的价格范围' },
+        ],
+        feedback: [],
+      },
+      {
+        id: id * 10 + 2,
+        recommendation_id: id,
+        fruit_id: 2,
+        score: 0.72,
+        rank: 2,
+        fruit: fruit(2, '橙子'),
+        reasons: [
+          { code: 'nutrition_complement', component: 'complement_score', message: '与首选水果营养特点互补' },
+          { code: 'convenient', component: 'convenience_score', message: '食用较为方便' },
+        ],
+        feedback: [],
+      },
+    ],
+  }
+}
+
+function mountToday() {
+  return mount(TodayView, {
+    global: {
+      stubs: {
+        RouterLink: { template: '<a><slot /></a>' },
+      },
+    },
+  })
+}
+
+describe('TodayView', () => {
+  beforeEach(() => {
+    userApi.getUser.mockResolvedValue({
+      id: 1,
+      username: '小果',
+      city: '苏州',
+      region: '华东',
+    })
+    recommendationApi.getTodayRecommendation.mockResolvedValue(makeRecommendation())
+    recommendationApi.refreshRecommendation.mockResolvedValue(makeRecommendation(11, 1))
+    recommendationApi.submitFeedback.mockResolvedValue({
+      id: 99,
+      recommendation_item_id: 101,
+      user_id: 1,
+      feedback_type: 'eaten',
+      comment: '',
+    })
+  })
+
+  it('renders exactly two ranked fruit cards', async () => {
+    const wrapper = mountToday()
+    await flushPromises()
+
+    expect(wrapper.findAll('.fruit-card')).toHaveLength(2)
+    expect(wrapper.text()).toContain('苹果')
+    expect(wrapper.text()).toContain('橙子')
+  })
+
+  it('prevents duplicate refresh and feedback submissions', async () => {
+    const wrapper = mountToday()
+    await flushPromises()
+
+    let resolveRefresh
+    recommendationApi.refreshRecommendation.mockReturnValue(
+      new Promise((resolve) => {
+        resolveRefresh = resolve
+      }),
+    )
+    const refreshButton = wrapper.find('.refresh-panel button')
+    await refreshButton.trigger('click')
+    await refreshButton.trigger('click')
+    expect(recommendationApi.refreshRecommendation).toHaveBeenCalledTimes(1)
+    resolveRefresh(makeRecommendation(11, 1))
+    await flushPromises()
+
+    let resolveFeedback
+    recommendationApi.submitFeedback.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFeedback = resolve
+      }),
+    )
+    const feedbackButton = wrapper.find('.feedback-button')
+    await feedbackButton.trigger('click')
+    await feedbackButton.trigger('click')
+    expect(recommendationApi.submitFeedback).toHaveBeenCalledTimes(1)
+    resolveFeedback({
+      id: 99,
+      recommendation_item_id: 111,
+      user_id: 1,
+      feedback_type: 'eaten',
+      comment: '',
+    })
+    await flushPromises()
+  })
+})

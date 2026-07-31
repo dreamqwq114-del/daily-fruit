@@ -475,6 +475,12 @@ p {
   color: var(--success);
 }
 
+.action-message--error {
+  border-color: #f0c5b8;
+  background: var(--danger-soft);
+  color: #7f3025;
+}
+
 .state-card {
   display: flex;
   width: min(100%, 720px);
@@ -1079,6 +1085,11 @@ p {
 }
 
 @media (max-width: 420px) {
+  .feedback-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    overflow-x: visible;
+  }
+
   .fruit-preference-row {
     grid-template-columns: auto minmax(0, 1fr);
   }

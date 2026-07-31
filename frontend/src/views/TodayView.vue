@@ -22,6 +22,7 @@ const loading = ref(true)
 const refreshing = ref(false)
 const errorMessage = ref('')
 const actionMessage = ref('')
+const actionTone = ref('success')
 const feedbackPending = ref({})
 
 const recommendationItems = computed(() =>
@@ -74,13 +75,16 @@ async function refreshToday() {
 
   refreshing.value = true
   actionMessage.value = ''
+  actionTone.value = 'success'
 
   try {
     recommendation.value = await refreshRecommendation(getUserId())
     actionMessage.value = '已经换成一组新的搭配。'
+    actionTone.value = 'success'
     window.scrollTo({ top: 0, behavior: 'smooth' })
   } catch (error) {
     actionMessage.value = error.message
+    actionTone.value = 'error'
   } finally {
     refreshing.value = false
   }
@@ -94,6 +98,7 @@ async function sendFeedback(item, feedbackType) {
     [item.id]: feedbackType,
   }
   actionMessage.value = ''
+  actionTone.value = 'success'
 
   try {
     const result = await submitFeedback(item.id, feedbackType)
@@ -102,8 +107,10 @@ async function sendFeedback(item, feedbackType) {
     )
     if (!alreadyVisible) item.feedback.push(result)
     actionMessage.value = '反馈已记录，会用于调整后续推荐。'
+    actionTone.value = 'success'
   } catch (error) {
     actionMessage.value = error.message
+    actionTone.value = 'error'
   } finally {
     const nextPending = { ...feedbackPending.value }
     delete nextPending[item.id]
@@ -146,7 +153,13 @@ onMounted(loadToday)
         />
       </div>
 
-      <p v-if="actionMessage" class="action-message" role="status" aria-live="polite">
+      <p
+        v-if="actionMessage"
+        class="action-message"
+        :class="{ 'action-message--error': actionTone === 'error' }"
+        :role="actionTone === 'error' ? 'alert' : 'status'"
+        aria-live="polite"
+      >
         {{ actionMessage }}
       </p>
 
