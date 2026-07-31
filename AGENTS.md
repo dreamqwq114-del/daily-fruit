@@ -115,5 +115,9 @@
   重复、孤立和非法范围记录均为 0，行为表均为空；
 - `public.rls_auto_enable()` 的两项 security advisor WARN 已修复，
   event trigger 仍启用；当前 advisor 只剩已解释的 INFO；
-- S2 已完成。未获得新的明确任务前，不继续实现 API、推荐算法或页面，
-  也不再修改远端数据库。
+- S2 已完成。用户已明确授权 S3 推荐算法阶段；S3 只允许实现纯 Python 算法、
+  输入对象、结构化理由和单元测试。
+- S3 不连接或修改 Supabase，不创建迁移，不修改 seed，不实现 Repository、Router、
+  正式 API 或 Vue 页面。
+- S3 任务边界和顺序以 `docs/luna-stage-3-task-list.md` 为准；完成当前小任务并提交后
+  才进入下一项。
