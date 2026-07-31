@@ -96,8 +96,10 @@
   migration 连接用途，受控文件中不保存数据库 URL；
 - `S2-05` 已由提交 `ddbc214` 完成，基础迁移只包含八张业务表及批准的
   约束和索引，未包含远端操作或系统 schema 变化；
-- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-06`，只在
-  `daily_fruit_test` 可丢弃 PostgreSQL 验证迁移；
+- `S2-06` 已由提交 `36c3e29` 完成，基础迁移已在 `daily_fruit_test`
+  实测 upgrade、downgrade、结构一致性、约束和删除策略；
+- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-07`，只创建并
+  在本地测试库验证 RLS、privileges 和已知函数权限的安全迁移；
 - `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
 - 在安全迁移完成静态审查并获得明确批准前，仍禁止远端 DDL、迁移、
   seed、policy 和 grant 修改。

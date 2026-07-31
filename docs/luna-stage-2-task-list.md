@@ -16,7 +16,8 @@
 - `S2-03` 已完成：`fab7a89 feat: add validated database schemas`；
 - `S2-04` 已完成：`f2e4a21 chore: initialize safe Alembic configuration`；
 - `S2-05` 已完成：`ddbc214 feat: add initial database migration`；
-- 当前下一任务：`S2-06`；
+- `S2-06` 已完成：`36c3e29 test: verify migrations on disposable postgres`；
+- 当前下一任务：`S2-07`；
 - 当前仍禁止远端 DDL、迁移、seed、policy 和 grant 修改。
 
 ## S2-00：恢复目标项目可见性并完成只读门禁
