@@ -60,6 +60,14 @@ const preferenceFields = [
           <option :value="3">可以接受较高价格</option>
         </select>
       </label>
+      <label class="form-field">
+        <span>尝鲜程度</span>
+        <select v-model.number="model.discovery_level" name="discovery_level" required>
+          <option :value="0">只推荐吃过的</option>
+          <option :value="1">偶尔尝试新水果</option>
+          <option :value="2">愿意探索更多</option>
+        </select>
+      </label>
     </div>
   </fieldset>
 

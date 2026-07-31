@@ -56,6 +56,33 @@ function clearSelection(group) {
     [group]: [],
   }
 }
+
+function isBooleanSelected(group, fruitId) {
+  return preferenceSelection.value[group]?.includes(fruitId) ?? false
+}
+
+function toggleBoolean(trueGroup, falseGroup, fruitId, value) {
+  const trueIds = new Set(preferenceSelection.value[trueGroup] ?? [])
+  const falseIds = new Set(preferenceSelection.value[falseGroup] ?? [])
+  const target = value ? trueIds : falseIds
+  const other = value ? falseIds : trueIds
+  if (target.has(fruitId)) target.delete(fruitId)
+  else {
+    target.add(fruitId)
+    other.delete(fruitId)
+  }
+  const nextSelection = {
+    ...preferenceSelection.value,
+    [trueGroup]: [...trueIds].sort((left, right) => left - right),
+    [falseGroup]: [...falseIds].sort((left, right) => left - right),
+  }
+  if (trueGroup === 'triedIds' && value === false) {
+    nextSelection.favoriteIds = nextSelection.favoriteIds.filter(
+      (id) => id !== fruitId,
+    )
+  }
+  preferenceSelection.value = nextSelection
+}
 </script>
 
 <template>
@@ -153,6 +180,42 @@ function clearSelection(group) {
             @click="toggleSelection('forbiddenIds', fruit.id)"
           >
             不能接受
+          </button>
+          <button
+            class="fruit-choice-button"
+            :class="{ 'is-selected': isBooleanSelected('triedIds', fruit.id) }"
+            type="button"
+            :aria-pressed="isBooleanSelected('triedIds', fruit.id)"
+            @click="toggleBoolean('triedIds', 'notTriedIds', fruit.id, true)"
+          >
+            吃过
+          </button>
+          <button
+            class="fruit-choice-button"
+            :class="{ 'is-selected': isBooleanSelected('notTriedIds', fruit.id) }"
+            type="button"
+            :aria-pressed="isBooleanSelected('notTriedIds', fruit.id)"
+            @click="toggleBoolean('triedIds', 'notTriedIds', fruit.id, false)"
+          >
+            没吃过
+          </button>
+          <button
+            class="fruit-choice-button"
+            :class="{ 'is-selected': isBooleanSelected('willingToTryIds', fruit.id) }"
+            type="button"
+            :aria-pressed="isBooleanSelected('willingToTryIds', fruit.id)"
+            @click="toggleBoolean('willingToTryIds', 'notWillingToTryIds', fruit.id, true)"
+          >
+            愿意尝试
+          </button>
+          <button
+            class="fruit-choice-button"
+            :class="{ 'is-selected': isBooleanSelected('notWillingToTryIds', fruit.id) }"
+            type="button"
+            :aria-pressed="isBooleanSelected('notWillingToTryIds', fruit.id)"
+            @click="toggleBoolean('willingToTryIds', 'notWillingToTryIds', fruit.id, false)"
+          >
+            暂不想尝试
           </button>
         </div>
       </article>

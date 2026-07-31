@@ -1279,3 +1279,8 @@ p {
     animation-iteration-count: 1 !important;
   }
 }
+.score-detail {
+  margin: -0.35rem 0 0.75rem;
+  color: var(--ink-muted, #64706a);
+  font-size: 0.82rem;
+}

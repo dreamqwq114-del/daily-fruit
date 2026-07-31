@@ -42,8 +42,8 @@ from app.services.recommendation_types import (
 )
 
 
-HISTORY_DAYS = 7
-FEEDBACK_DAYS = 30
+HISTORY_DAYS = 30
+FEEDBACK_DAYS = 180
 DEFAULT_HISTORY_LIMIT = 30
 
 
@@ -244,20 +244,49 @@ def _calculate_recommendation(
         fruit_to_recommendation_input(fruit) for fruit in fruits
     ]
     domain_user = user_to_recommendation_input(user)
+    since_date = recommendation_date - timedelta(days=HISTORY_DAYS)
+    now = datetime.now(UTC)
     recent_ids = recommendation_repository.recent_fruit_ids(
         session,
         user.id,
-        since=recommendation_date - timedelta(days=HISTORY_DAYS),
+        since=since_date,
+        until=recommendation_date,
+    )
+    history_events = recommendation_repository.history_events(
+        session,
+        user.id,
+        since=since_date,
+        until=recommendation_date,
+    )
+    previous_pairs = recommendation_repository.previous_pairs(
+        session,
+        user.id,
+        since=since_date,
+        until=recommendation_date,
+    )
+    feedback_events = recommendation_repository.feedback_events(
+        session,
+        user.id,
+        since=now - timedelta(days=FEEDBACK_DAYS),
+        until=now,
     )
     feedback = recommendation_repository.feedback_by_fruit(
         session,
         user.id,
-        since=datetime.now(UTC) - timedelta(days=FEEDBACK_DAYS),
+        since=now - timedelta(days=FEEDBACK_DAYS),
+        until=now,
     )
     context = build_recommendation_context(
         month=recommendation_date.month,
+        today=recommendation_date,
         recent_fruit_ids=recent_ids,
         feedback_by_fruit=feedback,
+        history_events=history_events,
+        feedback_events=feedback_events,
+        previous_pairs=previous_pairs,
+        excluded_pair=(
+            frozenset(previous_ids) if previous_ids else None
+        ),
         random_seed=_stable_seed(
             user.id,
             recommendation_date,
@@ -319,6 +348,21 @@ def _persist_recommendation(
             RecommendationItem(
                 fruit_id=item.fruit.id,
                 score=_score_decimal(item.score),
+                individual_score=_score_decimal(
+                    item.individual_score
+                    if item.individual_score is not None
+                    else item.score
+                ),
+                pair_score=_score_decimal(
+                    item.pair_score
+                    if item.pair_score is not None
+                    else result.total_score
+                ),
+                nutrition_pair_score=_score_decimal(
+                    item.nutrition_pair_score
+                    if item.nutrition_pair_score is not None
+                    else 0
+                ),
                 rank=item.rank,
                 reasons=[
                     reason.model_dump(mode="json")

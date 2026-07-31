@@ -31,6 +31,9 @@ def recommendation_to_detail(
                     RecommendationReason.model_validate(reason)
                     for reason in item.reasons
                 ],
+                individual_score=item.individual_score,
+                pair_score=item.pair_score,
+                nutrition_pair_score=item.nutrition_pair_score,
                 created_at=item.created_at,
                 fruit=FruitDetail.model_validate(item.fruit),
                 feedback=feedback,

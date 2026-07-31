@@ -33,6 +33,12 @@ PreferenceScore = Annotated[
     Field(ge=-1, le=2, max_digits=4, decimal_places=2),
     DecimalAsNumber,
 ]
+OptionalPreferenceScore = PreferenceScore | None
+PortionGrams = Annotated[
+    Decimal,
+    Field(gt=0, max_digits=7, decimal_places=2),
+    DecimalAsNumber,
+]
 RecommendationScore = Annotated[
     Decimal,
     Field(ge=0, le=1, max_digits=8, decimal_places=6),
@@ -64,6 +70,8 @@ __all__ = [
     "NutritionValue",
     "PositiveId",
     "PreferenceScore",
+    "OptionalPreferenceScore",
+    "PortionGrams",
     "RecommendationScore",
     "RefreshNumber",
 ]

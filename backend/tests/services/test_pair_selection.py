@@ -147,7 +147,7 @@ def test_random_choice_never_leaves_near_top_window() -> None:
     assert 3 not in selected_ids
 
 
-def test_second_score_uses_approved_formula() -> None:
+def test_pair_score_uses_v2_pair_formula() -> None:
     fruits = [
         make_fruit(1, profile(0, 0, 0, 0, 0, 0)),
         make_fruit(2, profile(1, 1, 1, 1, 1, 1)),
@@ -158,7 +158,11 @@ def test_second_score_uses_approved_formula() -> None:
         RecommendationContext(month=7),
     )
 
-    assert result.second_score == pytest.approx(
-        result.second.base_score * 0.7 + result.complement_score * 0.3
+    expected = (
+        0.70 * ((result.first.base_score + result.second.base_score) / 2)
+        + 0.15 * result.nutrition_pair_score
+        + 0.10 * result.sensory_category_diversity
+        + 0.05 * result.pair_novelty
     )
-    assert 0 <= result.second_score <= 1
+    assert result.pair_score == pytest.approx(expected)
+    assert 0 <= result.pair_score <= 1

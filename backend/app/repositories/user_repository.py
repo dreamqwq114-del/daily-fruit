@@ -55,7 +55,7 @@ def list_preferences(
 def replace_preferences(
     session: Session,
     user_id: int,
-    preferences: Iterable[tuple[int, object, bool]],
+    preferences: Iterable[tuple[int, object, bool, bool | None, bool | None]],
 ) -> list[UserFruitPreference]:
     existing = {
         item.fruit_id: item
@@ -63,7 +63,13 @@ def replace_preferences(
     }
     submitted_ids: set[int] = set()
     now = datetime.now(UTC)
-    for fruit_id, preference_score, is_forbidden in preferences:
+    for (
+        fruit_id,
+        preference_score,
+        is_forbidden,
+        has_tried,
+        willing_to_try,
+    ) in preferences:
         submitted_ids.add(fruit_id)
         item = existing.get(fruit_id)
         if item is None:
@@ -72,11 +78,15 @@ def replace_preferences(
                 fruit_id=fruit_id,
                 preference_score=preference_score,
                 is_forbidden=is_forbidden,
+                has_tried=has_tried,
+                willing_to_try=willing_to_try,
             )
             session.add(item)
         else:
             item.preference_score = preference_score
             item.is_forbidden = is_forbidden
+            item.has_tried = has_tried
+            item.willing_to_try = willing_to_try
             item.updated_at = now
 
     for fruit_id, item in existing.items():

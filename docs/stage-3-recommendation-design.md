@@ -121,3 +121,10 @@ second_score = base_score * 0.70 + complement_score * 0.30
 - 相同输入顺序无关；只有显式传入 `random_seed` 时才在近似最高分窗口内选择；
 - 缺失营养使用中性轮廓，相同营养维度不会除零；损坏的月份、分数和 ID 会明确失败；
 - 现有演示数据已离线贯通，但数据库加载和持久化必须留给后续 Repository/API 阶段。
+## V2 implementation status
+
+The V2 formula, fruit identity contract, familiarity semantics, seven-profile
+comparison and current acceptance evidence are maintained in
+`docs/recommendation-v2-comparison.md` and `docs/audits/`. The V2 implementation
+is in `backend/app/services/recommendation_service.py`; this document's older
+V1 formula is retained as the historical baseline.

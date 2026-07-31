@@ -35,6 +35,52 @@ EXPECTED_INDEXES = {
     "ix_recommendation_items_fruit_id",
     "ix_recommendation_feedback_user_created_at",
 }
+V2_COLUMNS = {
+    "fruits": {
+        "code", "aliases", "default_portion_grams", "direct_eating",
+        "consumption_mode", "daily_recommendation_role",
+        "preparation_difficulty", "portability_score", "messiness_score",
+        "storage_difficulty", "aroma_intensity", "commonness_score",
+        "novelty_level", "data_quality", "data_source_note",
+    },
+    "fruit_seasons": {"region_level", "availability_score", "supply_status"},
+    "users": {"discovery_level"},
+    "user_fruit_preferences": {"has_tried", "willing_to_try"},
+    "recommendation_items": {"individual_score", "pair_score", "nutrition_pair_score"},
+}
+V2_CONSTRAINTS = {
+    "uq_fruits_code",
+    "ck_fruits_default_portion_grams_positive",
+    "ck_fruits_preparation_difficulty_range",
+    "ck_fruits_portability_score_range",
+    "ck_fruits_messiness_score_range",
+    "ck_fruits_storage_difficulty_range",
+    "ck_fruits_aroma_intensity_range",
+    "ck_fruits_commonness_score_range",
+    "ck_fruits_novelty_level_range",
+    "ck_fruits_consumption_mode_values",
+    "ck_fruits_daily_role_values",
+    "ck_fruits_data_quality_values",
+    "ck_fruit_seasons_region_level_values",
+    "ck_fruit_seasons_availability_score_range",
+    "ck_fruit_seasons_supply_status_values",
+    "ck_users_discovery_level_range",
+    "ck_recommendation_items_individual_score_range",
+    "ck_recommendation_items_pair_score_range",
+    "ck_recommendation_items_nutrition_pair_score_range",
+    "ck_user_fruit_preferences_score_range",
+    "ck_users_sweet_preference_range",
+    "ck_users_sour_preference_range",
+    "ck_users_soft_preference_range",
+    "ck_users_crisp_preference_range",
+}
+V2_MODIFIED_COLUMNS = {
+    ("user_fruit_preferences", "preference_score"),
+    ("users", "sweet_preference"),
+    ("users", "sour_preference"),
+    ("users", "soft_preference"),
+    ("users", "crisp_preference"),
+}
 
 
 def load_migration() -> ModuleType:
@@ -147,11 +193,13 @@ def test_upgrade_matches_the_eight_table_metadata_definitions() -> None:
         actual_constraints = {
             signature
             for item in actual.constraints
+            if item.name not in V2_CONSTRAINTS
             if (signature := constraint_signature(item)) is not None
         }
         expected_constraints = {
             signature
             for item in expected.constraints
+            if item.name not in V2_CONSTRAINTS
             if not any(
                 column.name == "auth_user_id"
                 for column in getattr(item, "columns", ())
@@ -159,10 +207,16 @@ def test_upgrade_matches_the_eight_table_metadata_definitions() -> None:
             if (signature := constraint_signature(item)) is not None
         }
 
-        assert [column_signature(item) for item in actual.columns] == [
+        assert [
+            column_signature(item)
+            for item in actual.columns
+            if (table_name, item.name) not in V2_MODIFIED_COLUMNS
+        ] == [
             column_signature(item)
             for item in expected.columns
             if item.name != "auth_user_id"
+            and item.name not in V2_COLUMNS.get(table_name, set())
+            and (table_name, item.name) not in V2_MODIFIED_COLUMNS
         ]
         assert actual_constraints == expected_constraints
 

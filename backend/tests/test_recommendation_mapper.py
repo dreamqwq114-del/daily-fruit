@@ -63,6 +63,7 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
             start_month=8,
             end_month=12,
             season_score=Decimal("0.95"),
+            availability_score=Decimal("0"),
         )
     ]
 
@@ -73,6 +74,46 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
     assert mapped_fruit.nutrition is not None
     assert mapped_fruit.nutrition.folate == 0.6
     assert mapped_fruit.seasons[0].season_score == 0.95
+    assert mapped_fruit.seasons[0].availability_score == 0
+
+
+def test_mapper_preserves_explicit_zero_v2_identity_values() -> None:
+    fruit = Fruit(
+        id=9,
+        code="zero-values",
+        name="zero fruit",
+        category="test",
+        taste="test",
+        sweet_score=Decimal("0"),
+        sour_score=Decimal("0"),
+        soft_score=Decimal("0"),
+        crisp_score=Decimal("0"),
+        convenience_score=Decimal("0"),
+        average_price_level=1,
+        default_portion="100 g",
+        default_portion_grams=Decimal("1"),
+        direct_eating=False,
+        consumption_mode="ingredient",
+        daily_recommendation_role="supporting",
+        preparation_difficulty=Decimal("0"),
+        portability_score=Decimal("0"),
+        messiness_score=Decimal("0"),
+        storage_difficulty=Decimal("0"),
+        aroma_intensity=Decimal("0"),
+        commonness_score=Decimal("0"),
+        novelty_level=0,
+        data_quality="low",
+        description="test",
+    )
+    mapped = fruit_to_recommendation_input(fruit)
+    assert mapped.default_portion_grams == 1
+    assert mapped.preparation_difficulty == 0
+    assert mapped.portability_score == 0
+    assert mapped.messiness_score == 0
+    assert mapped.storage_difficulty == 0
+    assert mapped.aroma_intensity == 0
+    assert mapped.commonness_score == 0
+    assert mapped.novelty_level == 0
 
 
 def test_context_mapper_copies_mutable_inputs() -> None:

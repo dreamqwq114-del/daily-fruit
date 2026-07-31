@@ -289,3 +289,22 @@ Security advisor 原两项 WARN 已消失。当前只有 9 条
 - 前端构建和 Git 受控文件秘密扫描无命中。
 
 阶段二完成，当前不允许继续修改数据库或提前实现下一阶段功能。
+## 12. V2 follow-up audit (2026-08-01)
+
+The earlier S2-11 snapshot is retained as historical evidence. Before the V2
+write, the project was re-confirmed as `Daily Fruit` with ref
+`frzbbpocyzlqxljsrsiw`, version `0004`, and existing rows 24/24/48/11/57/11/22/4.
+
+After the reviewed Alembic `0005` SQL and idempotent V2 seed:
+
+- `public.alembic_version=0005`;
+- V2 columns and checks are present in fruits, seasons, users, preferences and
+  recommendation_items;
+- all existing row counts are unchanged;
+- all public business tables still have RLS enabled and zero policies;
+- the seed was executed twice with 24/24/48 rows and unique natural keys;
+- no auth, storage, policy or grant changes were made.
+
+The remote database now permits the V2 algorithm/API stage. Any future schema
+change still requires a new reviewed Alembic migration and a fresh read-only
+identity check first.

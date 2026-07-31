@@ -7,6 +7,7 @@ from app.schemas.common import (
     ApiSchema,
     AwareDatetime,
     NormalizedScore,
+    OptionalPreferenceScore,
     PositiveId,
     PreferenceScore,
 )
@@ -15,18 +16,20 @@ from app.schemas.common import (
 Username = Annotated[str, Field(min_length=1, max_length=80)]
 LocationName = Annotated[str, Field(min_length=1, max_length=100)]
 PriceLevel = Annotated[int, Field(ge=1, le=3)]
+DiscoveryLevel = Annotated[int, Field(ge=0, le=2)]
 
 
 class UserBase(ApiSchema):
     username: Username
     city: LocationName
     region: LocationName
-    sweet_preference: NormalizedScore
-    sour_preference: NormalizedScore
-    soft_preference: NormalizedScore
-    crisp_preference: NormalizedScore
+    sweet_preference: NormalizedScore | None = None
+    sour_preference: NormalizedScore | None = None
+    soft_preference: NormalizedScore | None = None
+    crisp_preference: NormalizedScore | None = None
     price_level: PriceLevel
     convenience_preference: NormalizedScore
+    discovery_level: DiscoveryLevel = 1
 
 
 class UserCreate(UserBase):
@@ -43,6 +46,7 @@ class UserUpdate(ApiSchema):
     crisp_preference: NormalizedScore | None = None
     price_level: PriceLevel | None = None
     convenience_preference: NormalizedScore | None = None
+    discovery_level: DiscoveryLevel | None = None
 
     @model_validator(mode="after")
     def require_non_null_update(self) -> "UserUpdate":
@@ -64,8 +68,18 @@ class UserRead(UserBase):
 
 class UserFruitPreferenceInput(ApiSchema):
     fruit_id: PositiveId
-    preference_score: PreferenceScore = Decimal("0")
+    preference_score: OptionalPreferenceScore = None
     is_forbidden: bool = False
+    has_tried: bool | None = None
+    willing_to_try: bool | None = None
+
+    @model_validator(mode="after")
+    def reject_untried_favorite(self) -> "UserFruitPreferenceInput":
+        if self.preference_score == 2 and self.has_tried is False:
+            raise ValueError(
+                "A fruit marked as especially loved cannot also be marked as not tried"
+            )
+        return self
 
 
 class UserFruitPreferencesUpdate(ApiSchema):

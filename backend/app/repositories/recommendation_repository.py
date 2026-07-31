@@ -11,6 +11,7 @@ from app.models import (
     RecommendationFeedback,
     RecommendationItem,
 )
+from app.services.recommendation_types import FeedbackEvent, HistoryEvent
 
 
 RECOMMENDATION_DETAIL_OPTIONS = (
@@ -102,15 +103,19 @@ def recent_fruit_ids(
     user_id: int,
     *,
     since: date,
+    until: date | None = None,
     limit: int = 30,
 ) -> tuple[int, ...]:
+    conditions = [
+        Recommendation.user_id == user_id,
+        Recommendation.recommendation_date >= since,
+    ]
+    if until is not None:
+        conditions.append(Recommendation.recommendation_date <= until)
     statement = (
         select(RecommendationItem.fruit_id)
         .join(Recommendation)
-        .where(
-            Recommendation.user_id == user_id,
-            Recommendation.recommendation_date >= since,
-        )
+        .where(*conditions)
         .order_by(
             Recommendation.recommendation_date.desc(),
             Recommendation.refresh_number.desc(),
@@ -127,8 +132,15 @@ def feedback_by_fruit(
     user_id: int,
     *,
     since: datetime,
+    until: datetime | None = None,
     limit: int = 100,
 ) -> dict[int, tuple[str, ...]]:
+    conditions = [
+        RecommendationFeedback.user_id == user_id,
+        RecommendationFeedback.created_at >= since,
+    ]
+    if until is not None:
+        conditions.append(RecommendationFeedback.created_at <= until)
     statement = (
         select(
             RecommendationItem.fruit_id,
@@ -139,10 +151,7 @@ def feedback_by_fruit(
             RecommendationItem.id
             == RecommendationFeedback.recommendation_item_id,
         )
-        .where(
-            RecommendationFeedback.user_id == user_id,
-            RecommendationFeedback.created_at >= since,
-        )
+        .where(*conditions)
         .order_by(RecommendationFeedback.created_at.desc())
         .limit(limit)
     )
@@ -153,6 +162,117 @@ def feedback_by_fruit(
         fruit_id: tuple(feedback_types)
         for fruit_id, feedback_types in grouped.items()
     }
+
+
+def history_events(
+    session: Session,
+    user_id: int,
+    *,
+    since: date,
+    until: date | None = None,
+    limit: int = 200,
+) -> tuple[HistoryEvent, ...]:
+    conditions = [
+        Recommendation.user_id == user_id,
+        Recommendation.recommendation_date >= since,
+    ]
+    if until is not None:
+        conditions.append(Recommendation.recommendation_date <= until)
+    statement = (
+        select(
+            Recommendation.recommendation_date,
+            RecommendationItem.fruit_id,
+            func.count(RecommendationItem.id),
+        )
+        .join(RecommendationItem, RecommendationItem.recommendation_id == Recommendation.id)
+        .where(*conditions)
+        .group_by(Recommendation.recommendation_date, RecommendationItem.fruit_id)
+        .order_by(Recommendation.recommendation_date.desc())
+        .limit(limit)
+    )
+    eaten_statement = (
+        select(
+            Recommendation.recommendation_date,
+            RecommendationItem.fruit_id,
+            func.count(RecommendationFeedback.id),
+        )
+        .join(RecommendationItem, RecommendationItem.recommendation_id == Recommendation.id)
+        .join(RecommendationFeedback, RecommendationFeedback.recommendation_item_id == RecommendationItem.id)
+        .where(
+            *conditions,
+            RecommendationFeedback.user_id == user_id,
+            RecommendationFeedback.feedback_type == "eaten",
+        )
+        .group_by(Recommendation.recommendation_date, RecommendationItem.fruit_id)
+    )
+    eaten = {
+        (occurred_on, fruit_id): int(count)
+        for occurred_on, fruit_id, count in session.execute(eaten_statement)
+    }
+    return tuple(
+        HistoryEvent(
+            fruit_id=int(fruit_id),
+            occurred_on=occurred_on,
+            times_shown=int(times_shown),
+            eaten_count=eaten.get((occurred_on, fruit_id), 0),
+        )
+        for occurred_on, fruit_id, times_shown in session.execute(statement)
+    )
+
+
+def feedback_events(
+    session: Session,
+    user_id: int,
+    *,
+    since: datetime,
+    until: datetime | None = None,
+    limit: int = 200,
+) -> tuple[FeedbackEvent, ...]:
+    conditions = [
+        Recommendation.user_id == user_id,
+        RecommendationFeedback.user_id == user_id,
+        RecommendationFeedback.created_at >= since,
+    ]
+    if until is not None:
+        conditions.append(RecommendationFeedback.created_at <= until)
+    statement = (
+        select(
+            RecommendationItem.fruit_id,
+            RecommendationFeedback.feedback_type,
+            RecommendationFeedback.created_at,
+        )
+        .join(Recommendation, Recommendation.id == RecommendationItem.recommendation_id)
+        .join(RecommendationFeedback, RecommendationFeedback.recommendation_item_id == RecommendationItem.id)
+        .where(*conditions)
+        .order_by(RecommendationFeedback.created_at.desc())
+        .limit(limit)
+    )
+    return tuple(
+        FeedbackEvent(
+            fruit_id=int(fruit_id),
+            feedback_type=feedback_type,
+            occurred_at=created_at,
+        )
+        for fruit_id, feedback_type, created_at in session.execute(statement)
+    )
+
+
+def previous_pairs(
+    session: Session,
+    user_id: int,
+    *,
+    since: date,
+    until: date | None = None,
+    limit: int = 30,
+) -> tuple[frozenset[int], ...]:
+    recommendations = list_history(session, user_id, limit=limit)
+    return tuple(
+        frozenset(item.fruit_id for item in recommendation.items)
+        for recommendation in recommendations
+        if recommendation.recommendation_date >= since
+        and (until is None or recommendation.recommendation_date <= until)
+        and len(recommendation.items) >= 2
+    )
 
 
 def add_recommendation(
@@ -208,11 +328,14 @@ __all__ = [
     "add_feedback",
     "add_recommendation",
     "feedback_by_fruit",
+    "feedback_events",
     "get_active_recommendation",
     "get_feedback",
     "get_item",
     "get_recommendation",
     "list_history",
+    "history_events",
     "next_refresh_number",
+    "previous_pairs",
     "recent_fruit_ids",
 ]

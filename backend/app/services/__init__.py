@@ -13,7 +13,9 @@ from app.services.recommendation_service import (
     select_recommendation_pair,
 )
 from app.services.recommendation_types import (
+    FeedbackEvent,
     FruitPreference,
+    HistoryEvent,
     NutritionProfile,
     PairSelection,
     RecommendationContext,
@@ -29,6 +31,8 @@ from app.services.recommendation_types import (
 
 __all__ = [
     "FruitPreference",
+    "FeedbackEvent",
+    "HistoryEvent",
     "InvalidRecommendationInputError",
     "NoRecommendationCandidatesError",
     "NutritionProfile",

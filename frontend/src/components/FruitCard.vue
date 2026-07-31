@@ -50,6 +50,10 @@ const rankLabels = {
         </span>
       </header>
 
+      <p v-if="item.pair_score != null" class="score-detail">
+        本水果分 {{ Math.round((item.individual_score ?? item.score) * 100) }} · 组合分 {{ Math.round(item.pair_score * 100) }}
+      </p>
+
       <p class="fruit-description">{{ item.fruit.description }}</p>
 
       <div class="portion-row">

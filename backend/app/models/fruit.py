@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
+    ARRAY,
     Boolean,
     CheckConstraint,
     ForeignKey,
@@ -15,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
     true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,6 +32,7 @@ class Fruit(TimestampMixin, Base):
     __tablename__ = "fruits"
     __table_args__ = (
         UniqueConstraint("name", name="uq_fruits_name"),
+        UniqueConstraint("code", name="uq_fruits_code"),
         CheckConstraint(
             "sweet_score BETWEEN 0 AND 1",
             name="ck_fruits_sweet_score_range",
@@ -54,6 +57,50 @@ class Fruit(TimestampMixin, Base):
             "average_price_level BETWEEN 1 AND 3",
             name="ck_fruits_average_price_level_range",
         ),
+        CheckConstraint(
+            "default_portion_grams > 0",
+            name="ck_fruits_default_portion_grams_positive",
+        ),
+        CheckConstraint(
+            "preparation_difficulty BETWEEN 0 AND 1",
+            name="ck_fruits_preparation_difficulty_range",
+        ),
+        CheckConstraint(
+            "portability_score BETWEEN 0 AND 1",
+            name="ck_fruits_portability_score_range",
+        ),
+        CheckConstraint(
+            "messiness_score BETWEEN 0 AND 1",
+            name="ck_fruits_messiness_score_range",
+        ),
+        CheckConstraint(
+            "storage_difficulty BETWEEN 0 AND 1",
+            name="ck_fruits_storage_difficulty_range",
+        ),
+        CheckConstraint(
+            "aroma_intensity BETWEEN 0 AND 1",
+            name="ck_fruits_aroma_intensity_range",
+        ),
+        CheckConstraint(
+            "commonness_score BETWEEN 0 AND 1",
+            name="ck_fruits_commonness_score_range",
+        ),
+        CheckConstraint(
+            "novelty_level BETWEEN 0 AND 2",
+            name="ck_fruits_novelty_level_range",
+        ),
+        CheckConstraint(
+            "consumption_mode IN ('direct', 'peel', 'cut', 'ingredient')",
+            name="ck_fruits_consumption_mode_values",
+        ),
+        CheckConstraint(
+            "daily_recommendation_role IN ('main', 'exploration', 'supporting')",
+            name="ck_fruits_daily_role_values",
+        ),
+        CheckConstraint(
+            "data_quality IN ('high', 'medium', 'low')",
+            name="ck_fruits_data_quality_values",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -61,7 +108,17 @@ class Fruit(TimestampMixin, Base):
         Identity(always=False),
         primary_key=True,
     )
+    code: Mapped[str] = mapped_column(
+        String(60),
+        nullable=False,
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
+    aliases: Mapped[list[str]] = mapped_column(
+        ARRAY(String(100)),
+        nullable=False,
+        default=list,
+        server_default=text("ARRAY[]::varchar[]"),
+    )
     category: Mapped[str] = mapped_column(String(80), nullable=False)
     taste: Mapped[str] = mapped_column(String(120), nullable=False)
     sweet_score: Mapped[Decimal] = mapped_column(
@@ -89,6 +146,79 @@ class Fruit(TimestampMixin, Base):
         nullable=False,
     )
     default_portion: Mapped[str] = mapped_column(String(80), nullable=False)
+    default_portion_grams: Mapped[Decimal] = mapped_column(
+        Numeric(7, 2),
+        nullable=False,
+        default=Decimal("100"),
+        server_default=text("100"),
+    )
+    direct_eating: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=true(),
+    )
+    consumption_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="direct",
+        server_default=text("'direct'"),
+    )
+    daily_recommendation_role: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="main",
+        server_default=text("'main'"),
+    )
+    preparation_difficulty: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+        default=Decimal("0.5"),
+        server_default=text("0.5"),
+    )
+    portability_score: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+        default=Decimal("0.5"),
+        server_default=text("0.5"),
+    )
+    messiness_score: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+        default=Decimal("0.5"),
+        server_default=text("0.5"),
+    )
+    storage_difficulty: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+        default=Decimal("0.5"),
+        server_default=text("0.5"),
+    )
+    aroma_intensity: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+        default=Decimal("0.5"),
+        server_default=text("0.5"),
+    )
+    commonness_score: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+        default=Decimal("0.5"),
+        server_default=text("0.5"),
+    )
+    novelty_level: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+        default=1,
+        server_default=text("1"),
+    )
+    data_quality: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="low",
+        server_default=text("'low'"),
+    )
+    data_source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     is_active: Mapped[bool] = mapped_column(
@@ -183,6 +313,18 @@ class FruitSeason(CreatedAtMixin, Base):
             name="uq_fruit_seasons_fruit_region_months",
         ),
         CheckConstraint(
+            "region_level IN ('city', 'province', 'area', 'national')",
+            name="ck_fruit_seasons_region_level_values",
+        ),
+        CheckConstraint(
+            "availability_score BETWEEN 0 AND 1",
+            name="ck_fruit_seasons_availability_score_range",
+        ),
+        CheckConstraint(
+            "supply_status IN ('available', 'unknown', 'unavailable')",
+            name="ck_fruit_seasons_supply_status_values",
+        ),
+        CheckConstraint(
             "start_month BETWEEN 1 AND 12",
             name="ck_fruit_seasons_start_month_range",
         ),
@@ -212,11 +354,29 @@ class FruitSeason(CreatedAtMixin, Base):
         nullable=False,
     )
     region: Mapped[str] = mapped_column(String(100), nullable=False)
+    region_level: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="national",
+        server_default=text("'national'"),
+    )
     start_month: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     end_month: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     season_score: Mapped[Decimal] = mapped_column(
         Numeric(4, 3),
         nullable=False,
+    )
+    availability_score: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+        default=Decimal("0.45"),
+        server_default=text("0.45"),
+    )
+    supply_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="unknown",
+        server_default=text("'unknown'"),
     )
 
     fruit: Mapped[Fruit] = relationship(back_populates="seasons")

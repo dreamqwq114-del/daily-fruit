@@ -54,4 +54,40 @@ describe('FruitPreferencePicker', () => {
     expect(wrapper.text()).toContain('香蕉')
     expect(wrapper.text()).not.toContain('苹果')
   })
+
+  it('captures familiarity and willingness separately from hard exclusions', async () => {
+    const wrapper = mountPicker()
+    const buttons = wrapper.findAll('.fruit-choice-button')
+    const eatenButton = buttons.find((button) => button.text() === '吃过')
+    const unwillingButton = buttons.find((button) => button.text() === '暂不想尝试')
+    await eatenButton.trigger('click')
+    await unwillingButton.trigger('click')
+    const latest = wrapper.emitted('update:modelValue').at(-1)[0]
+    expect(latest.triedIds).toEqual([1])
+    expect(latest.notWillingToTryIds).toEqual([1])
+    expect(latest.forbiddenIds).toEqual([])
+  })
+
+  it('removes favorite when a fruit is marked as not tried', async () => {
+    const wrapper = mount(FruitPreferencePicker, {
+      props: {
+        fruits,
+        modelValue: {
+          favoriteIds: [1],
+          forbiddenIds: [],
+          triedIds: [],
+          notTriedIds: [],
+          willingToTryIds: [],
+          notWillingToTryIds: [],
+          legacyPreferences: [],
+        },
+      },
+    })
+    const buttons = wrapper.findAll('.fruit-choice-button')
+    const notTriedButton = buttons.find((button) => button.text() === '没吃过')
+    await notTriedButton.trigger('click')
+    const latest = wrapper.emitted('update:modelValue').at(-1)[0]
+    expect(latest.favoriteIds).toEqual([])
+    expect(latest.notTriedIds).toEqual([1])
+  })
 })

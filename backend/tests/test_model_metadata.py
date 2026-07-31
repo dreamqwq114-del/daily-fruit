@@ -165,7 +165,7 @@ def test_user_and_fruit_score_types_and_checks() -> None:
         4,
         3,
     )
-    assert len(check_sql(users)) == 6
+    assert len(check_sql(users)) == 7
 
     fruits = table("fruits")
     assert_numeric(
@@ -180,8 +180,8 @@ def test_user_and_fruit_score_types_and_checks() -> None:
         4,
         3,
     )
-    assert unique_column_sets(fruits) == {("name",)}
-    assert len(check_sql(fruits)) == 6
+    assert unique_column_sets(fruits) == {("name",), ("code",)}
+    assert len(check_sql(fruits)) == 17
     assert fruits.c.is_active.server_default is not None
 
 
@@ -211,6 +211,9 @@ def test_nutrition_and_season_constraints_match_design() -> None:
         "ck_fruit_seasons_start_month_range",
         "ck_fruit_seasons_end_month_range",
         "ck_fruit_seasons_score_range",
+        "ck_fruit_seasons_region_level_values",
+        "ck_fruit_seasons_availability_score_range",
+        "ck_fruit_seasons_supply_status_values",
     }
     assert {
         index.name: index_expression_names(index)
@@ -224,6 +227,9 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     preferences = table("user_fruit_preferences")
     assert unique_column_sets(preferences) == {("user_id", "fruit_id")}
     assert "ck_user_fruit_preferences_score_range" in check_sql(preferences)
+    assert preferences.c.preference_score.nullable is True
+    assert preferences.c.has_tried.nullable is True
+    assert preferences.c.willing_to_try.nullable is True
 
     recommendations = table("recommendations")
     assert unique_column_sets(recommendations) == {
@@ -243,6 +249,9 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     assert isinstance(items.c.reasons.type, JSONB)
     assert items.c.reasons.server_default is not None
     assert "ck_recommendation_items_reasons_array" in check_sql(items)
+    assert "ck_recommendation_items_individual_score_range" in check_sql(items)
+    assert "ck_recommendation_items_pair_score_range" in check_sql(items)
+    assert "ck_recommendation_items_nutrition_pair_score_range" in check_sql(items)
 
     feedback = table("recommendation_feedback")
     assert unique_column_sets(feedback) == {

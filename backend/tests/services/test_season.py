@@ -27,8 +27,8 @@ def test_season_uses_highest_matching_regional_score() -> None:
     result = evaluate_season(
         [
             SeasonWindow("全国", 5, 9, 0.8),
-            SeasonWindow("华东", 6, 8, 0.95),
-            SeasonWindow("华南", 5, 10, 1.0),
+            SeasonWindow("华东", 6, 8, 0.95, region_level="area"),
+            SeasonWindow("华南", 5, 10, 1.0, region_level="area"),
         ],
         region="华东",
         month=7,
@@ -53,7 +53,7 @@ def test_known_but_out_of_season_is_marked_inapplicable() -> None:
 
 def test_missing_relevant_season_data_uses_penalty_not_exclusion() -> None:
     result = evaluate_season(
-        [SeasonWindow("华南", 5, 9, 0.9)],
+        [SeasonWindow("华南", 5, 9, 0.9, region_level="area")],
         region="华东",
         month=7,
     )

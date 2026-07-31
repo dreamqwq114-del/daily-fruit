@@ -94,6 +94,8 @@ def replace_fruit_preferences(
                 item.fruit_id,
                 item.preference_score,
                 item.is_forbidden,
+                item.has_tried,
+                item.willing_to_try,
             )
             for item in payload.preferences
         ),

@@ -41,6 +41,12 @@ class ReasonCode(StrEnum):
     NUTRITION_DIVERSITY = "nutrition_diversity"
     NUTRITION_COMPLEMENT = "nutrition_complement"
     FEEDBACK_MATCH = "feedback_match"
+    EXPLICIT_PREFERENCE = "explicit_preference"
+    EXPLORATION = "exploration"
+    AVAILABILITY = "availability"
+    HISTORY_FRESHNESS = "history_freshness"
+    PAIR_NOVELTY = "pair_novelty"
+    DEFAULT_MATCH = "default_match"
 
 
 class ReasonComponent(StrEnum):
@@ -52,12 +58,20 @@ class ReasonComponent(StrEnum):
     PRICE_MATCH_SCORE = "price_match_score"
     COMPLEMENT_SCORE = "complement_score"
     FEEDBACK_ADJUSTMENT = "feedback_adjustment"
+    EXPLICIT_PREFERENCE = "explicit_preference"
+    TASTE_MATCH = "taste_match"
+    AVAILABILITY_SCORE = "availability_score"
+    HISTORY_FRESHNESS = "history_freshness"
+    PAIR_SCORE = "pair_score"
+    PAIR_NOVELTY = "pair_novelty"
+    FAMILIARITY = "familiarity"
 
 
 class RecommendationReason(ApiSchema):
     code: ReasonCode
     message: Annotated[str, Field(min_length=1, max_length=200)]
     component: ReasonComponent
+    contribution: RecommendationScore = 0
 
 
 Reasons = Annotated[
@@ -72,6 +86,9 @@ class RecommendationItemCreate(ApiSchema):
     score: RecommendationScore
     rank: Rank
     reasons: Reasons
+    individual_score: RecommendationScore | None = None
+    pair_score: RecommendationScore | None = None
+    nutrition_pair_score: RecommendationScore | None = None
 
 
 class RecommendationItemRead(RecommendationItemCreate):

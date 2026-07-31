@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -110,6 +110,18 @@ class RecommendationItem(CreatedAtMixin, Base):
             name="ck_recommendation_items_score_range",
         ),
         CheckConstraint(
+            "individual_score BETWEEN 0 AND 1",
+            name="ck_recommendation_items_individual_score_range",
+        ),
+        CheckConstraint(
+            "pair_score BETWEEN 0 AND 1",
+            name="ck_recommendation_items_pair_score_range",
+        ),
+        CheckConstraint(
+            "nutrition_pair_score BETWEEN 0 AND 1",
+            name="ck_recommendation_items_nutrition_pair_score_range",
+        ),
+        CheckConstraint(
             "rank IN (1, 2)",
             name="ck_recommendation_items_rank_values",
         ),
@@ -139,8 +151,20 @@ class RecommendationItem(CreatedAtMixin, Base):
         nullable=False,
     )
     score: Mapped[Decimal] = mapped_column(Numeric(8, 6), nullable=False)
+    individual_score: Mapped[Decimal] = mapped_column(
+        Numeric(8, 6),
+        nullable=False,
+    )
+    pair_score: Mapped[Decimal] = mapped_column(
+        Numeric(8, 6),
+        nullable=False,
+    )
+    nutrition_pair_score: Mapped[Decimal] = mapped_column(
+        Numeric(8, 6),
+        nullable=False,
+    )
     rank: Mapped[int] = mapped_column(SmallInteger, nullable=False)
-    reasons: Mapped[list[dict[str, str]]] = mapped_column(
+    reasons: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB,
         nullable=False,
         default=list,

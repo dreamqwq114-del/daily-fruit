@@ -130,7 +130,7 @@
 - 前端对业务数据只能调用 FastAPI；Supabase 客户端仅限 Auth，不得包含数据库 URL、
   secret key 或 service role key。
 - S6 生产迁移只允许新增已审查的 `users.auth_user_id` 绑定，不得修改 seed 或其他表。
-- S6 已部署：远端迁移为 `0004`，FastAPI Cloud 业务 API 强制 JWT，GitHub Pages 已连接；
+- S6 已部署：远端迁移为 `0004`；V2 阶段后续迁移为 `0005`，FastAPI Cloud 业务 API 强制 JWT，GitHub Pages 已连接；
   后续不得退回 localStorage user ID 或公开无认证写接口。
 - 不得启用 Supabase 匿名登录；后端必须拒绝 `is_anonymous=true` 的 token。
 - 阶段七明确关闭注册邮箱确认；注册必须立即返回 session，不得恢复注册确认邮件，除非先完成新的安全设计审查。
@@ -138,3 +138,15 @@
 - GitHub Pages 发布必须在构建时验证公开 API URL、Supabase URL 和 publishable key，
   任何一项缺失都不得生成可部署产物。
 - 如后续任务发现必须改变 schema，立即停止并先更新设计与授权门禁。
+## V2 recommendation rules
+
+- `RecommendationUser`, `RecommendationFruit` and `RecommendationContext` are
+  the pure-algorithm boundary; the algorithm must not hold a database session.
+- V2 fruit identity, familiarity, availability and score fields are owned by
+  SQLAlchemy/Alembic and must stay synchronized with the actual Daily Fruit
+  Supabase project before seed or migration work.
+- `has_tried=NULL` means unknown; do not silently convert it to tried or
+  forbidden. A favorite and an explicit not-tried answer are an invalid
+  combination at the API boundary.
+- Run backend tests, frontend tests/build, migration SQL checks and a secret
+  scan after changes. Do not claim seed idempotence without running it twice.

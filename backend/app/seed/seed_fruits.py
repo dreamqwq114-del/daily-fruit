@@ -23,13 +23,15 @@ from app.models import Fruit, FruitNutrition, FruitSeason
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
-EXPECTED_ALEMBIC_VERSION = "0004"
+EXPECTED_ALEMBIC_VERSION = "0005"
 
 
 class FruitSeed(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
+    code: str = Field(min_length=1, max_length=60)
     name: str = Field(min_length=1, max_length=100)
+    aliases: list[str] = Field(default_factory=list)
     category: str = Field(min_length=1, max_length=80)
     taste: str = Field(min_length=1, max_length=120)
     sweet_score: Decimal = Field(ge=0, le=1)
@@ -39,6 +41,21 @@ class FruitSeed(BaseModel):
     convenience_score: Decimal = Field(ge=0, le=1)
     average_price_level: int = Field(ge=1, le=3)
     default_portion: str = Field(min_length=1, max_length=80)
+    default_portion_grams: Decimal = Field(gt=0)
+    direct_eating: bool
+    consumption_mode: str = Field(pattern="^(direct|peel|cut|ingredient)$")
+    daily_recommendation_role: str = Field(
+        pattern="^(main|exploration|supporting)$"
+    )
+    preparation_difficulty: Decimal = Field(ge=0, le=1)
+    portability_score: Decimal = Field(ge=0, le=1)
+    messiness_score: Decimal = Field(ge=0, le=1)
+    storage_difficulty: Decimal = Field(ge=0, le=1)
+    aroma_intensity: Decimal = Field(ge=0, le=1)
+    commonness_score: Decimal = Field(ge=0, le=1)
+    novelty_level: int = Field(ge=0, le=2)
+    data_quality: str = Field(pattern="^(high|medium|low)$")
+    data_source_note: str | None = Field(default=None, max_length=500)
     image_url: str | None = None
     description: str = Field(min_length=1)
     is_active: bool = True
@@ -61,9 +78,15 @@ class SeasonSeed(BaseModel):
 
     fruit_name: str = Field(min_length=1, max_length=100)
     region: str = Field(min_length=1, max_length=100)
+    region_level: str = Field(default="national", pattern="^(city|province|area|national)$")
     start_month: int = Field(ge=1, le=12)
     end_month: int = Field(ge=1, le=12)
     season_score: Decimal = Field(ge=0, le=1)
+    availability_score: Decimal = Field(default=Decimal("0.45"), ge=0, le=1)
+    supply_status: str = Field(
+        default="unknown",
+        pattern="^(available|unknown|unavailable)$",
+    )
 
 
 @dataclass(frozen=True)
@@ -99,10 +122,18 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
         NutritionSeed.model_validate(item)
         for item in read_csv(data_root / "nutrition_demo.csv")
     )
-    seasons = tuple(
-        SeasonSeed.model_validate(item)
-        for item in read_csv(data_root / "seasons_demo.csv")
-    )
+    season_rows = []
+    for item in read_csv(data_root / "seasons_demo.csv"):
+        row = dict(item)
+        region = row.get("region", "")
+        row.setdefault("region_level", "national" if region == "全国" else "area")
+        row.setdefault(
+            "availability_score",
+            "0.9" if region != "全国" else "0.8",
+        )
+        row.setdefault("supply_status", "available")
+        season_rows.append(SeasonSeed.model_validate(row))
+    seasons = tuple(season_rows)
 
     fruit_names = [item.name for item in fruits]
     nutrition_names = [item.fruit_name for item in nutritions]
@@ -133,7 +164,13 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
 
 
 def fruit_rows(dataset: SeedDataset) -> list[dict[str, object]]:
-    return [item.model_dump() for item in dataset.fruits]
+    rows: list[dict[str, object]] = []
+    for item in dataset.fruits:
+        row = item.model_dump()
+        if not row["aliases"]:
+            row["aliases"] = postgresql.array([], type_=String(100))
+        rows.append(row)
+    return rows
 
 
 def build_fruit_statement(dataset: SeedDataset) -> object:
@@ -143,6 +180,8 @@ def build_fruit_statement(dataset: SeedDataset) -> object:
         name: getattr(excluded, name)
         for name in (
             "category",
+            "code",
+            "aliases",
             "taste",
             "sweet_score",
             "sour_score",
@@ -151,6 +190,19 @@ def build_fruit_statement(dataset: SeedDataset) -> object:
             "convenience_score",
             "average_price_level",
             "default_portion",
+            "default_portion_grams",
+            "direct_eating",
+            "consumption_mode",
+            "daily_recommendation_role",
+            "preparation_difficulty",
+            "portability_score",
+            "messiness_score",
+            "storage_difficulty",
+            "aroma_intensity",
+            "commonness_score",
+            "novelty_level",
+            "data_quality",
+            "data_source_note",
             "image_url",
             "description",
             "is_active",
@@ -232,9 +284,12 @@ def season_values_table(dataset: SeedDataset) -> object:
     seed_values = values(
         column("fruit_name", String(100)),
         column("region", String(100)),
+        column("region_level", String(20)),
         column("start_month", FruitSeason.start_month.type),
         column("end_month", FruitSeason.end_month.type),
         column("season_score", FruitSeason.season_score.type),
+        column("availability_score", FruitSeason.season_score.type),
+        column("supply_status", String(20)),
         name="seed_season",
     )
     return seed_values.data(
@@ -242,9 +297,12 @@ def season_values_table(dataset: SeedDataset) -> object:
             (
                 item.fruit_name,
                 item.region,
+                item.region_level,
                 item.start_month,
                 item.end_month,
                 item.season_score,
+                item.availability_score,
+                item.supply_status,
             )
             for item in dataset.seasons
         ]
@@ -256,17 +314,23 @@ def build_season_statement(dataset: SeedDataset) -> object:
     selected = select(
         Fruit.id,
         seed_values.c.region,
+        seed_values.c.region_level,
         seed_values.c.start_month,
         seed_values.c.end_month,
         seed_values.c.season_score,
+        seed_values.c.availability_score,
+        seed_values.c.supply_status,
     ).join(seed_values, Fruit.name == seed_values.c.fruit_name)
     statement = insert(FruitSeason).from_select(
         (
             "fruit_id",
             "region",
+            "region_level",
             "start_month",
             "end_month",
             "season_score",
+            "availability_score",
+            "supply_status",
         ),
         selected,
     )
@@ -277,7 +341,12 @@ def build_season_statement(dataset: SeedDataset) -> object:
             FruitSeason.start_month,
             FruitSeason.end_month,
         ],
-        set_={"season_score": statement.excluded.season_score},
+        set_={
+            "region_level": statement.excluded.region_level,
+            "season_score": statement.excluded.season_score,
+            "availability_score": statement.excluded.availability_score,
+            "supply_status": statement.excluded.supply_status,
+        },
     )
 
 

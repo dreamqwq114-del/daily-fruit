@@ -46,19 +46,19 @@ class User(TimestampMixin, Base):
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint(
-            "sweet_preference BETWEEN 0 AND 1",
+            "sweet_preference IS NULL OR sweet_preference BETWEEN 0 AND 1",
             name="ck_users_sweet_preference_range",
         ),
         CheckConstraint(
-            "sour_preference BETWEEN 0 AND 1",
+            "sour_preference IS NULL OR sour_preference BETWEEN 0 AND 1",
             name="ck_users_sour_preference_range",
         ),
         CheckConstraint(
-            "soft_preference BETWEEN 0 AND 1",
+            "soft_preference IS NULL OR soft_preference BETWEEN 0 AND 1",
             name="ck_users_soft_preference_range",
         ),
         CheckConstraint(
-            "crisp_preference BETWEEN 0 AND 1",
+            "crisp_preference IS NULL OR crisp_preference BETWEEN 0 AND 1",
             name="ck_users_crisp_preference_range",
         ),
         CheckConstraint(
@@ -68,6 +68,10 @@ class User(TimestampMixin, Base):
         CheckConstraint(
             "price_level BETWEEN 1 AND 3",
             name="ck_users_price_level_range",
+        ),
+        CheckConstraint(
+            "discovery_level BETWEEN 0 AND 2",
+            name="ck_users_discovery_level_range",
         ),
     )
 
@@ -85,26 +89,32 @@ class User(TimestampMixin, Base):
     username: Mapped[str] = mapped_column(String(80), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)
     region: Mapped[str] = mapped_column(String(100), nullable=False)
-    sweet_preference: Mapped[Decimal] = mapped_column(
+    sweet_preference: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 3),
-        nullable=False,
+        nullable=True,
     )
-    sour_preference: Mapped[Decimal] = mapped_column(
+    sour_preference: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 3),
-        nullable=False,
+        nullable=True,
     )
-    soft_preference: Mapped[Decimal] = mapped_column(
+    soft_preference: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 3),
-        nullable=False,
+        nullable=True,
     )
-    crisp_preference: Mapped[Decimal] = mapped_column(
+    crisp_preference: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 3),
-        nullable=False,
+        nullable=True,
     )
     price_level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     convenience_preference: Mapped[Decimal] = mapped_column(
         Numeric(4, 3),
         nullable=False,
+    )
+    discovery_level: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+        default=1,
+        server_default=text("1"),
     )
 
     fruit_preferences: Mapped[list[UserFruitPreference]] = relationship(
@@ -133,7 +143,7 @@ class UserFruitPreference(TimestampMixin, Base):
             name="uq_user_fruit_preferences_user_fruit",
         ),
         CheckConstraint(
-            "preference_score BETWEEN -1 AND 2",
+            "preference_score IS NULL OR preference_score BETWEEN -1 AND 2",
             name="ck_user_fruit_preferences_score_range",
         ),
         Index(
@@ -157,11 +167,9 @@ class UserFruitPreference(TimestampMixin, Base):
         ForeignKey("public.fruits.id", ondelete="RESTRICT"),
         nullable=False,
     )
-    preference_score: Mapped[Decimal] = mapped_column(
+    preference_score: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 2),
-        nullable=False,
-        default=Decimal("0"),
-        server_default=text("0"),
+        nullable=True,
     )
     is_forbidden: Mapped[bool] = mapped_column(
         Boolean,
@@ -169,6 +177,8 @@ class UserFruitPreference(TimestampMixin, Base):
         default=False,
         server_default=false(),
     )
+    has_tried: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    willing_to_try: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
 
     user: Mapped[User] = relationship(back_populates="fruit_preferences")
     fruit: Mapped[Fruit] = relationship(back_populates="user_preferences")

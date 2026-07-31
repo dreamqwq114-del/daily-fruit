@@ -98,10 +98,13 @@ def test_dislike_can_be_scored_when_strict_exclusion_is_disabled() -> None:
     assert [fruit.id for fruit in eligible] == [1, 2]
 
 
-def test_known_out_of_season_is_filtered_but_missing_data_is_kept() -> None:
+def test_known_out_of_season_is_kept_with_a_score_penalty() -> None:
     fruits = [
         make_fruit(1, seasons=(SeasonWindow("全国", 1, 3, 0.9),)),
-        make_fruit(2, seasons=(SeasonWindow("华南", 1, 12, 0.9),)),
+        make_fruit(
+            2,
+            seasons=(SeasonWindow("华南", 1, 12, 0.9, region_level="area"),),
+        ),
         make_fruit(3),
     ]
 
@@ -111,8 +114,9 @@ def test_known_out_of_season_is_filtered_but_missing_data_is_kept() -> None:
         RecommendationContext(month=7),
     )
 
-    assert [fruit.id for fruit in eligible] == [2, 3]
+    assert [fruit.id for fruit in eligible] == [1, 2, 3]
     scores = score_by_id(eligible)
+    assert scores[1].scores.season_score == pytest.approx(0.0)
     assert scores[2].scores.season_score == pytest.approx(0.35)
 
 
@@ -135,12 +139,12 @@ def test_each_subscore_and_total_are_normalized() -> None:
     for result in results:
         assert 0 <= result.base_score <= 1
         for field_name in (
-            "season_score",
-            "preference_score",
-            "nutrition_diversity_score",
+            "availability_and_season",
+            "explicit_preference",
             "history_diversity_score",
             "convenience_score",
             "price_match_score",
+            "taste_match",
         ):
             assert 0 <= getattr(result.scores, field_name) <= 1
 
@@ -153,12 +157,13 @@ def test_base_score_uses_approved_weight_formula() -> None:
     )[0]
     scores = result.scores
     expected = (
-        scores.season_score * 0.35
-        + scores.preference_score * 0.25
-        + scores.nutrition_diversity_score * 0.20
-        + scores.history_diversity_score * 0.10
-        + scores.convenience_score * 0.05
-        + scores.price_match_score * 0.05
+        scores.explicit_preference * 0.30
+        + scores.taste_match * 0.25
+        + scores.availability_and_season * 0.20
+        + scores.price_match_score * 0.10
+        + scores.convenience_score * 0.10
+        + scores.history_diversity_score * 0.05
+        + scores.feedback_adjustment
     )
 
     assert result.base_score == pytest.approx(expected)
@@ -168,7 +173,10 @@ def test_in_season_fruit_scores_higher_when_other_factors_match() -> None:
     scores = score_by_id(
         [
             make_fruit(1, seasons=(SeasonWindow("全国", 1, 12, 1.0),)),
-            make_fruit(2, seasons=(SeasonWindow("华南", 1, 12, 1.0),)),
+            make_fruit(
+                2,
+                seasons=(SeasonWindow("华南", 1, 12, 1.0, region_level="area"),),
+            ),
         ]
     )
 
@@ -227,10 +235,9 @@ def test_feedback_adjusts_preference_and_is_bounded() -> None:
         ),
     )
 
-    assert positive[1].scores.feedback_adjustment == pytest.approx(0.25)
-    assert positive[1].scores.preference_score == 1
-    assert negative[1].scores.feedback_adjustment == pytest.approx(-0.35)
-    assert negative[1].scores.preference_score < negative[2].scores.preference_score
+    assert positive[1].scores.feedback_adjustment == pytest.approx(0.15)
+    assert negative[1].scores.feedback_adjustment == pytest.approx(-0.15)
+    assert negative[1].base_score < negative[2].base_score
 
 
 def test_input_order_does_not_change_deterministic_score_order() -> None:

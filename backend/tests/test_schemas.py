@@ -186,6 +186,17 @@ def test_fruit_preference_rejects_out_of_range_score(score: str) -> None:
         )
 
 
+def test_fruit_preference_rejects_untried_favorite_combination() -> None:
+    with pytest.raises(ValidationError, match="especially loved"):
+        UserFruitPreferenceInput.model_validate(
+            {
+                "fruit_id": 1,
+                "preference_score": 2,
+                "has_tried": False,
+            }
+        )
+
+
 def test_preference_batch_rejects_duplicate_fruit_ids() -> None:
     with pytest.raises(ValidationError, match="only once"):
         UserFruitPreferencesUpdate.model_validate(
@@ -202,8 +213,8 @@ def test_reason_structure_is_strict_and_has_stable_field_order() -> None:
     reason = RecommendationReason.model_validate(valid_reasons()[0])
     payload = json.loads(reason.model_dump_json())
 
-    assert list(payload) == ["code", "message", "component"]
-    assert payload == valid_reasons()[0]
+    assert list(payload) == ["code", "message", "component", "contribution"]
+    assert payload == {**valid_reasons()[0], "contribution": 0.0}
 
     with pytest.raises(ValidationError):
         RecommendationReason.model_validate(

@@ -54,12 +54,12 @@ def test_equal_feature_values_use_neutral_score_without_division_by_zero() -> No
     assert normalized[2] == profile(0.5)
 
 
-def test_missing_nutrition_uses_neutral_profile() -> None:
+def test_missing_nutrition_remains_missing_instead_of_becoming_neutral() -> None:
     normalized = normalize_nutrition_profiles(
         [make_fruit(1, profile(10)), make_fruit(2, None)]
     )
 
-    assert normalized[2] == profile(0.5)
+    assert normalized[2] == NutritionProfile()
 
 
 def test_duplicate_fruit_id_is_rejected() -> None:

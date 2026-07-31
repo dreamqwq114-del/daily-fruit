@@ -61,11 +61,9 @@ def test_result_contains_two_ranked_distinct_items_and_normalized_total() -> Non
 
     assert [item.rank for item in result.items] == [1, 2]
     assert len({item.fruit.id for item in result.items}) == 2
-    assert result.items[0].complement_score is None
-    assert result.items[1].complement_score is not None
-    assert result.total_score == (
-        result.items[0].score + result.items[1].score
-    ) / 2
+    assert result.items[0].pair_score is not None
+    assert result.items[1].pair_score is not None
+    assert result.total_score == result.items[0].pair_score
     assert 0 <= result.total_score <= 1
 
 
@@ -80,7 +78,7 @@ def test_each_item_has_two_to_four_stable_structured_reasons() -> None:
         assert 2 <= len(item.reasons) <= 4
         for reason in item.reasons:
             payload = json.loads(reason.model_dump_json())
-            assert list(payload) == ["code", "message", "component"]
+            assert list(payload) == ["code", "message", "component", "contribution"]
 
 
 def test_in_season_reason_only_appears_for_actual_in_season_data() -> None:
@@ -88,7 +86,7 @@ def test_in_season_reason_only_appears_for_actual_in_season_data() -> None:
     fruits[0] = make_fruit(
         1,
         fruits[0].nutrition,
-        seasons=(SeasonWindow("华南", 1, 12, 1.0),),
+        seasons=(SeasonWindow("华南", 1, 12, 1.0, region_level="area"),),
     )
     result = recommend_fruits(
         fruits,
@@ -99,9 +97,9 @@ def test_in_season_reason_only_appears_for_actual_in_season_data() -> None:
     for item in result.items:
         reason_codes = {reason.code for reason in item.reasons}
         if item.fruit.id == 1:
-            assert "in_season" not in reason_codes
+            assert "availability" not in reason_codes
         else:
-            assert "in_season" in reason_codes
+            assert "availability" in reason_codes
 
 
 def test_recent_fruit_does_not_claim_it_was_not_recently_recommended() -> None:

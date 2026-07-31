@@ -34,6 +34,10 @@ test('fruit preference mapping uses favorite and forbidden selections', () => {
   assert.deepEqual(selection, {
     favoriteIds: [1],
     forbiddenIds: [3],
+    triedIds: [],
+    notTriedIds: [],
+    willingToTryIds: [],
+    notWillingToTryIds: [],
     legacyPreferences: [
       { fruit_id: 2, preference_score: -1, is_forbidden: false },
     ],
@@ -42,9 +46,9 @@ test('fruit preference mapping uses favorite and forbidden selections', () => {
   assert.deepEqual(
     selectionToPreferences(selection),
     [
-      { fruit_id: 1, preference_score: 2, is_forbidden: false },
-      { fruit_id: 2, preference_score: -1, is_forbidden: false },
-      { fruit_id: 3, preference_score: 0, is_forbidden: true },
+      { fruit_id: 1, preference_score: 2, is_forbidden: false, has_tried: null, willing_to_try: null },
+      { fruit_id: 2, preference_score: -1, is_forbidden: false, has_tried: null, willing_to_try: null },
+      { fruit_id: 3, preference_score: null, is_forbidden: true, has_tried: null, willing_to_try: null },
     ],
   )
 })
@@ -58,12 +62,31 @@ test('new selections override a legacy preference without dropping other legacy 
         { fruit_id: 1, preference_score: -1, is_forbidden: false },
         { fruit_id: 2, preference_score: 1, is_forbidden: false },
       ],
+      triedIds: [],
+      notTriedIds: [],
+      willingToTryIds: [],
+      notWillingToTryIds: [],
     }),
     [
-      { fruit_id: 1, preference_score: -1, is_forbidden: false },
-      { fruit_id: 2, preference_score: 2, is_forbidden: false },
+      { fruit_id: 1, preference_score: -1, is_forbidden: false, has_tried: null, willing_to_try: null },
+      { fruit_id: 2, preference_score: 2, is_forbidden: false, has_tried: null, willing_to_try: null },
     ],
   )
+})
+
+test('familiarity answers round-trip without changing favorite or forbidden groups', () => {
+  const selection = preferencesToSelection([
+    { fruit_id: 4, preference_score: null, is_forbidden: false, has_tried: true, willing_to_try: true },
+    { fruit_id: 5, preference_score: null, is_forbidden: false, has_tried: false, willing_to_try: false },
+  ])
+  assert.deepEqual(selection.triedIds, [4])
+  assert.deepEqual(selection.notTriedIds, [5])
+  assert.deepEqual(selection.willingToTryIds, [4])
+  assert.deepEqual(selection.notWillingToTryIds, [5])
+  assert.deepEqual(selectionToPreferences(selection), [
+    { fruit_id: 4, preference_score: null, is_forbidden: false, has_tried: true, willing_to_try: true },
+    { fruit_id: 5, preference_score: null, is_forbidden: false, has_tried: false, willing_to_try: false },
+  ])
 })
 
 test('apiRequest returns json for successful responses', async () => {
