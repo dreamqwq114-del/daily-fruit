@@ -47,19 +47,21 @@ async function loadPage() {
     fruits.value = await listFruits()
     initializeFruitState()
 
+    let user
     try {
-      const [user, preferences] = await Promise.all([
-        getUser(),
-        getFruitPreferences(),
-      ])
-      existingUser.value = true
-      Object.assign(profile, profileFromUser(user))
-      preferenceState.value = {
-        ...preferenceState.value,
-        ...preferencesToState(preferences),
-      }
+      user = await getUser()
     } catch (error) {
-      if (!(error instanceof ApiError && error.status === 404)) throw error
+      if (error instanceof ApiError && error.status === 404) return
+      throw error
+    }
+
+    existingUser.value = true
+    Object.assign(profile, profileFromUser(user))
+
+    const preferences = await getFruitPreferences()
+    preferenceState.value = {
+      ...preferenceState.value,
+      ...preferencesToState(preferences),
     }
   } catch (error) {
     errorMessage.value = error.message
@@ -76,9 +78,18 @@ async function saveOnboarding() {
   saveMessage.value = ''
 
   try {
-    const user = existingUser.value
-      ? await updateUser({ ...profile })
-      : await createUser({ ...profile })
+    let user
+    if (existingUser.value) {
+      user = await updateUser({ ...profile })
+    } else {
+      try {
+        user = await createUser({ ...profile })
+      } catch (error) {
+        if (!(error instanceof ApiError && error.status === 409)) throw error
+        existingUser.value = true
+        user = await updateUser({ ...profile })
+      }
+    }
 
     existingUser.value = true
 

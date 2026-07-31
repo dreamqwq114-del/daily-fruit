@@ -42,8 +42,14 @@ async function loadPreferences() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [user, fruitList, preferences] = await Promise.all([
-      getUser(),
+    let user
+    try {
+      user = await getUser()
+    } catch (error) {
+      if (await handleUserNotFound(error)) return
+      throw error
+    }
+    const [fruitList, preferences] = await Promise.all([
       listFruits(),
       getFruitPreferences(),
     ])
@@ -54,9 +60,7 @@ async function loadPreferences() {
       fruitList.map((fruit) => [fruit.id, existingState[fruit.id] ?? 'neutral']),
     )
   } catch (error) {
-    if (!(await handleUserNotFound(error))) {
-      errorMessage.value = error.message
-    }
+    errorMessage.value = error.message
   } finally {
     loading.value = false
   }

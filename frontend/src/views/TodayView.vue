@@ -51,16 +51,15 @@ async function loadToday() {
   errorMessage.value = ''
   actionMessage.value = ''
   try {
-    const [userResult, recommendationResult] = await Promise.all([
-      getUser(),
-      getTodayRecommendation(),
-    ])
-    user.value = userResult
-    recommendation.value = recommendationResult
-  } catch (error) {
-    if (!(await handleUserNotFound(error))) {
-      errorMessage.value = error.message
+    try {
+      user.value = await getUser()
+    } catch (error) {
+      if (await handleUserNotFound(error)) return
+      throw error
     }
+    recommendation.value = await getTodayRecommendation()
+  } catch (error) {
+    errorMessage.value = error.message
   } finally {
     loading.value = false
   }

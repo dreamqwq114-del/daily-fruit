@@ -172,4 +172,15 @@ describe('TodayView', () => {
     expect(routerApi.replace).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('数据库服务暂时不可用')
   })
+
+  it('does not treat a recommendation 404 as a missing profile', async () => {
+    recommendationApi.getTodayRecommendation.mockRejectedValueOnce(
+      new ApiError('当前没有可用推荐', { status: 404, code: 'http_error' }),
+    )
+    const wrapper = mountToday()
+    await flushPromises()
+
+    expect(routerApi.replace).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('当前没有可用推荐')
+  })
 })

@@ -42,18 +42,18 @@ async function loadHistory() {
   loading.value = true
   errorMessage.value = ''
   try {
-    const [userResult, historyResult] = await Promise.all([
-      getUser(),
-      listRecommendationHistory(),
-    ])
-    user.value = userResult
-    history.value = historyResult
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      await router.replace('/onboarding')
-    } else {
-      errorMessage.value = error.message
+    try {
+      user.value = await getUser()
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        await router.replace('/onboarding')
+        return
+      }
+      throw error
     }
+    history.value = await listRecommendationHistory()
+  } catch (error) {
+    errorMessage.value = error.message
   } finally {
     loading.value = false
   }
