@@ -104,3 +104,22 @@ Router -> Application Service -> Repository -> SQLAlchemy Session
   Data API；本项目不依赖 Data API，因此无需调整；
 - extension version pinning、Management API logs 和 self-hosted gateway 变化不影响 S4。
 
+## 10. 实现审查结论
+
+- runtime Engine 进程内复用，Session 每请求关闭且异常回滚；
+- 同用户推荐使用 transaction advisory lock，并由 partial unique index双重保护；
+- today 页面刷新只读取已保存 active 推荐；
+- refresh 在同一短事务内完成 replaced、change_requested 和新 active 写入；
+- 水果、推荐 items、营养、季节与 feedback 使用 select-in eager loading；
+- API 测试实测 today 和 history 查询数量有固定上限，不随 item 数量线性增长；
+- 所有 API 响应在 Session 可用时转换为 Pydantic Schema，不依赖 detached lazy load；
+- 第一版 user_id 机制已明确标记为非生产认证方案。
+
+## 11. 官方资料核对
+
+- [Supabase Connect to your database](https://supabase.com/docs/guides/database/connecting-to-postgres)
+  用于确认 Direct、Session Pooler 和 Transaction Pooler 的用途；
+- [Supabase Query Optimization](https://supabase.com/docs/guides/database/query-optimization)
+  用于复核 JOIN、过滤和排序列的索引策略；
+- [Supabase Changelog](https://supabase.com/changelog)
+  已在实现前检查 2026-07-31 前的 breaking changes，没有需要 S4 改变架构的条目。

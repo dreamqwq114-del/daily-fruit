@@ -44,3 +44,17 @@
 - `.env` 未被跟踪，秘密扫描无真实凭据；
 - Git working tree 干净。
 
+## 2026-07-31 验收结果
+
+- 后端全量：`165 passed`，包含纯算法、Schema、配置、迁移、安全、seed 和 API；
+- FastAPI + 本地 PostgreSQL API 专项：`21 passed`；
+- 并发 today 请求实测返回同一 recommendation ID，数据库只有一个 active；
+- 已验证七种 feedback、重复反馈幂等、refresh 不同组合、change_requested 和历史响应；
+- 已验证 today 与 history 查询次数上限，未发现逐 item 查询；
+- `alembic current` 为 `0002 (head)`，`alembic history` 正常，`alembic check`
+  返回 `No new upgrade operations detected`；
+- `npm run build` 成功；
+- Router 无 SQL/算法调用，Repository 无 commit，纯算法无 Session/SQLAlchemy 依赖；
+- 受控文件未发现真实数据库 URL、Supabase secret、JWT 或被跟踪的 `.env`；
+- 本阶段只修改本地代码和可丢弃 `daily_fruit_test`，没有远程 Supabase 写入；
+- S4 验收通过，S5 Vue 页面尚未授权和实现。

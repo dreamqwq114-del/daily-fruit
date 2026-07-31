@@ -2,7 +2,8 @@
 
 一个优先适配手机浏览器的 Vue 3 + FastAPI 教学项目。第一版计划使用条件过滤、加权评分、营养互补、历史去重和反馈调整，每天推荐两种水果，并给出可解释的推荐理由。
 
-当前已完成阶段一、Supabase 审计、阶段二数据库基础结构和阶段三推荐算法：
+当前已完成阶段一、Supabase 审计、阶段二数据库基础结构、阶段三推荐算法和
+阶段四后端 API：
 
 - Vue 3 + Vite 单页占位界面；
 - FastAPI `/health`；
@@ -15,10 +16,13 @@
 - 八张业务表已启用 RLS，并对浏览器角色保持 deny-by-default；
 - 目标 Supabase 已幂等写入 24 种水果、24 条营养和 48 条季节演示数据；
 - 纯 Python 推荐算法已实现过滤、六项加权评分、历史和反馈调整、营养互补、
-  可复现随机选择及结构化推荐理由。
+  可复现随机选择及结构化推荐理由；
+- FastAPI 已实现用户、偏好、水果、今日推荐、换一组、历史和反馈接口；
+- 今日推荐支持同日幂等和并发保护，换一组会替换旧组并记录 change_requested；
+- Repository 批量预加载关联数据，数据库错误统一返回不泄漏内部信息的响应。
 
-阶段三算法不访问数据库或网络。正式 API、推荐持久化和 Vue 业务页面尚未实现，
-将在后续阶段通过 Repository 和 FastAPI 接入。
+阶段三算法仍不访问数据库或网络。Vue 正式业务页面尚未实现，将在后续阶段接入这些
+FastAPI 接口。
 
 ## 本地运行
 
@@ -48,6 +52,21 @@ cd backend
 
 算法入口是 `app.services.recommend_fruits`。它接收内存中的用户、水果和上下文对象，
 每次返回两种不同水果、归一化分数和每项 2 到 4 条理由。传入 `random_seed` 可复现结果。
+
+### 后端业务接口
+
+启动 FastAPI 后可以在 `http://127.0.0.1:8000/docs` 查看交互式接口文档。当前接口包括：
+
+- `POST /api/users`、`GET/PUT /api/users/{user_id}`；
+- `GET/PUT /api/users/{user_id}/fruit-preferences`；
+- `GET /api/fruits`、`GET /api/fruits/{fruit_id}`；
+- `GET /api/recommendations/today?user_id=1`；
+- `POST /api/recommendations/refresh`；
+- `GET /api/users/{user_id}/recommendations`；
+- `POST /api/recommendations/items/{item_id}/feedback`。
+
+第一版通过普通 `user_id` 演示流程，没有正式登录与授权，不应把写接口直接开放到公网。
+Vue 只调用 FastAPI，不能直接操作 Supabase 业务表。
 
 ## 数据库配置
 
