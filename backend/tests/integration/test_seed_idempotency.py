@@ -37,6 +37,7 @@ def run_seed_cli(*arguments: str, database_url: str) -> str:
     environment.update(
         TEST_DATABASE_URL=database_url,
         DAILY_FRUIT_ALLOW_TEST_DATABASE_WRITE="yes",
+        PYTHONUTF8="1",
     )
     result = subprocess.run(
         [

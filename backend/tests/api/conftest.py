@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.config import Settings
 from app.database import get_database_session
 from app.main import app
+from app.seed.seed_fruits import load_seed_dataset, seed_database
 
 
 @pytest.fixture(scope="session")
@@ -28,6 +29,7 @@ def api_engine() -> Engine:
             text("SELECT version_num FROM public.alembic_version")
         ).scalar_one()
     assert version == "0002"
+    seed_database(engine, load_seed_dataset())
     try:
         yield engine
     finally:
