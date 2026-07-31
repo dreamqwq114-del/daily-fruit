@@ -80,8 +80,16 @@
 
 截至 `docs/stage-1.5-supabase-audit.md` 的当前记录：
 
-- Supabase 连接器可见项目数为 0；
-- `daily-fruit` 目标 project ref 未确认；
-- 禁止 ORM、Alembic、DDL、迁移、seed 和远端写入；
-- Luna 的下一任务只能是 `S2-00` 只读连接门禁。
-
+- 已确认唯一目标项目为 `Daily Fruit`，project ref 为
+  `frzbbpocyzlqxljsrsiw`；
+- 已完成 `public` schema、迁移、扩展、RLS、policies、grants、数据和
+  advisors 的只读审计；
+- 目标项目当前没有业务表或业务数据，八个计划表名没有冲突；
+- `S2-00` 已由提交 `3d71816` 完成；
+- `S2-01` 已由提交 `742eeeb` 完成，runtime、migration 和 test URL
+  已隔离，测试 URL 默认拒绝 Supabase 正式域名；
+- 下一项允许的任务是 `S2-02`：只创建 SQLAlchemy metadata 和 ORM
+  Model，不连接或修改 Supabase；
+- `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
+- 在安全迁移完成静态审查并获得明确批准前，仍禁止远端 DDL、迁移、
+  seed、policy 和 grant 修改。

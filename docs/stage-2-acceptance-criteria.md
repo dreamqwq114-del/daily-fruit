@@ -4,14 +4,17 @@
 
 ## 1. 进入条件
 
-- [ ] 用户提供并确认目标 Supabase project ref；
-- [ ] 连接器列出的项目与该 ref、名称和组织一致；
-- [ ] 已完成 `public` 表、约束、索引、迁移、RLS、policies、grants、扩展和 advisors 的只读审计；
-- [ ] 已确认八个计划表名不存在未解决冲突；
-- [ ] 已区分测试数据库与正式数据库；
+- [x] 用户已确认连接器中的唯一 `Daily Fruit` 目标项目；
+- [x] 连接器列出的项目与 project ref、名称和组织一致；
+- [x] 已完成 `public` 表、约束、索引、迁移、RLS、policies、grants、扩展和 advisors 的只读审计；
+- [x] 已确认八个计划表名不存在未解决冲突；
+- [x] 已通过 S2-01 区分 runtime、migration、test 数据库 URL；
 - [ ] 用户批准当前唯一的小任务。
 
 任一项不满足，停止数据库修改。
+
+以上已勾选项目以 `3d71816` 和 `742eeeb` 的审计、代码及测试结果为
+依据；执行远端写入前仍须重新核对 project ref 和实际数据库状态。
 
 ## 2. 仓库与秘密
 
@@ -34,13 +37,17 @@ git grep -n "DATABASE_URL"
 
 ## 3. 配置与连接
 
-- [ ] SQLAlchemy 使用 `postgresql+psycopg://`；
-- [ ] 运行时与迁移连接可分别配置；
+- [x] SQLAlchemy 配置只接受 `postgresql+psycopg://`；
+- [x] 运行时、迁移和测试连接可分别配置且不互相回退；
 - [ ] Session Pooler/direct connection 的选择与部署网络一致；
-- [ ] 连接失败只返回稳定的公开错误，不返回 host、username、password 或 SQL；
+- [x] 连接失败只返回稳定的公开错误，不返回 host、username、password 或 SQL；
 - [ ] Session 在请求结束后关闭；
 - [ ] 事务异常会 rollback；
-- [ ] 正式环境不允许 `DEBUG=true`。
+- [x] 正式环境不允许 `DEBUG=true`；
+- [x] 测试 URL 拒绝 `*.supabase.co` 和
+  `*.pooler.supabase.com`，且数据库名必须包含 `daily_fruit_test`；
+- [x] Supabase runtime/migration URL 要求安全 SSL mode，并拒绝端口
+  `6543` 的 Transaction Pooler。
 
 ## 4. ORM 与 Schema
 
@@ -172,4 +179,3 @@ npm run build
 - RLS/grants 使匿名角色获得意外访问；
 - 任何秘密将进入 Git 或日志；
 - 无法解释的数据库或权限错误重复出现。
-

@@ -8,6 +8,13 @@
 - 目标 Supabase project ref 未确认时，所有数据库写入任务禁用；
 - 发现范围外文件、未知表、真实数据或身份不一致时立即停止。
 
+## 当前进度
+
+- `S2-00` 已完成：`3d71816 docs: record live Supabase audit`；
+- `S2-01` 已完成：`742eeeb feat: add safe database configuration contract`；
+- 当前下一任务：`S2-02`；
+- 当前仍禁止远端 DDL、迁移、seed、policy 和 grant 修改。
+
 ## S2-00：恢复目标项目可见性并完成只读门禁
 
 目标：确认 `daily-fruit` 目标 project ref，并补全只读审计。
@@ -466,7 +473,7 @@ python -m app.seed.seed_fruits
 - 出现未知真实数据覆盖风险；
 - advisors 出现新的高风险项。
 
-## Luna 的第一个任务
+## Luna 的下一个任务
 
-必须从 **S2-00** 开始。当前不得执行 S2-01 或任何数据库实现任务。
-
+在用户明确确认后执行 **S2-02**。该任务只能创建和测试 SQLAlchemy
+metadata/ORM Model，不得连接或修改 Supabase，不得初始化 Alembic。
