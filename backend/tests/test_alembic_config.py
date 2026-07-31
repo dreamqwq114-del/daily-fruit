@@ -43,7 +43,8 @@ def test_alembic_history_works_without_database_configuration() -> None:
     result = run_alembic("history")
 
     assert result.returncode == 0
-    assert "<base> -> 0001 (head), create daily fruit tables" in result.stdout
+    assert "<base> -> 0001, create daily fruit tables" in result.stdout
+    assert "0001 -> 0002 (head)" in result.stdout
     assert "postgresql" not in result.stdout
     assert "supabase" not in result.stdout.lower()
 

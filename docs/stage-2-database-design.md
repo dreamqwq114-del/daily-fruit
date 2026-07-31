@@ -343,6 +343,17 @@ Vue 只调用 FastAPI，不使用 Supabase Data API 访问业务表。
 - 如项目完全不使用 Data API，可在 Dashboard 关闭 Data API，但该设置必须记录，不能代替迁移中的 grants/RLS；
 - FastAPI 数据库凭据只存在后端环境变量。
 
+`0002_secure_daily_fruit_tables` 对八张业务表和对应 identity sequence
+逐一从 `PUBLIC`、`anon`、`authenticated` 撤销权限，不使用影响其他
+`public` 表的宽泛 `ALL TABLES IN SCHEMA`。第一版不创建 allow policy，
+因此 Data API 保持 deny-by-default。
+
+阶段 1.5 已确认的 `public.rls_auto_enable()` 是 `SECURITY DEFINER`
+函数。`0002` 仅在该精确签名存在时撤销 `PUBLIC`、`anon`、
+`authenticated` 的执行权限，不删除函数或事件触发器。安全迁移的
+downgrade 可以关闭这八张表的 RLS 以便可丢弃数据库验证，但不会重新
+授予浏览器角色或该函数的权限，避免回滚扩大访问面。
+
 注意：数据库 owner 或具有 `BYPASSRLS` 的运行时角色可绕过 RLS。第一版仍必须在 FastAPI Service 中验证 `user_id`，不能把 RLS 当作后端授权替代品。
 
 ### 未来接入 Supabase Auth
@@ -484,4 +495,3 @@ Supabase Dashboard/连接器负责：
 - 默认不创建用户、推荐、反馈等行为数据；
 - 失败整体回滚；
 - README 保留演示数据非医学建议声明。
-

@@ -153,6 +153,12 @@ def test_upgrade_downgrade_upgrade_round_trip(
         }
 
     run_alembic("upgrade", "0001", database_url=database_url)
+    with engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0001"
+
+    run_alembic("upgrade", "head", database_url=database_url)
     run_alembic("check", database_url=database_url)
 
 
