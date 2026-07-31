@@ -188,6 +188,7 @@ class RecommendationFeedback(CreatedAtMixin, Base):
         ForeignKey(
             "public.recommendation_items.id",
             ondelete="CASCADE",
+            name="fk_rec_feedback_item_id_items",
         ),
         nullable=False,
     )

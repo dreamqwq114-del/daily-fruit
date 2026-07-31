@@ -3,6 +3,7 @@ import os
 from typing import Any, Literal
 
 from alembic import context
+from sqlalchemy import ForeignKeyConstraint
 from sqlalchemy.engine import Connection
 
 from app.config import Settings, get_settings
@@ -57,11 +58,56 @@ def include_name(
     return True
 
 
+def normalized_foreign_key_signature(
+    constraint: ForeignKeyConstraint,
+) -> tuple[object, ...]:
+    def normalize_target(target: str) -> tuple[str, ...]:
+        parts = tuple(target.split("."))
+        if len(parts) == 2:
+            return ("public", *parts)
+        return parts
+
+    source_schema = constraint.table.schema or "public"
+    return (
+        source_schema,
+        constraint.table.name,
+        tuple(element.parent.name for element in constraint.elements),
+        tuple(
+            normalize_target(element.target_fullname)
+            for element in constraint.elements
+        ),
+        constraint.onupdate,
+        constraint.ondelete,
+        constraint.deferrable,
+        constraint.initially,
+    )
+
+
+def include_object(
+    object_: object,
+    name: str | None,
+    type_: str,
+    reflected: bool,
+    compare_to: object | None,
+) -> bool:
+    del name, reflected
+    if (
+        type_ == "foreign_key_constraint"
+        and isinstance(object_, ForeignKeyConstraint)
+        and isinstance(compare_to, ForeignKeyConstraint)
+    ):
+        return normalized_foreign_key_signature(
+            object_
+        ) != normalized_foreign_key_signature(compare_to)
+    return True
+
+
 def context_options() -> dict[str, Any]:
     return {
         "target_metadata": target_metadata,
         "include_schemas": True,
         "include_name": include_name,
+        "include_object": include_object,
         "compare_type": True,
         "compare_server_default": True,
         "version_table_schema": "public",

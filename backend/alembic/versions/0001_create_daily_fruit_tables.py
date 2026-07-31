@@ -170,7 +170,7 @@ def upgrade() -> None:
     sa.Column('comment', sa.String(length=1000), nullable=True),
     sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
     sa.CheckConstraint("feedback_type IN ('eaten', 'liked', 'disliked', 'unavailable', 'expensive', 'tired_of_it', 'change_requested')", name='ck_recommendation_feedback_type_values'),
-    sa.ForeignKeyConstraint(['recommendation_item_id'], ['public.recommendation_items.id'], name=op.f('fk_recommendation_feedback_recommendation_item_id_recommendation_items'), ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['recommendation_item_id'], ['public.recommendation_items.id'], name='fk_rec_feedback_item_id_items', ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['user_id'], ['public.users.id'], name=op.f('fk_recommendation_feedback_user_id_users'), ondelete='RESTRICT'),
     sa.PrimaryKeyConstraint('id', name=op.f('pk_recommendation_feedback')),
     sa.UniqueConstraint('recommendation_item_id', 'user_id', 'feedback_type', name='uq_recommendation_feedback_item_user_type'),
