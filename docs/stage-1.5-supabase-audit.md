@@ -248,3 +248,44 @@ Security advisor 原两项 WARN 已消失。当前只有 9 条
 不应通过添加宽泛 policy 消除。Performance advisor 的 5 条
 `unused_index` INFO 来自刚创建且尚无业务查询的空表，不能作为删除
 必要外键/历史查询索引的依据。
+
+## 11. S2-11 seed 与最终审计（2026-07-31）
+
+写入前第三次确认：连接器仍只返回 `Daily Fruit`，project ref 仍为
+`frzbbpocyzlqxljsrsiw`，`public.alembic_version=0002`，水果、营养、
+季节和所有行为表计数均为 0。
+
+使用提交 `1174603` 的 seed 生成 UTF-8 PostgreSQL upsert SQL，校验只
+包含 fruits、fruit_nutritions、fruit_seasons 三条 INSERT/ON CONFLICT，
+再通过 Supabase SQL 接口作为单个事务执行。远端连续执行两次，第二次
+没有增加行数。
+
+最终远端结果：
+
+- fruits：24；
+- fruit_nutritions：24；
+- fruit_seasons：48，其中跨年月份记录 10；
+- 必需水果：22/22；
+- users、user_fruit_preferences、recommendations、
+  recommendation_items、recommendation_feedback：全部为 0；
+- 重复自然键：0；
+- 孤立记录：0；
+- 非法分数、价格或月份记录：0；
+- `public.alembic_version=0002`；
+- 八张业务表 RLS：8/8 启用，policies：0；
+- `anon`、`authenticated` 业务表 CRUD 权限：0；
+- `PUBLIC`、`anon`、`authenticated` 对 `rls_auto_enable()` 的执行
+  权限均为 false；
+- `ensure_rls` event trigger 仍启用；
+- Supabase 迁移记录仍只有已审查的 0001、0002；
+- security advisor 只有 9 条预期 deny-by-default INFO；
+- performance advisor 只有 5 条新空表的 unused-index INFO。
+
+最终本地验收：
+
+- 后端：82 passed；
+- Alembic：`0002 (head)`，history 顺序正确，check 无新操作；
+- 前端：`npm run build` 成功；
+- 前端构建和 Git 受控文件秘密扫描无命中。
+
+阶段二完成，当前不允许继续修改数据库或提前实现下一阶段功能。

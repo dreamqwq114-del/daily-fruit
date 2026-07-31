@@ -84,7 +84,8 @@
   `frzbbpocyzlqxljsrsiw`；
 - 已完成 `public` schema、迁移、扩展、RLS、policies、grants、数据和
   advisors 的只读审计；
-- 目标项目当前没有业务表或业务数据，八个计划表名没有冲突；
+- S2-08 写入前确认目标项目没有业务表或业务数据，八个计划表名没有
+  冲突；
 - `S2-00` 已由提交 `3d71816` 完成；
 - `S2-01` 已由提交 `742eeeb` 完成，runtime、migration 和 test URL
   已隔离，测试 URL 默认拒绝 Supabase 正式域名；
@@ -110,8 +111,9 @@
   UTF-8 SQL 输出和两次本地幂等执行已通过测试；
 - S2-11 写入前再次确认唯一目标 project ref、远端 schema 版本为
   `0002`，且 fruits、nutrition、seasons 和行为表计数均为 0；
-- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-11`，只向该
-  精确项目写入已验证的 24/24/48 演示数据并完成最终审计；
-- `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
-- 当前禁止用户、推荐和反馈 seed，以及任何未包含在已提交迁移中的
-  DDL、policy 或 grant 修改。
+- `S2-11` 已完成：远端 seed 连续执行两次后计数稳定为 24/24/48，
+  重复、孤立和非法范围记录均为 0，行为表均为空；
+- `public.rls_auto_enable()` 的两项 security advisor WARN 已修复，
+  event trigger 仍启用；当前 advisor 只剩已解释的 INFO；
+- S2 已完成。未获得新的明确任务前，不继续实现 API、推荐算法或页面，
+  也不再修改远端数据库。

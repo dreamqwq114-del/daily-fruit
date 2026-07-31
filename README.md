@@ -13,7 +13,7 @@
 - SQLAlchemy Model、Pydantic Schema 和两版 Alembic migration；
 - 目标 Supabase 已迁移到 `public.alembic_version=0002`；
 - 八张业务表已启用 RLS，并对浏览器角色保持 deny-by-default；
-- 演示水果、营养和季节数据文件已准备，尚未执行 seed。
+- 目标 Supabase 已幂等写入 24 种水果、24 条营养和 48 条季节演示数据。
 
 ## 本地运行
 
@@ -94,5 +94,21 @@ npm run dev
 - `data/seasons_demo.csv` 的月份、地区和季节分数用于验证跨年季节和
   地区匹配逻辑；
 - 不得把这些演示值用于医疗判断、营养诊断或治疗建议。
+
+### Seed 校验与本地测试
+
+`--dry-run` 和 `--emit-sql` 都不会连接数据库：
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m app.seed.seed_fruits --dry-run
+.\.venv\Scripts\python.exe -m app.seed.seed_fruits --emit-sql
+```
+
+本地写入只允许精确名为 `daily_fruit_test` 的 localhost 数据库，并要求
+同时设置 `TEST_DATABASE_URL` 和
+`DAILY_FRUIT_ALLOW_TEST_DATABASE_WRITE=yes`。正式 Supabase seed 必须先
+核对 project ref 和 schema 版本，再使用经过审查的 SQL/连接流程；不要
+把数据库密码写入命令、README 或 Git。
 
 详细设计见 [docs/stage-1-plan.md](docs/stage-1-plan.md)。
