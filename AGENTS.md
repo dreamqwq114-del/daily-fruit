@@ -133,6 +133,8 @@
 - S6 已部署：远端迁移为 `0004`，FastAPI Cloud 业务 API 强制 JWT，GitHub Pages 已连接；
   后续不得退回 localStorage user ID 或公开无认证写接口。
 - 不得启用 Supabase 匿名登录；后端必须拒绝 `is_anonymous=true` 的 token。
+- 阶段七明确关闭注册邮箱确认；注册必须立即返回 session，不得恢复注册确认邮件，除非先完成新的安全设计审查。
+- 关闭注册确认不等于关闭密码找回邮件；`/auth/callback` 保留给未来的找回流程。
 - GitHub Pages 发布必须在构建时验证公开 API URL、Supabase URL 和 publishable key，
   任何一项缺失都不得生成可部署产物。
 - 如后续任务发现必须改变 schema，立即停止并先更新设计与授权门禁。
