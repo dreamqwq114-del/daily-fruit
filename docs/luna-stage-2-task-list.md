@@ -19,9 +19,10 @@
 - `S2-06` 已完成：`36c3e29 test: verify migrations on disposable postgres`；
 - `S2-07` 已完成：`a3a417d feat: secure daily fruit database access`；
 - `S2-08` 已完成：`741edcc docs: record applied Supabase migrations`；
-- 当前下一任务：`S2-09`；
-- 当前只允许创建演示数据文件和静态校验，仍禁止 seed 和范围外 DDL、
-  policy、grant 修改。
+- `S2-09` 已完成：`cb935b6 data: add validated fruit demo dataset`；
+- 当前下一任务：`S2-10`；
+- 当前只允许在 `daily_fruit_test` 实现和验证 seed，仍禁止远端 seed 和
+  范围外 DDL、policy、grant 修改。
 
 ## S2-00：恢复目标项目可见性并完成只读门禁
 

@@ -104,8 +104,10 @@
   (`frzbbpocyzlqxljsrsiw`)，`public` 用户表、迁移和业务数据仍为空；
 - `S2-08` 已完成，远端 `public.alembic_version=0002`，八张业务表、
   RLS、grants、约束、索引、迁移记录和 advisors 已复核；
-- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-09`，只准备
-  演示数据文件和静态校验，不连接数据库；
+- `S2-09` 已由提交 `cb935b6` 完成，24 种水果及营养、季节演示文件
+  已通过静态范围、自然键和口径校验；
+- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-10`，只实现
+  seed 并在 `daily_fruit_test` 验证 dry-run、事务和幂等性；
 - `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
-- 当前仍禁止本地或远端 seed，以及任何未包含在已提交迁移中的 DDL、
-  policy 或 grant 修改。
+- 当前仍禁止远端 seed，以及任何未包含在已提交迁移中的 DDL、policy
+  或 grant 修改。
