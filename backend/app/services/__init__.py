@@ -1,0 +1,41 @@
+from app.services.recommendation_service import (
+    InvalidRecommendationInputError,
+    NoRecommendationCandidatesError,
+    RecommendationError,
+    evaluate_season,
+    month_is_in_range,
+    normalize_nutrition_profiles,
+)
+from app.services.recommendation_types import (
+    FruitPreference,
+    NutritionProfile,
+    RecommendationContext,
+    RecommendationFruit,
+    RecommendationItemResult,
+    RecommendationResult,
+    RecommendationUser,
+    ScoredFruit,
+    ScoreBreakdown,
+    SeasonEvaluation,
+    SeasonWindow,
+)
+
+__all__ = [
+    "FruitPreference",
+    "InvalidRecommendationInputError",
+    "NoRecommendationCandidatesError",
+    "NutritionProfile",
+    "RecommendationContext",
+    "RecommendationError",
+    "RecommendationFruit",
+    "RecommendationItemResult",
+    "RecommendationResult",
+    "RecommendationUser",
+    "ScoredFruit",
+    "ScoreBreakdown",
+    "SeasonEvaluation",
+    "SeasonWindow",
+    "evaluate_season",
+    "month_is_in_range",
+    "normalize_nutrition_profiles",
+]
