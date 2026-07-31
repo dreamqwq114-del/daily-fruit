@@ -6,9 +6,6 @@ import sys
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 ALEMBIC_INI = BACKEND_ROOT / "alembic.ini"
-VERSIONS_DIR = BACKEND_ROOT / "alembic" / "versions"
-
-
 def run_alembic(
     *arguments: str,
     extra_environment: dict[str, str] | None = None,
@@ -46,7 +43,9 @@ def test_alembic_history_works_without_database_configuration() -> None:
     result = run_alembic("history")
 
     assert result.returncode == 0
-    assert result.stdout == ""
+    assert "<base> -> 0001 (head), create daily fruit tables" in result.stdout
+    assert "postgresql" not in result.stdout
+    assert "supabase" not in result.stdout.lower()
 
 
 def test_alembic_ini_does_not_contain_a_database_url() -> None:
@@ -112,13 +111,3 @@ def test_offline_sql_uses_test_metadata_without_connecting() -> None:
 
     assert result.returncode == 0
     assert secret not in output
-
-
-def test_versions_directory_contains_no_business_migration() -> None:
-    migrations = [
-        path
-        for path in VERSIONS_DIR.iterdir()
-        if path.is_file() and path.suffix == ".py"
-    ]
-
-    assert migrations == []

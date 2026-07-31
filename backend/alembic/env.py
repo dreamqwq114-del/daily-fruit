@@ -52,6 +52,8 @@ def include_name(
     del parent_names
     if type_ == "schema":
         return name in {None, "public"}
+    if type_ == "table" and name == "alembic_version":
+        return False
     return True
 
 
