@@ -1,197 +1,212 @@
 # 阶段 1.5：Supabase 连接与只读审计
 
 审计日期：2026-07-31  
-审计范围：`daily-fruit` 本地仓库与当前 Supabase 连接器  
+审计范围：`daily-fruit` 本地仓库与已连接的 Supabase 项目
 数据库写入：0  
-结论：**目标项目未确认，不允许进入会修改数据库的阶段二任务。**
+结论：**目标项目身份和空业务结构已经确认；允许开始阶段二的本地配置任务，但远端迁移前必须先处理并复核现有安全警告。**
 
 ## 1. 本地仓库状态
 
-审计时：
+本轮复核时：
 
 - Git 分支：`main`；
-- HEAD：`fd22be9 chore: use public npm registry for Sites`；
-- 工作树：干净；
+- 审计前 HEAD：`6c79f6d docs: record Supabase audit gate and stage-two design`；
+- 审计前工作树：干净；
 - 阶段一基础提交：`a33b35e chore: add stage-one daily fruit skeleton`；
-- 后续还有两次 Sites 部署支持提交：
-  - `dc55755 chore: add Sites deployment support`；
-  - `fd22be9 chore: use public npm registry for Sites`。
+- 未读取或修改 `daily-fruit` 以外的项目；
+- 未创建 ORM、Alembic、业务表、seed、推荐算法或正式页面。
 
-因此，当前仓库不能被描述为“仅包含 `a33b35e`”。Sites 文件是前端部署支持，不是 Supabase 配置，也没有改变数据库边界。
+此前已经检查：
 
-### 已读取的主要文件
+- 受控文件和 Git 历史中没有发现 `.env`、数据库密码、Supabase secret/service role key 或完整数据库连接串；
+- `backend/.env` 不存在且被 `.gitignore` 忽略；
+- `backend/.env.example` 的 `DATABASE_URL` 为空；
+- 前端没有 Supabase 高权限凭据；
+- 当前配置使用后端环境变量和 `postgresql+psycopg://`，可以支持后续连接 Supabase PostgreSQL；
+- `/health?check_database=true` 只做安全的连通性检查，不泄漏连接信息。
 
-- `README.md`
-- `docs/stage-1-plan.md`
-- `backend/app/main.py`
-- `backend/app/config.py`
-- `backend/app/database.py`
-- `backend/.env.example`
-- `backend/requirements.txt`
-- `backend/tests/test_health.py`
-- `frontend/src/App.vue`
-- `frontend/.openai/hosting.json`
-- `.gitignore`
-- Git 状态、受控文件列表与最近提交
+## 2. 目标 Supabase 项目
 
-未读取、未修改 `daily-fruit` 以外的项目。
+连接器当前只返回一个项目，且名称与用户配置的目标一致，因此本轮将其确认为 `daily-fruit` 的目标项目：
 
-## 2. 本地安全检查
-
-### 结果
-
-- 受控文件中没有 `.env`；
-- 本地只有 `backend/.env.example`，其 `DATABASE_URL` 为空；
-- `backend/.env` 当前不存在，并且已被 `.gitignore` 忽略；
-- 工作树扫描未发现：
-  - 带用户名和密码的 PostgreSQL URL；
-  - `sb_secret_...`；
-  - `sbp_...`；
-  - JWT 形态的 Supabase key；
-- 全部 Git 提交历史扫描也未发现上述凭据形态；
-- 未发现 `SUPABASE_URL`、`SUPABASE_KEY`、`service_role` 值或 `*.supabase.co` 项目 URL；
-- 未发现 `.mcp.json`、本地 `supabase/` 目录或 `supabase/config.toml`；
-- `frontend/.openai/hosting.json` 是 Sites 部署元数据，只包含 Sites project ID 和空的 D1/R2 绑定，不是 Supabase project ref 或数据库凭据。
-
-### 配置代码评估
-
-当前后端已经具备连接 Supabase PostgreSQL 的最小技术基础：
-
-- `DATABASE_URL` 从 `backend/.env` 或进程环境读取；
-- SQLAlchemy 版本为 2.0；
-- 使用 psycopg 3；
-- `postgresql+psycopg://...` 可交给 `create_engine()`；
-- `/health?check_database=true` 只执行 `SELECT 1`；
-- 缺少配置、URL 无效或 SQLAlchemy 连接失败时返回安全状态，不返回连接字符串。
-
-当前阶段不需要修改上述代码。进入数据库实现前仍需补充：
-
-- 明确区分运行时连接与迁移连接；
-- SQLAlchemy Session 和事务生命周期；
-- 连接池参数与连接超时；
-- `TEST_DATABASE_URL` 及测试数据库防误连保护；
-- 对正式环境禁止 `DEBUG=true` 的校验。
-
-这些属于阶段二的独立小任务，不能在连接身份未确认时提前实现。
-
-## 3. Supabase 连接器结果
-
-### 当前可见账户范围
-
-连接器调用成功返回：
-
-```text
-organizations:
-  - dreamqwq114-del's Org
-
-projects: []
-```
-
-可以确认：
-
-- Supabase 连接器已经连到某个 Supabase 账户；
-- 该账户至少能看到一个组织；
-- 该账户当前看不到任何项目；
-- 没有可用于确认 `daily-fruit` 的 project ref、项目名称或项目 URL。
-
-不能确认：
-
-- 当前 Supabase 账户是否是用户打算使用的账户；
-- `daily-fruit` 目标项目是否已经创建；
-- 目标项目是否位于其他组织；
-- 当前账户是否缺少目标项目成员权限；
-- OAuth 连接是否没有获得目标项目的管理可见性；
-- 远端数据库是否为空。
-
-“项目列表为空”只说明当前连接范围内没有可见项目，**绝不等于数据库为空**。
-
-## 4. 远端数据库只读审计结果
-
-因为没有已确认的 project ref，以下项目均未执行，也没有结果：
-
-| 审计项 | 状态 |
+| 项目 | 值 |
 |---|---|
-| 项目名称和 project ref | 未确认 |
-| `public` schema 表 | 未读取 |
-| 字段和数据类型 | 未读取 |
-| 主键、外键、唯一约束 | 未读取 |
-| 索引 | 未读取 |
-| PostgreSQL 扩展 | 未读取 |
-| Supabase 迁移记录 | 未读取 |
-| Alembic 版本表 | 未读取 |
-| RLS 是否启用 | 未读取 |
-| Policies | 未读取 |
-| Grants 与角色权限 | 未读取 |
-| Security/Performance advisors | 未运行 |
-| 测试数据或真实数据 | 未抽样 |
-| 与八个计划表名的冲突 | 无法判断 |
+| 名称 | `Daily Fruit` |
+| Project ref | `frzbbpocyzlqxljsrsiw` |
+| Organization ref | `gacwsgimtxvfyoyokjqs` |
+| Region | `ap-northeast-1` |
+| 状态 | `ACTIVE_HEALTHY` |
+| PostgreSQL 主版本 | 17 |
+| 数据库版本 | `17.6.1.155` |
+| 创建时间 | `2026-07-31T07:38:38.15377Z` |
 
-没有调用 SQL 执行、迁移、seed、policy 或 grant 修改工具。
+没有在文档中记录数据库密码、连接串或任何 secret。
 
-## 5. 最可能的阻塞原因
+## 3. `public` schema 结构
 
-按当前证据从高到低排列：
+由于连接器的表列表接口两次出现传输错误，本轮使用只读系统目录 `SELECT` 交叉验证，未执行任何 DDL 或 DML。
 
-1. Codex 中连接的是另一个 Supabase 账户；
-2. `daily-fruit` 项目尚未创建；
-3. 项目位于另一个组织，当前账户不是该组织或项目成员；
-4. 用户虽然登录了 Supabase，但没有被授予具体项目权限；
-5. Supabase OAuth 连接需要重新授权或刷新后才能看到新增的项目成员关系。
+### 表、字段、约束和索引
 
-当前证据不足以在这些原因之间做唯一判断。
+| 审计项 | 结果 |
+|---|---|
+| `public` 普通表/分区表 | 0 |
+| `public` 字段 | 0 |
+| 主键、外键、唯一与 CHECK 约束 | 0 |
+| 用户索引 | 0 |
+| RLS policies | 0 |
+| 表级 grants | 0 |
+| `public.alembic_version` | 不存在 |
+| 业务数据或测试数据 | 不存在 |
 
-## 6. 用户需要完成的最少操作
+计划中的八张表均不存在，因此目前没有表名或字段冲突：
 
-1. 在 Supabase Dashboard 使用预期账户登录，确认目标项目确实属于 `daily-fruit`。
-2. 只提供以下非秘密信息之一：
-   - 目标 project ref；或
-   - 目标项目名称和 Dashboard 项目 URL。
-3. 确认当前 Codex 连接的 Supabase 账户已加入该项目所在组织，并拥有至少只读管理权限。
-4. 如果 Dashboard 中能看到项目而 Codex 看不到：
-   - 在 Codex 的 Supabase 连接中重新授权正确账户；
-   - 完成浏览器 OAuth；
-   - 重新加载会话；
-   - 再次运行“列出项目”。
+- `users`
+- `fruits`
+- `fruit_nutritions`
+- `fruit_seasons`
+- `user_fruit_preferences`
+- `recommendations`
+- `recommendation_items`
+- `recommendation_feedback`
 
-禁止提供数据库密码、secret key 或 service role key。
+### 已有函数和事件触发器
 
-## 7. 项目可见后的只读审计顺序
+`public` 并非字面意义上的空 schema，已有：
 
-只在用户确认 project ref 后执行：
+- 函数：`public.rls_auto_enable()`；
+- 函数所有者：`postgres`；
+- 属性：`SECURITY DEFINER`；
+- 用途：在 `public` 中创建表、`CREATE TABLE AS` 或 `SELECT INTO` 后自动执行 `ENABLE ROW LEVEL SECURITY`；
+- 事件触发器：`ensure_rls`；
+- 触发时机：`ddl_command_end`；
+- 状态：启用。
 
-1. 读取项目元数据并再次核对名称、ref 和组织；
-2. 列出 `public` 表及详细字段和外键；
-3. 读取约束、索引、RLS、policies 和 grants；
-4. 列出扩展和迁移记录；
-5. 检查 `alembic_version` 或其他迁移体系；
-6. 只读统计候选表行数，并抽样判断是否为真实数据；
-7. 检查八个计划表名冲突；
-8. 运行 security 和 performance advisors；
-9. 把结果追加到本文档；
-10. 只有审计结论明确为兼容，才允许准备迁移。
+还存在 Supabase 管理的系统事件触发器，例如 PostgREST、GraphQL、Cron 和网络扩展相关触发器。本项目不得修改这些系统对象。
 
-## 8. 进入阶段二判定
+## 4. 迁移和扩展
 
-当前判定：**不允许进入数据库实施阶段。**
+### 迁移记录
 
-解除阻塞必须同时满足：
+- Supabase 连接器返回的项目迁移列表为空；
+- `public` 中没有 `alembic_version`；
+- 只发现 Supabase 系统 schema 自己的迁移表：
+  - `auth.schema_migrations`
+  - `realtime.schema_migrations`
+  - `storage.migrations`
 
-- 目标 project ref 已由用户确认；
-- 连接器能读取同一 project ref；
-- `public` schema、迁移、RLS、policies、grants 和 advisors 已完成只读审计；
-- 已确认不会覆盖未知表或数据；
-- 用户批准阶段二的第一个写入任务。
+这些系统迁移表不属于 `daily-fruit`，不得复用或修改。
 
-## 9. 官方资料核对
+### 已安装扩展
 
-本次核对了 2026-07-31 可访问的 Supabase changelog。与本项目相关的变化包括：
+| 扩展 | Schema | 版本 |
+|---|---|---|
+| `pgcrypto` | `extensions` | `1.3` |
+| `pg_stat_statements` | `extensions` | `1.11` |
+| `supabase_vault` | `vault` | `0.3.1` |
+| `uuid-ossp` | `extensions` | `1.1` |
+| `plpgsql` | `pg_catalog` | `1.0` |
 
-- 新表是否自动暴露给 Data API 的平台默认值正在变化，不能依赖隐含默认值；
-- 扩展版本固定行为发生变化，后续必须读取实际扩展版本，不能只相信迁移文本。
+当前阶段不需要新增、升级或移动扩展。
 
-阶段二安全设计以显式 grants、显式 RLS 和最小权限为准：
+## 5. RLS、权限和安全顾问
 
-- [Securing your API](https://supabase.com/docs/guides/api/securing-your-api)
-- [Connecting to Postgres](https://supabase.com/docs/guides/database/connecting-to-postgres)
-- [MCP setup](https://supabase.com/docs/guides/getting-started/mcp)
+### RLS 和 policies
 
+- 当前没有业务表，因此不存在可报告的表级 RLS 状态或 policy；
+- `ensure_rls` 会在后续创建 `public` 表时自动启用 RLS；
+- 自动启用 RLS 不等于已经定义可用且安全的 policies；
+- 第一版浏览器只调用 FastAPI，不能依赖浏览器直接访问业务表。
+
+### Schema 和函数权限
+
+- `PUBLIC`、`anon`、`authenticated`、`service_role` 和 `postgres` 对 `public` schema 有 `USAGE`；
+- `anon` 和 `authenticated` 没有 `CREATE`；
+- `public.rls_auto_enable()` 当前使用默认函数 ACL，`PUBLIC` 可执行；
+- 实测 `anon` 和 `authenticated` 均可执行该函数。
+
+### 默认对象权限
+
+`public` 的默认权限取决于对象创建者：
+
+- `postgres` 创建的表默认向 `anon`、`authenticated` 和 `service_role` 授予部分非 CRUD 表权限；
+- `supabase_admin` 创建的表、序列和函数默认向上述 API 角色授予更宽权限；
+- 因此不能依赖平台默认 ACL。阶段二迁移必须显式撤销 `anon` 和 `authenticated` 对业务表、序列和业务函数的权限，再逐对象验证实际 grants。
+
+### Advisors
+
+Security advisor 返回两项 `WARN`：
+
+1. `anon_security_definer_function_executable`：`anon` 可执行 `public.rls_auto_enable()`；
+2. `authenticated_security_definer_function_executable`：`authenticated` 可执行同一 `SECURITY DEFINER` 函数。
+
+Performance advisor：没有发现问题。
+
+参考：
+
+- [Anon security-definer function executable](https://supabase.com/docs/guides/database/database-linter?lint=0028_anon_security_definer_function_executable)
+- [Authenticated security-definer function executable](https://supabase.com/docs/guides/database/database-linter?lint=0029_authenticated_security_definer_function_executable)
+
+本轮没有撤销权限、修改函数、修改 event trigger 或执行其他安全变更。修复必须先形成可审查的 Alembic 迁移方案，并确认不会破坏 Supabase 的自动 RLS 机制。
+
+## 6. 冲突和数据风险
+
+- 没有现存业务表、业务约束、索引或数据需要兼容；
+- 没有发现计划表名冲突；
+- 没有发现孤立业务记录，因为业务表尚不存在；
+- `auth`、`storage`、`realtime` 等 Supabase 系统 schema 已存在，必须保持不变；
+- 主要风险不是数据覆盖，而是默认权限和现有 `SECURITY DEFINER` 函数暴露；
+- 迁移使用的数据库角色会改变新对象的默认 ACL，必须在迁移后读取实际权限，不能只审查迁移文本。
+
+## 7. 本轮实际执行
+
+只执行了以下只读操作：
+
+- 列出和读取目标项目元数据；
+- 读取 `public` relations、columns、constraints、indexes、policies 和 grants；
+- 读取函数、事件触发器和函数 ACL；
+- 读取 schema 权限和默认权限；
+- 读取扩展；
+- 读取 Supabase 迁移列表，并检查迁移表；
+- 运行 security 和 performance advisors。
+
+明确未执行：
+
+- `CREATE`
+- `ALTER`
+- `DROP`
+- `INSERT`
+- `UPDATE`
+- `DELETE`
+- `TRUNCATE`
+- migration
+- seed
+- policy/grant 修改
+
+## 8. 阶段二准入判定
+
+分项判定：
+
+| 工作 | 是否允许 | 条件 |
+|---|---|---|
+| S2-01 本地配置契约和连接保护 | 允许 | 不连接或修改远端结构 |
+| 本地 ORM/Pydantic 设计 | 暂缓 | 先完成并验收 S2-01 |
+| 初始化 Alembic 文件 | 暂缓 | 按任务列表逐项执行 |
+| 对 Supabase 执行迁移 | 不允许 | 先批准安全修复方案并复核实际 grants/RLS |
+| 写入 seed 或业务数据 | 不允许 | 迁移、结构复核和幂等 seed 测试通过后再批准 |
+
+阶段 1.5 的“项目身份未知”阻塞已经解除；数据库实施仍受安全警告和逐任务审批约束。
+
+## 9. 下一步
+
+Luna 的下一个任务应为 `S2-01：配置契约与防误连保护`：
+
+- 只修改该任务允许的后端配置、数据库连接和测试文件；
+- 加入运行时、迁移和测试数据库 URL 的明确边界；
+- 防止测试误连正式 Supabase；
+- 不创建 ORM；
+- 不初始化 Alembic；
+- 不执行 SQL、迁移或 seed；
+- 完成后运行指定测试并独立提交。
+
+在任何远端数据库写入任务之前，还应单独准备一个可审查的安全迁移设计，说明如何最小范围撤销 `public.rls_auto_enable()` 对 `PUBLIC`、`anon`、`authenticated` 的执行权限，并验证 `ensure_rls` 仍能由数据库事件触发器正常工作。
