@@ -90,8 +90,10 @@
   已隔离，测试 URL 默认拒绝 Supabase 正式域名；
 - `S2-02` 已由提交 `ae83235` 完成，八张业务表的 SQLAlchemy
   metadata、约束、索引和删除策略已通过静态测试；
-- 下一项允许的任务是 `S2-03`：只创建数据库 Pydantic Schema，
-  不连接或修改 Supabase；
+- `S2-03` 已由提交 `fab7a89` 完成，Pydantic Schema 和验证测试已与
+  ORM 分离；
+- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-04`，只初始化
+  Alembic 安全配置，不生成或执行业务迁移；
 - `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
 - 在安全迁移完成静态审查并获得明确批准前，仍禁止远端 DDL、迁移、
   seed、policy 和 grant 修改。

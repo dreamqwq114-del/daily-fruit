@@ -4,7 +4,7 @@
 审计范围：`daily-fruit` 本地仓库与已连接的 Supabase 项目
 
 数据库写入：0  
-结论：**目标项目身份和空业务结构已经确认；S2-02 已完成，允许准备 S2-03 Pydantic Schema，但远端迁移前必须先处理并复核现有安全警告。**
+结论：**目标项目身份和空业务结构已经确认；S2-03 已完成，允许初始化 S2-04 Alembic 安全配置，但远端迁移前必须先处理并复核现有安全警告。**
 
 ## 1. 本地仓库状态
 
@@ -192,8 +192,8 @@ Performance advisor：没有发现问题。
 |---|---|---|
 | S2-01 本地配置契约和连接保护 | 已完成 | 提交 `742eeeb`，17 项后端测试通过 |
 | S2-02 本地 ORM metadata | 已完成 | 提交 `ae83235`，完整后端测试 28 项通过 |
-| S2-03 本地 Pydantic Schema | 允许 | 只定义和测试 Schema，不连接数据库 |
-| 初始化 Alembic 文件 | 暂缓 | 按任务列表逐项执行 |
+| S2-03 本地 Pydantic Schema | 已完成 | 提交 `fab7a89`，完整后端测试 61 项通过 |
+| S2-04 初始化 Alembic 文件 | 允许 | 不生成业务 migration，不连接 Supabase |
 | 对 Supabase 执行迁移 | 不允许 | 先批准安全修复方案并复核实际 grants/RLS |
 | 写入 seed 或业务数据 | 不允许 | 迁移、结构复核和幂等 seed 测试通过后再批准 |
 
@@ -201,13 +201,12 @@ Performance advisor：没有发现问题。
 
 ## 9. 下一步
 
-Luna 的下一个任务应为 `S2-03：创建数据库 Pydantic Schema`：
+Luna 的下一个任务应为 `S2-04：初始化 Alembic 安全配置`：
 
-- 只修改 `backend/app/schemas/` 和 `backend/tests/test_schemas.py`；
-- 验证分数、月份、价格、status、feedback type 和 reasons 结构；
-- 保持 SQLAlchemy Model 与 Pydantic Schema 分离；
-- 不创建 Repository、Service 或 Router；
-- 不初始化 Alembic；
+- 固定 Alembic 依赖并创建最小配置和模板；
+- URL 只从安全配置注入，不写入 `alembic.ini`；
+- 迁移命令必须显式选择 `test` 或 `migration` 用途；
+- 不生成业务 migration；
 - 不连接本地或远端数据库；
 - 不执行 SQL、迁移或 seed；
 - 完成后运行指定测试并独立提交。

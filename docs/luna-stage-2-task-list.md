@@ -13,7 +13,8 @@
 - `S2-00` 已完成：`3d71816 docs: record live Supabase audit`；
 - `S2-01` 已完成：`742eeeb feat: add safe database configuration contract`；
 - `S2-02` 已完成：`ae83235 feat: define daily fruit database models`；
-- 当前下一任务：`S2-03`；
+- `S2-03` 已完成：`fab7a89 feat: add validated database schemas`；
+- 当前下一任务：`S2-04`；
 - 当前仍禁止远端 DDL、迁移、seed、policy 和 grant 修改。
 
 ## S2-00：恢复目标项目可见性并完成只读门禁
@@ -182,6 +183,8 @@ cd backend
 
 允许修改：
 
+- `backend/requirements.txt`
+- `backend/.env.example`
 - `backend/alembic.ini`
 - `backend/alembic/env.py`
 - `backend/alembic/script.py.mako`
@@ -476,5 +479,5 @@ python -m app.seed.seed_fruits
 
 ## Luna 的下一个任务
 
-在用户明确确认后执行 **S2-03**。该任务只能创建和测试 Pydantic
-Schema，不得连接或修改 Supabase，不得初始化 Alembic。
+用户已明确授权继续完成 S2。当前执行 **S2-04**：只初始化和测试
+Alembic 安全配置，不生成业务迁移，不连接或修改 Supabase。

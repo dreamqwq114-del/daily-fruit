@@ -58,7 +58,7 @@ git grep -n "DATABASE_URL"
 - [x] SQLAlchemy metadata 包含八张目标表；
 - [x] ORM 类型、nullable、默认值、约束和外键与设计文档一致；
 - [x] `recommendation_items.reasons` 使用 JSONB；
-- [ ] reasons 的 Pydantic 结构可稳定序列化。
+- [x] reasons 的 Pydantic 结构可稳定序列化。
 
 ## 5. Alembic
 
