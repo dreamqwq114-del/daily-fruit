@@ -2,7 +2,7 @@
 
 一个优先适配手机浏览器的 Vue 3 + FastAPI 教学项目。第一版计划使用条件过滤、加权评分、营养互补、历史去重和反馈调整，每天推荐两种水果，并给出可解释的推荐理由。
 
-当前已完成阶段一、Supabase 只读审计和阶段二的数据库配置合同：
+当前已完成阶段一、Supabase 审计和阶段二数据库基础结构：
 
 - Vue 3 + Vite 单页占位界面；
 - FastAPI `/health`；
@@ -10,7 +10,10 @@
 - 测试数据库防误连 Supabase 正式项目；
 - 环境变量读取与可选数据库连通性检查；
 - 阶段一架构、ER、API 与实施计划；
-- 尚未创建或修改任何 Supabase 数据表。
+- SQLAlchemy Model、Pydantic Schema 和两版 Alembic migration；
+- 目标 Supabase 已迁移到 `public.alembic_version=0002`；
+- 八张业务表已启用 RLS，并对浏览器角色保持 deny-by-default；
+- 演示水果、营养和季节数据文件已准备，尚未执行 seed。
 
 ## 本地运行
 
@@ -81,5 +84,15 @@ npm run dev
 - 第一版由 FastAPI 连接 PostgreSQL，Vue 不直连业务表；
 - 当前简化用户机制不属于生产级认证方案；
 - 项目中的季节、价格和部分营养数据用于软件功能演示，不构成医学或专业营养建议。
+
+## 演示数据口径
+
+- `data/fruits_seed.json` 提供水果属性、价格等级和食用便利度演示值；
+- `data/nutrition_demo.csv` 的六项营养字段统一使用 0 到 1 的
+  **归一化演示分数**，仅用于比较营养特点和测试互补算法，不表示每
+  100 克的真实克数或毫克数；
+- `data/seasons_demo.csv` 的月份、地区和季节分数用于验证跨年季节和
+  地区匹配逻辑；
+- 不得把这些演示值用于医疗判断、营养诊断或治疗建议。
 
 详细设计见 [docs/stage-1-plan.md](docs/stage-1-plan.md)。
