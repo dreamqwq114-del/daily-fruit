@@ -11,6 +11,7 @@ from app.schemas.common import (
     RecommendationScore,
     RefreshNumber,
 )
+from app.schemas.fruit import FruitDetail
 
 
 class RecommendationStatus(StrEnum):
@@ -145,14 +146,38 @@ class RecommendationFeedbackRead(RecommendationFeedbackCreate):
     created_at: AwareDatetime
 
 
+class RecommendationItemDetail(RecommendationItemRead):
+    fruit: FruitDetail
+    feedback: list[RecommendationFeedbackRead] = Field(default_factory=list)
+
+
+class RecommendationDetail(RecommendationBase):
+    id: PositiveId
+    created_at: AwareDatetime
+    items: Annotated[
+        list[RecommendationItemDetail],
+        Field(min_length=2, max_length=2),
+    ]
+
+    @field_validator("items")
+    @classmethod
+    def validate_item_pair(
+        cls,
+        items: list[RecommendationItemDetail],
+    ) -> list[RecommendationItemDetail]:
+        return list(_validate_recommendation_pair(items))
+
+
 __all__ = [
     "FeedbackType",
     "ReasonCode",
     "ReasonComponent",
     "RecommendationCreate",
+    "RecommendationDetail",
     "RecommendationFeedbackCreate",
     "RecommendationFeedbackRead",
     "RecommendationItemCreate",
+    "RecommendationItemDetail",
     "RecommendationItemRead",
     "RecommendationRead",
     "RecommendationReason",
