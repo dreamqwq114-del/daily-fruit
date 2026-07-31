@@ -104,9 +104,23 @@ def evaluate_season(
     if not 1 <= month <= 12:
         raise InvalidRecommendationInputError("月份必须在 1 到 12 之间")
 
+    season_list = list(seasons)
+    for season in season_list:
+        if not season.region.strip():
+            raise InvalidRecommendationInputError("季节地区不能为空")
+        if not 1 <= season.start_month <= 12:
+            raise InvalidRecommendationInputError(
+                "季节开始月份必须在 1 到 12 之间"
+            )
+        if not 1 <= season.end_month <= 12:
+            raise InvalidRecommendationInputError(
+                "季节结束月份必须在 1 到 12 之间"
+            )
+        _validate_unit_scores({"season_score": season.season_score})
+
     relevant = [
         season
-        for season in seasons
+        for season in season_list
         if season.region in {region, "全国"}
     ]
     if not relevant:
@@ -133,7 +147,7 @@ def evaluate_season(
         )
 
     return SeasonEvaluation(
-        score=max(clamp_score(season.season_score) for season in matching),
+        score=max(float(season.season_score) for season in matching),
         has_relevant_data=True,
         is_in_season=True,
     )
@@ -691,6 +705,10 @@ def _validate_inputs(
             raise InvalidRecommendationInputError(
                 "水果偏好分必须在 -1 到 2 之间"
             )
+    if any(fruit_id <= 0 for fruit_id in context.recent_fruit_ids):
+        raise InvalidRecommendationInputError("历史水果 ID 必须为正整数")
+    if any(fruit_id <= 0 for fruit_id in context.feedback_by_fruit):
+        raise InvalidRecommendationInputError("反馈水果 ID 必须为正整数")
 
 
 def _validate_unit_scores(values: Mapping[str, float]) -> None:

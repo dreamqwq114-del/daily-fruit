@@ -68,3 +68,18 @@ def test_invalid_month_has_clear_error(month: int) -> None:
     with pytest.raises(InvalidRecommendationInputError, match="月份"):
         month_is_in_range(month, 1, 12)
 
+
+@pytest.mark.parametrize(
+    "season",
+    [
+        SeasonWindow("华东", 0, 12, 0.8),
+        SeasonWindow("华东", 1, 13, 0.8),
+        SeasonWindow("华东", 1, 12, 1.1),
+        SeasonWindow("", 1, 12, 0.8),
+    ],
+)
+def test_invalid_season_window_is_rejected_even_for_other_region(
+    season: SeasonWindow,
+) -> None:
+    with pytest.raises(InvalidRecommendationInputError):
+        evaluate_season([season], region="华南", month=7)
