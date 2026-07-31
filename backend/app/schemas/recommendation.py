@@ -1,0 +1,161 @@
+from datetime import date
+from enum import StrEnum
+from typing import Annotated
+
+from pydantic import Field, field_validator
+
+from app.schemas.common import (
+    ApiSchema,
+    AwareDatetime,
+    PositiveId,
+    RecommendationScore,
+    RefreshNumber,
+)
+
+
+class RecommendationStatus(StrEnum):
+    ACTIVE = "active"
+    REPLACED = "replaced"
+
+
+class FeedbackType(StrEnum):
+    EATEN = "eaten"
+    LIKED = "liked"
+    DISLIKED = "disliked"
+    UNAVAILABLE = "unavailable"
+    EXPENSIVE = "expensive"
+    TIRED_OF_IT = "tired_of_it"
+    CHANGE_REQUESTED = "change_requested"
+
+
+class ReasonCode(StrEnum):
+    IN_SEASON = "in_season"
+    SWEET_MATCH = "sweet_match"
+    SOUR_MATCH = "sour_match"
+    SOFT_MATCH = "soft_match"
+    CRISP_MATCH = "crisp_match"
+    PRICE_MATCH = "price_match"
+    NOT_RECENTLY_RECOMMENDED = "not_recently_recommended"
+    CONVENIENT = "convenient"
+    NUTRITION_DIVERSITY = "nutrition_diversity"
+    NUTRITION_COMPLEMENT = "nutrition_complement"
+    FEEDBACK_MATCH = "feedback_match"
+
+
+class ReasonComponent(StrEnum):
+    SEASON_SCORE = "season_score"
+    PREFERENCE_SCORE = "preference_score"
+    NUTRITION_DIVERSITY_SCORE = "nutrition_diversity_score"
+    HISTORY_DIVERSITY_SCORE = "history_diversity_score"
+    CONVENIENCE_SCORE = "convenience_score"
+    PRICE_MATCH_SCORE = "price_match_score"
+    COMPLEMENT_SCORE = "complement_score"
+    FEEDBACK_ADJUSTMENT = "feedback_adjustment"
+
+
+class RecommendationReason(ApiSchema):
+    code: ReasonCode
+    message: Annotated[str, Field(min_length=1, max_length=200)]
+    component: ReasonComponent
+
+
+Reasons = Annotated[
+    list[RecommendationReason],
+    Field(min_length=2, max_length=4),
+]
+Rank = Annotated[int, Field(ge=1, le=2)]
+
+
+class RecommendationItemCreate(ApiSchema):
+    fruit_id: PositiveId
+    score: RecommendationScore
+    rank: Rank
+    reasons: Reasons
+
+
+class RecommendationItemRead(RecommendationItemCreate):
+    id: PositiveId
+    recommendation_id: PositiveId
+    created_at: AwareDatetime
+
+
+class RecommendationBase(ApiSchema):
+    user_id: PositiveId
+    recommendation_date: date
+    refresh_number: RefreshNumber
+    total_score: RecommendationScore
+    status: RecommendationStatus = RecommendationStatus.ACTIVE
+
+
+def _validate_recommendation_pair(
+    items: list[RecommendationItemCreate | RecommendationItemRead],
+) -> list[RecommendationItemCreate | RecommendationItemRead]:
+    if {item.rank for item in items} != {1, 2}:
+        raise ValueError("Recommendation items must have ranks 1 and 2")
+    if len({item.fruit_id for item in items}) != 2:
+        raise ValueError("Recommendation items must use distinct fruits")
+    return items
+
+
+class RecommendationCreate(RecommendationBase):
+    items: Annotated[
+        list[RecommendationItemCreate],
+        Field(min_length=2, max_length=2),
+    ]
+
+    @field_validator("items")
+    @classmethod
+    def validate_item_pair(
+        cls,
+        items: list[RecommendationItemCreate],
+    ) -> list[RecommendationItemCreate]:
+        return list(_validate_recommendation_pair(items))
+
+
+class RecommendationRead(RecommendationBase):
+    id: PositiveId
+    created_at: AwareDatetime
+    items: Annotated[
+        list[RecommendationItemRead],
+        Field(min_length=2, max_length=2),
+    ]
+
+    @field_validator("items")
+    @classmethod
+    def validate_item_pair(
+        cls,
+        items: list[RecommendationItemRead],
+    ) -> list[RecommendationItemRead]:
+        return list(_validate_recommendation_pair(items))
+
+
+class RecommendationRefreshRequest(ApiSchema):
+    user_id: PositiveId
+
+
+class RecommendationFeedbackCreate(ApiSchema):
+    feedback_type: FeedbackType
+    comment: Annotated[str, Field(max_length=1000)] | None = None
+
+
+class RecommendationFeedbackRead(RecommendationFeedbackCreate):
+    id: PositiveId
+    recommendation_item_id: PositiveId
+    user_id: PositiveId
+    created_at: AwareDatetime
+
+
+__all__ = [
+    "FeedbackType",
+    "ReasonCode",
+    "ReasonComponent",
+    "RecommendationCreate",
+    "RecommendationFeedbackCreate",
+    "RecommendationFeedbackRead",
+    "RecommendationItemCreate",
+    "RecommendationItemRead",
+    "RecommendationRead",
+    "RecommendationReason",
+    "RecommendationRefreshRequest",
+    "RecommendationStatus",
+]
