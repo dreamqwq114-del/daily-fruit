@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from app.config import get_settings
 from app.database import check_database_connection
+from app.errors import register_exception_handlers
 
 
 class HealthResponse(BaseModel):
@@ -27,6 +28,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+register_exception_handlers(app)
 
 
 @app.get("/health", response_model=HealthResponse)
@@ -44,4 +46,3 @@ def health(
         environment=settings.app_env,
         database=database_status,
     )
-

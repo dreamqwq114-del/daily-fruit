@@ -2,6 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 from urllib.parse import parse_qs, unquote, urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -102,6 +103,10 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         alias="FRONTEND_ORIGIN",
     )
+    app_timezone: str = Field(
+        default="Asia/Shanghai",
+        alias="APP_TIMEZONE",
+    )
     app_env: Literal["development", "test", "production"] = Field(
         default="development",
         alias="APP_ENV",
@@ -126,6 +131,15 @@ class Settings(BaseSettings):
     def normalize_optional_database_url(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
             return None
+        return value
+
+    @field_validator("app_timezone")
+    @classmethod
+    def validate_app_timezone(cls, value: str) -> str:
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise ValueError("APP_TIMEZONE must be a valid IANA timezone") from error
         return value
 
     @model_validator(mode="after")
