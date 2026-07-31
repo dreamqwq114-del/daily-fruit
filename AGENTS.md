@@ -102,8 +102,10 @@
   deny-by-default、表/序列 revoke 和已知函数权限修复；
 - S2-08 写入前只读复核再次确认唯一目标为 `Daily Fruit`
   (`frzbbpocyzlqxljsrsiw`)，`public` 用户表、迁移和业务数据仍为空；
-- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-08`，只向该
-  精确 project ref 应用已提交的 `0001` 和 `0002`；
+- `S2-08` 已完成，远端 `public.alembic_version=0002`，八张业务表、
+  RLS、grants、约束、索引、迁移记录和 advisors 已复核；
+- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-09`，只准备
+  演示数据文件和静态校验，不连接数据库；
 - `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
-- 当前仍禁止远端 seed 和任何未包含在已提交迁移中的 DDL、policy 或
-  grant 修改。
+- 当前仍禁止本地或远端 seed，以及任何未包含在已提交迁移中的 DDL、
+  policy 或 grant 修改。
