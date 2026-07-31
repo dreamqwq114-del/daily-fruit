@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 
 import { getUserId } from '../utils/user-session.js'
 
@@ -34,7 +34,7 @@ const routes = [
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: import.meta.env.PROD ? createWebHashHistory() : createWebHistory(),
   routes,
   scrollBehavior: () => ({ top: 0 }),
 })

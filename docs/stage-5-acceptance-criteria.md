@@ -2,7 +2,8 @@
 
 ## 路由与会话
 
-- `/onboarding`、`/`、`/preferences`、`/history` 均可直接打开；
+- 本地 `/onboarding`、`/`、`/preferences`、`/history` 均可直接打开；Sites 对应
+  hash 路由可刷新和直接打开；
 - 缺少或损坏的 localStorage user ID 会被安全处理；
 - 未设置用户访问业务页会跳转初始设置；
 - 只有用户明确 `404` 才清除 user ID；

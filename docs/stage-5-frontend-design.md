@@ -12,6 +12,10 @@ FastAPI，不引入 Supabase 客户端，不修改数据库结构、迁移、RLS
 - `/preferences`：修改用户资料、口味和水果偏好；
 - `/history`：查看最近推荐、理由、反馈和 replaced 状态。
 
+本地 Vite 开发使用普通 history 路径。Sites 托管层不会把未知深层路径交给应用
+Worker，因此生产构建使用 hash history（例如 `/#/onboarding`），保证刷新和直接打开
+不会返回托管层 404；页面内的逻辑路由名称和访问控制保持不变。
+
 ## 2. 前端分层
 
 ```text
@@ -116,4 +120,3 @@ PUT 请求发送完整 `preferences` 数组；无所谓且不禁止的水果可�
 - 不引入认证或 Supabase JS；
 - 不把生产 API 暴露给公开匿名用户；
 - Sites 可发布私有 UI 预览，但只有 FastAPI 获得安全公网地址后才做真实线上联调。
-
