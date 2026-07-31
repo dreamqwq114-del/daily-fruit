@@ -23,9 +23,9 @@
 - Vue 通过统一 fetch 客户端调用 FastAPI，包含超时、错误、空状态和防重复提交；
 - 第一版演示 user ID 只保存在 localStorage，不保存用户资料或任何数据库密钥。
 
-阶段三算法仍不访问数据库或网络。阶段五没有修改数据库或 Supabase。当前 Sites
-部署可以用于私有前端预览；在 FastAPI 获得安全的公网运行地址前，线上页面不会连接
-本机后端，也不应对公网开放第一版无认证写接口。
+阶段三算法仍不访问数据库或网络。阶段五没有修改数据库或 Supabase。FastAPI Cloud
+当前只部署健康检查入口，GitHub Pages 和 Sites 预览仍不会连接该后端，避免把第一版
+无认证业务接口直接开放给网页访客。
 
 ## 本地运行
 
@@ -166,11 +166,27 @@ cd backend
 
 详细设计见 [docs/stage-1-plan.md](docs/stage-1-plan.md)。
 
+## FastAPI Cloud 后端
+
+后端地址为 `https://daily-fruit.fastapicloud.dev`。部署运行时固定为 Python 3.11，
+云端入口 `backend/main.py` 只注册 `/health`，完整业务应用仍位于 `app.main:app`，
+依赖继续由 `backend/requirements.txt` 管理。2026-07-31 已验证：
+
+- `GET /health` 返回 HTTP 200，环境为 `production`；
+- `GET /health?check_database=true` 返回 HTTP 200，数据库状态为 `ok`；
+- `/api`、`/docs` 和 `/openapi.json` 不在云端入口暴露；
+- `DATABASE_URL` 只保存在 FastAPI Cloud Secret 和本机被 Git 忽略的
+  `backend/.env` 中；
+- 本次部署没有执行迁移、seed 或数据库写入。
+
+该公网地址目前仅用于后端健康验证。第一版用户身份机制不适合生产环境，因此在增加
+认证或演示级写入保护前，不部署创建用户、修改偏好、换一组和反馈等业务接口。
+
 ## GitHub Pages 部署
 
-GitHub Pages 只托管 `frontend` 生成的 Vue 静态文件。FastAPI 必须在后续阶段
-独立部署，并继续由 FastAPI 连接 Supabase PostgreSQL；浏览器不能直接访问业务表，
-也不能持有数据库密码、Supabase secret key 或 service role key。
+GitHub Pages 只托管 `frontend` 生成的 Vue 静态文件。FastAPI 已独立部署，并继续由
+FastAPI 连接 Supabase PostgreSQL；浏览器不能直接访问业务表，也不能持有数据库密码、
+Supabase secret key 或 service role key。
 
 项目站点地址为：
 
@@ -216,10 +232,9 @@ Remove-Item Env:DEPLOY_TARGET,Env:GITHUB_REPOSITORY,Env:GITHUB_REPOSITORY_OWNER 
 公开的 FastAPI 地址通过仓库变量 `VITE_API_BASE_URL` 设置。它必须是一个 HTTPS
 网址，例如 `https://api.example.com`，不是秘密；不得把 `DATABASE_URL`、数据库密码
 或任何 Supabase key 放入 `VITE_` 变量。变量未设置时，生产页面不会请求访问者的
-localhost，而会显示“在线服务尚未配置”。因此 FastAPI 尚未部署时，GitHub Pages
+localhost，而会显示“在线服务尚未配置”。当前故意不设置该变量，所以 GitHub Pages
 只能展示前端界面，不能完成创建用户、推荐或反馈等在线操作。
 
-FastAPI 后续上线时，还必须把
-`https://dreamqwq114-del.github.io` 加入后端允许的 CORS 来源，再设置
-`VITE_API_BASE_URL` 并重新运行部署工作流。当前 GitHub Pages 部署不会修改或重新
-发布现有 ChatGPT Site，也不会修改 Supabase。
+FastAPI Cloud 已把 `https://dreamqwq114-del.github.io` 配置为允许的 CORS 来源；
+仍需先完成认证或演示级写入保护，才能设置 `VITE_API_BASE_URL` 并重新运行部署工作流。
+当前 GitHub Pages 部署不会修改或重新发布现有 ChatGPT Site，也不会修改 Supabase。
