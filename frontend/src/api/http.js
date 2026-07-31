@@ -1,3 +1,5 @@
+import { clearLocalSession, getAccessToken } from '../auth/session.js'
+
 const DEFAULT_TIMEOUT_MS = 10_000
 const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? '')
   .trim()
@@ -6,7 +8,6 @@ const IS_DEVELOPMENT = import.meta.env?.DEV ?? true
 const IS_GITHUB_PAGES =
   typeof __DAILY_FRUIT_GITHUB_PAGES__ !== 'undefined' &&
   __DAILY_FRUIT_GITHUB_PAGES__
-import { getAccessToken, signOut } from '../auth/session.js'
 
 const STATUS_MESSAGES = {
   400: '请求内容有误，请检查后重试。',
@@ -50,6 +51,23 @@ function getResponseMessage(status, payload) {
   }
 
   return STATUS_MESSAGES[status] ?? '请求没有成功，请稍后重试。'
+}
+
+function notifyAuthenticationRequired() {
+  window.dispatchEvent(new Event('daily-fruit:auth-required'))
+}
+
+export async function handleAuthenticationRequired({
+  clearSession = clearLocalSession,
+  notify = notifyAuthenticationRequired,
+} = {}) {
+  try {
+    await clearSession()
+  } catch {
+    // A stale local session must not prevent the route from returning to login.
+  } finally {
+    notify()
+  }
 }
 
 async function readPayload(response) {
@@ -99,6 +117,7 @@ export async function apiRequest(
   try {
     const accessToken = suppliedAccessToken ?? await getAccessToken()
     if (!accessToken) {
+      notifyAuthenticationRequired()
       throw new ApiError('请先登录后再继续。', {
         status: 401,
         code: 'login_required',
@@ -117,8 +136,7 @@ export async function apiRequest(
 
     if (!response.ok) {
       if (response.status === 401) {
-        await signOut()
-        window.dispatchEvent(new Event('daily-fruit:auth-required'))
+        await handleAuthenticationRequired()
       }
       throw new ApiError(getResponseMessage(response.status, payload), {
         status: response.status,

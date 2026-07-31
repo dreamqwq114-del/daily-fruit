@@ -37,7 +37,14 @@ export async function signUp(email, password) {
 
 export async function signOut() {
   if (!isAuthConfigured()) return
-  await getSupabaseClient().auth.signOut({ scope: 'local' })
+  const { error } = await getSupabaseClient().auth.signOut()
+  if (error) throw error
+}
+
+export async function clearLocalSession() {
+  if (!isAuthConfigured()) return
+  const { error } = await getSupabaseClient().auth.signOut({ scope: 'local' })
+  if (error) throw error
 }
 
 export function onAuthStateChange(callback) {

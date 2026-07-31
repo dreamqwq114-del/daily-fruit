@@ -68,6 +68,8 @@ class JwtVerifier:
             )
             if claims.get("role") != "authenticated":
                 raise AuthenticationError()
+            if claims.get("is_anonymous") is True:
+                raise AuthenticationError()
             return AuthPrincipal(
                 auth_user_id=UUID(str(claims["sub"])),
                 session_id=UUID(str(claims["session_id"])),

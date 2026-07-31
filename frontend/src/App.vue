@@ -9,15 +9,30 @@ const route = useRoute()
 const router = useRouter()
 const showNavigation = computed(() => route.meta.showNavigation !== false)
 const authenticated = ref(false)
+const loggingOut = ref(false)
+const logoutError = ref('')
 let unsubscribe = () => {}
 
 async function logout() {
-  await signOut()
-  await router.replace('/login')
+  if (loggingOut.value) return
+  loggingOut.value = true
+  logoutError.value = ''
+  try {
+    await signOut()
+    await router.replace('/login')
+  } catch {
+    logoutError.value = '退出失败，请检查网络后重试。'
+  } finally {
+    loggingOut.value = false
+  }
 }
 
 onMounted(async () => {
-  authenticated.value = Boolean(await getSession())
+  try {
+    authenticated.value = Boolean(await getSession())
+  } catch {
+    authenticated.value = false
+  }
   unsubscribe = onAuthStateChange((_event, session) => {
     authenticated.value = Boolean(session)
   })
@@ -35,9 +50,17 @@ onBeforeUnmount(() => unsubscribe())
           <small>今天吃什么，交给好选择</small>
         </span>
       </RouterLink>
-      <button v-if="authenticated" class="button button--ghost" type="button" @click="logout">
-        退出登录
-      </button>
+      <div v-if="authenticated" class="logout-controls">
+        <button
+          class="button button--ghost"
+          type="button"
+          :disabled="loggingOut"
+          @click="logout"
+        >
+          {{ loggingOut ? '正在退出…' : '退出登录' }}
+        </button>
+        <small v-if="logoutError" class="logout-error" role="alert">{{ logoutError }}</small>
+      </div>
     </header>
 
     <main class="app-main">

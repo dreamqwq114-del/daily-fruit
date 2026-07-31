@@ -11,7 +11,12 @@ globalThis.window = {
   dispatchEvent: () => {},
 }
 
-const { ApiError, apiRequest, ensureApiConfigured } = await import(
+const {
+  ApiError,
+  apiRequest,
+  ensureApiConfigured,
+  handleAuthenticationRequired,
+} = await import(
   '../src/api/http.js'
 )
 
@@ -69,6 +74,40 @@ test('apiRequest refuses protected requests without a session', async () => {
     (error) => error instanceof ApiError && error.code === 'login_required',
   )
   assert.equal(called, false)
+})
+
+test('authentication redirect waits for local session cleanup', async () => {
+  const order = []
+  let finishCleanup
+  const cleanup = new Promise((resolve) => {
+    finishCleanup = () => {
+      order.push('cleared')
+      resolve()
+    }
+  })
+
+  const handling = handleAuthenticationRequired({
+    clearSession: () => cleanup,
+    notify: () => order.push('notified'),
+  })
+  await Promise.resolve()
+  assert.deepEqual(order, [])
+
+  finishCleanup()
+  await handling
+  assert.deepEqual(order, ['cleared', 'notified'])
+})
+
+test('authentication redirect still runs after local cleanup fails', async () => {
+  const order = []
+  await handleAuthenticationRequired({
+    clearSession: async () => {
+      order.push('cleanup-failed')
+      throw new Error('storage unavailable')
+    },
+    notify: () => order.push('notified'),
+  })
+  assert.deepEqual(order, ['cleanup-failed', 'notified'])
 })
 
 test('production requests stop before fetch when no public api is configured', () => {

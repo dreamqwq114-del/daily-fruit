@@ -39,12 +39,23 @@ FastAPI。浏览器不得获得 PostgreSQL 连接串、secret key 或 service ro
 - FastAPI Cloud 仅配置项目 URL 和 JWT audience，不保存 publishable key；
 - GitHub Pages 只配置公开的 API URL、Supabase URL 和 publishable key；
 - JWKS 短时缓存，认证服务不可用返回统一 503，非法或过期 token 返回统一 401；
+- 后端明确拒绝 `is_anonymous=true` 的 Supabase 匿名身份；项目不得启用匿名登录；
+- 用户主动退出调用 Supabase 的服务端会话撤销，API 返回 401 时只清理本地失效会话；
+  已签发 access token 在自身过期前仍可能有效，因此生产环境应保持较短 JWT 有效期；
+- GitHub Pages 构建必须同时获得 HTTPS API URL、HTTPS Supabase URL 和
+  `sb_publishable_` 公钥，任一缺失或格式错误都会阻止发布；
 - public 业务表维持 RLS deny-by-default，浏览器角色不获得表权限，也不新增 Data API
   policy；
 - 本地测试用独立 PostgreSQL 的最小 `auth.users` 兼容表，禁止连接正式 Supabase。
 
 ## 迁移与回滚
 
-`0003` 只新增 nullable 字段、唯一约束和 `SET NULL` 外键。先在独立 PostgreSQL 验证
+`0003` 只新增 nullable 字段、唯一约束和 `SET NULL` 外键。`0004` 收紧浏览器角色对
+`alembic_version` 的遗留权限，downgrade 不恢复权限。两版迁移先在独立 PostgreSQL 验证
 upgrade、downgrade、再次 upgrade，再对已确认的 Daily Fruit project ref 执行 upgrade。
 生产回滚优先发布应用修复；只有确认没有绑定数据时才考虑 downgrade。
+
+迁移状态存在两个不同用途的记录源：应用结构以 `public.alembic_version=0004` 为权威；
+Supabase 连接器自己的迁移列表只记录由连接器提交的 `0001/0002`，不会自动收录通过
+Alembic 连接执行的 `0003/0004`。审计时必须同时说明两者，不能把连接器列表误认为实际
+数据库 schema 版本。

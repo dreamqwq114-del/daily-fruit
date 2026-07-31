@@ -5,7 +5,7 @@ import {
   githubPagesHtml,
   resolvePagesBase,
   resolvePagesOrigin,
-  validatePublicApiBaseUrl,
+  validateGitHubPagesEnvironment,
 } from './build/github-pages.js'
 import { sites } from './build/sites-vite-plugin.js'
 
@@ -17,9 +17,16 @@ export default defineConfig(async ({ mode }) => {
 
   if (isGitHubPages) {
     const env = loadEnv(mode, process.cwd(), 'VITE_')
-    validatePublicApiBaseUrl(
-      process.env.VITE_API_BASE_URL ?? env.VITE_API_BASE_URL ?? '',
-    )
+    validateGitHubPagesEnvironment({
+      apiBaseUrl:
+        process.env.VITE_API_BASE_URL ?? env.VITE_API_BASE_URL ?? '',
+      supabaseUrl:
+        process.env.VITE_SUPABASE_URL ?? env.VITE_SUPABASE_URL ?? '',
+      publishableKey:
+        process.env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+        env.VITE_SUPABASE_PUBLISHABLE_KEY ??
+        '',
+    })
   }
 
   process.env.WRANGLER_WRITE_LOGS ??= 'false'

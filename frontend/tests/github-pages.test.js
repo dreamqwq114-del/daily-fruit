@@ -5,12 +5,66 @@ import {
   githubPagesHtml,
   resolvePagesBase,
   resolvePagesOrigin,
+  validateGitHubPagesEnvironment,
+  validatePublishableKey,
   validatePublicApiBaseUrl,
+  validatePublicSupabaseUrl,
 } from '../build/github-pages.js'
 
 test('GitHub Pages base is derived from the repository with a local fallback', () => {
   assert.equal(resolvePagesBase('dreamqwq114-del/daily-fruit'), '/daily-fruit/')
   assert.equal(resolvePagesBase(undefined), '/daily-fruit/')
+})
+
+test('Pages deployment requires all three public runtime values', () => {
+  assert.deepEqual(
+    validateGitHubPagesEnvironment({
+      apiBaseUrl: 'https://api.example.com/',
+      supabaseUrl: 'https://project.supabase.co/',
+      publishableKey: 'sb_publishable_example',
+    }),
+    {
+      apiBaseUrl: 'https://api.example.com',
+      supabaseUrl: 'https://project.supabase.co',
+      publishableKey: 'sb_publishable_example',
+    },
+  )
+  assert.throws(() =>
+    validateGitHubPagesEnvironment({
+      apiBaseUrl: '',
+      supabaseUrl: 'https://project.supabase.co',
+      publishableKey: 'sb_publishable_example',
+    }),
+  )
+  assert.throws(() =>
+    validateGitHubPagesEnvironment({
+      apiBaseUrl: 'https://api.example.com',
+      supabaseUrl: '',
+      publishableKey: 'sb_publishable_example',
+    }),
+  )
+  assert.throws(() =>
+    validateGitHubPagesEnvironment({
+      apiBaseUrl: 'https://api.example.com',
+      supabaseUrl: 'https://project.supabase.co',
+      publishableKey: '',
+    }),
+  )
+})
+
+test('Supabase public values reject insecure URLs and secret-like keys', () => {
+  assert.equal(
+    validatePublicSupabaseUrl('https://project.supabase.co/'),
+    'https://project.supabase.co',
+  )
+  assert.throws(() => validatePublicSupabaseUrl('http://project.supabase.co'))
+  assert.throws(() => validatePublicSupabaseUrl('https://localhost:54321'))
+  assert.equal(
+    validatePublishableKey(' sb_publishable_example '),
+    'sb_publishable_example',
+  )
+  assert.throws(() => validatePublishableKey('sb_secret_example'))
+  assert.throws(() => validatePublishableKey('legacy-anon-key'))
 })
 
 test('GitHub Pages origin includes the project path', () => {

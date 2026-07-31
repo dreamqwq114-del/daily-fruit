@@ -89,6 +89,7 @@ def test_valid_token_returns_stable_principal(key_pair) -> None:
         {"aud": "wrong"},
         {"iss": "https://attacker.example/auth/v1"},
         {"role": "anon"},
+        {"is_anonymous": True},
         {"exp": datetime.now(UTC) - timedelta(seconds=1)},
         {"sub": "not-a-uuid"},
         {"session_id": "not-a-uuid"},

@@ -92,6 +92,20 @@ p {
   padding: 22px clamp(16px, 4vw, 36px) 8px;
 }
 
+.logout-controls {
+  float: right;
+  display: grid;
+  justify-items: end;
+  gap: 4px;
+}
+
+.logout-error {
+  max-width: 15rem;
+  color: var(--danger, #9f2d20);
+  font-size: 0.72rem;
+  text-align: right;
+}
+
 .brand {
   display: inline-flex;
   align-items: center;

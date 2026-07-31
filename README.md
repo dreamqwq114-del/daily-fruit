@@ -11,8 +11,8 @@
 - 测试数据库防误连 Supabase 正式项目；
 - 环境变量读取与可选数据库连通性检查；
 - 阶段一架构、ER、API 与实施计划；
-- SQLAlchemy Model、Pydantic Schema 和两版 Alembic migration；
-- 目标 Supabase 已迁移到 `public.alembic_version=0002`；
+- SQLAlchemy Model、Pydantic Schema 和四版 Alembic migration；
+- 目标 Supabase 已迁移到 `public.alembic_version=0004`；
 - 八张业务表已启用 RLS，并对浏览器角色保持 deny-by-default；
 - 目标 Supabase 已幂等写入 24 种水果、24 条营养和 48 条季节演示数据；
 - 纯 Python 推荐算法已实现过滤、六项加权评分、历史和反馈调整、营养互补、
@@ -21,12 +21,11 @@
 - 今日推荐支持同日幂等和并发保护，换一组会替换旧组并记录 change_requested；
 - Repository 批量预加载关联数据，数据库错误统一返回不泄漏内部信息的响应；
 - Vue 通过统一 fetch 客户端调用 FastAPI，包含超时、错误、空状态和防重复提交；
-- 阶段六正在接入 Supabase Auth；业务 API 从已验证 JWT 推导当前用户，不再信任浏览器
+- 阶段六已接入 Supabase Auth；业务 API 从已验证 JWT 推导当前用户，不再信任浏览器
   提交的 BIGINT user ID。
 
-阶段三算法仍不访问数据库或网络。FastAPI Cloud 当前线上版本仍是健康检查入口；S6
-本地代码已改为完整受保护入口，只有在认证、迁移和验收全部通过后才会替换线上版本并
-连接 GitHub Pages。
+阶段三算法仍不访问数据库或网络。阶段六已把 Supabase Auth、受保护的 FastAPI Cloud
+业务接口和 GitHub Pages 连成公网链路；浏览器仍不能直接访问业务表。
 
 ## 本地运行
 
@@ -174,18 +173,20 @@ cd backend
 ## FastAPI Cloud 后端
 
 后端地址为 `https://daily-fruit.fastapicloud.dev`。部署运行时固定为 Python 3.11。
-当前已提交线上版本的入口只注册 `/health`；S6 工作树中的 `backend/main.py` 已切换为
-完整且必须登录的 `app.main:app`。依赖继续由 `backend/requirements.txt` 管理。
-2026-07-31 的已上线版本验证结果是：
+云端入口 `backend/main.py` 运行完整且必须登录的 `app.main:app`，依赖继续由
+`backend/requirements.txt` 管理。2026-07-31 的已上线版本验证结果是：
 
 - `GET /health` 返回 HTTP 200，环境为 `production`；
 - `GET /health?check_database=true` 返回 HTTP 200，数据库状态为 `ok`；
-- `/api`、`/docs` 和 `/openapi.json` 不在云端入口暴露；
+- 匿名访问 `/api/fruits` 和 `/api/me` 返回 401；
+- `/docs` 和 `/openapi.json` 在 production 返回 404；
 - `DATABASE_URL` 只保存在 FastAPI Cloud Secret 和本机被 Git 忽略的
   `backend/.env` 中；
-- 本次部署没有执行迁移、seed 或数据库写入。
+- Supabase 已迁移到 `0004`，并保持 24/24/48 演示数据不变；
+- 线上 E2E 已验证登录、建档、两卡、刷新幂等、反馈、换组和历史数据，临时账号及
+  行为数据随后已清理。
 
-在 S6 迁移、部署和线上端到端验收完成前，该公网地址仍只应视为健康验证服务。
+所有业务接口都要求有效 Supabase access token，不能以请求参数冒充其他用户。
 
 ## GitHub Pages 部署
 
@@ -218,6 +219,9 @@ npm run build
 $env:DEPLOY_TARGET = "github-pages"
 $env:GITHUB_REPOSITORY = "dreamqwq114-del/daily-fruit"
 $env:GITHUB_REPOSITORY_OWNER = "dreamqwq114-del"
+$env:VITE_API_BASE_URL = "https://daily-fruit.fastapicloud.dev"
+$env:VITE_SUPABASE_URL = "https://frzbbpocyzlqxljsrsiw.supabase.co"
+$env:VITE_SUPABASE_PUBLISHABLE_KEY = "sb_publishable_your_public_key"
 npm run build
 npm run preview -- --host 127.0.0.1
 ```
@@ -226,7 +230,8 @@ npm run preview -- --host 127.0.0.1
 PowerShell 中开发，可以清理本次构建变量：
 
 ```powershell
-Remove-Item Env:DEPLOY_TARGET,Env:GITHUB_REPOSITORY,Env:GITHUB_REPOSITORY_OWNER `
+Remove-Item Env:DEPLOY_TARGET,Env:GITHUB_REPOSITORY,Env:GITHUB_REPOSITORY_OWNER, `
+  Env:VITE_API_BASE_URL,Env:VITE_SUPABASE_URL,Env:VITE_SUPABASE_PUBLISHABLE_KEY `
   -ErrorAction SilentlyContinue
 ```
 
@@ -239,9 +244,10 @@ Remove-Item Env:DEPLOY_TARGET,Env:GITHUB_REPOSITORY,Env:GITHUB_REPOSITORY_OWNER 
 浏览器可用 publishable key。FastAPI 地址必须是 HTTPS，例如
 `https://api.example.com`；不得把 `DATABASE_URL`、数据库密码、secret key 或
 service role key 放入 `VITE_` 变量。变量未设置时，生产页面不会请求访问者的
-localhost，而会显示“在线服务尚未配置”。当前故意不设置该变量，所以 GitHub Pages
-只能展示前端界面，不能完成创建用户、推荐或反馈等在线操作。
+localhost；普通本地/Sites 构建会显示“在线服务尚未配置”，GitHub Pages 构建则会直接失败，
+避免发布一个无法登录的版本。当前三个公开变量已配置，GitHub Pages 可以
+完成登录、推荐和反馈；publishable key 不是高权限密钥。
 
 FastAPI Cloud 已把 `https://dreamqwq114-del.github.io` 配置为允许的 CORS 来源；
-仍需先完成认证或演示级写入保护，才能设置 `VITE_API_BASE_URL` 并重新运行部署工作流。
-当前 GitHub Pages 部署不会修改或重新发布现有 ChatGPT Site，也不会修改 Supabase。
+Supabase Auth Site URL 和回调 allow list 已配置为 GitHub Pages 项目地址。该部署没有
+修改或重新发布现有 ChatGPT Site。

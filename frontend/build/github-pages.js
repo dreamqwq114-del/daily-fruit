@@ -48,6 +48,64 @@ export function validatePublicApiBaseUrl(value) {
   return normalized
 }
 
+export function validatePublicSupabaseUrl(value) {
+  const normalized = value.trim().replace(/\/$/, '')
+  if (!normalized) {
+    throw new Error('VITE_SUPABASE_URL is required for GitHub Pages.')
+  }
+
+  let url
+  try {
+    url = new URL(normalized)
+  } catch {
+    throw new Error('VITE_SUPABASE_URL must be an absolute HTTPS URL.')
+  }
+
+  const hostname = url.hostname.toLowerCase().replace(/\.$/, '')
+  if (
+    url.protocol !== 'https:' ||
+    ['localhost', '127.0.0.1', '[::1]', '0.0.0.0'].includes(hostname)
+  ) {
+    throw new Error(
+      'VITE_SUPABASE_URL must use HTTPS and must not point to localhost.',
+    )
+  }
+  if (url.username || url.password || url.search || url.hash) {
+    throw new Error(
+      'VITE_SUPABASE_URL must not include credentials, a query, or a hash.',
+    )
+  }
+
+  return normalized
+}
+
+export function validatePublishableKey(value) {
+  const normalized = value.trim()
+  if (!normalized.startsWith('sb_publishable_')) {
+    throw new Error(
+      'VITE_SUPABASE_PUBLISHABLE_KEY must be a Supabase publishable key.',
+    )
+  }
+  return normalized
+}
+
+export function validateGitHubPagesEnvironment({
+  apiBaseUrl,
+  supabaseUrl,
+  publishableKey,
+}) {
+  const normalizedApiBaseUrl = validatePublicApiBaseUrl(apiBaseUrl)
+  if (!normalizedApiBaseUrl) {
+    throw new Error('VITE_API_BASE_URL is required for GitHub Pages.')
+  }
+
+  return {
+    apiBaseUrl: normalizedApiBaseUrl,
+    supabaseUrl: validatePublicSupabaseUrl(supabaseUrl),
+    publishableKey: validatePublishableKey(publishableKey),
+  }
+}
+
 export function githubPagesHtml({ siteOrigin }) {
   return {
     name: 'github-pages-html',
