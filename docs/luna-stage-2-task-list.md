@@ -17,8 +17,10 @@
 - `S2-04` 已完成：`f2e4a21 chore: initialize safe Alembic configuration`；
 - `S2-05` 已完成：`ddbc214 feat: add initial database migration`；
 - `S2-06` 已完成：`36c3e29 test: verify migrations on disposable postgres`；
-- 当前下一任务：`S2-07`；
-- 当前仍禁止远端 DDL、迁移、seed、policy 和 grant 修改。
+- `S2-07` 已完成：`a3a417d feat: secure daily fruit database access`；
+- 当前下一任务：`S2-08`；
+- 当前只允许向已确认的目标 project ref 应用已提交的 `0001` 和 `0002`，
+  仍禁止 seed 和范围外 DDL、policy、grant 修改。
 
 ## S2-00：恢复目标项目可见性并完成只读门禁
 

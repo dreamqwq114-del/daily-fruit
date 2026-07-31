@@ -98,8 +98,12 @@
   约束和索引，未包含远端操作或系统 schema 变化；
 - `S2-06` 已由提交 `36c3e29` 完成，基础迁移已在 `daily_fruit_test`
   实测 upgrade、downgrade、结构一致性、约束和删除策略；
-- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-07`，只创建并
-  在本地测试库验证 RLS、privileges 和已知函数权限的安全迁移；
+- `S2-07` 已由提交 `a3a417d` 完成，安全迁移已在本地实测八表 RLS、
+  deny-by-default、表/序列 revoke 和已知函数权限修复；
+- S2-08 写入前只读复核再次确认唯一目标为 `Daily Fruit`
+  (`frzbbpocyzlqxljsrsiw`)，`public` 用户表、迁移和业务数据仍为空；
+- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-08`，只向该
+  精确 project ref 应用已提交的 `0001` 和 `0002`；
 - `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
-- 在安全迁移完成静态审查并获得明确批准前，仍禁止远端 DDL、迁移、
-  seed、policy 和 grant 修改。
+- 当前仍禁止远端 seed 和任何未包含在已提交迁移中的 DDL、policy 或
+  grant 修改。
