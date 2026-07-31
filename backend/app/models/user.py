@@ -2,24 +2,37 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import TYPE_CHECKING
+from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Column,
     ForeignKey,
     Identity,
     Index,
     Numeric,
     SmallInteger,
     String,
+    Table,
     UniqueConstraint,
+    Uuid,
     false,
     text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import Base, TimestampMixin
+
+
+AUTH_USERS_TABLE = Table(
+    "users",
+    Base.metadata,
+    Column("id", Uuid(as_uuid=True), primary_key=True),
+    schema="auth",
+    info={"external": True},
+)
 
 if TYPE_CHECKING:
     from app.models.fruit import Fruit
@@ -62,6 +75,12 @@ class User(TimestampMixin, Base):
         BigInteger,
         Identity(always=False),
         primary_key=True,
+    )
+    auth_user_id: Mapped[UUID | None] = mapped_column(
+        Uuid(as_uuid=True),
+        ForeignKey("auth.users.id", ondelete="SET NULL"),
+        nullable=True,
+        unique=True,
     )
     username: Mapped[str] = mapped_column(String(80), nullable=False)
     city: Mapped[str] = mapped_column(String(100), nullable=False)

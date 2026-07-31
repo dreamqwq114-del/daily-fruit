@@ -3,19 +3,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.orm import Session
 
+from app.auth import CurrentUser
 from app.database import get_database_session
 from app.schemas.recommendation import (
     RecommendationDetail,
     RecommendationFeedbackCreate,
     RecommendationFeedbackRead,
-    RecommendationRefreshRequest,
 )
 from app.services import recommendation_application_service
 
 
 router = APIRouter(tags=["recommendations"])
 DatabaseSession = Annotated[Session, Depends(get_database_session)]
-PositiveUserId = Annotated[int, Query(gt=0)]
 HistoryLimit = Annotated[int, Query(ge=1, le=100)]
 
 
@@ -24,12 +23,12 @@ HistoryLimit = Annotated[int, Query(ge=1, le=100)]
     response_model=RecommendationDetail,
 )
 def get_today_recommendation(
-    user_id: PositiveUserId,
+    current_user: CurrentUser,
     session: DatabaseSession,
 ) -> RecommendationDetail:
     return recommendation_application_service.get_today_recommendation(
         session,
-        user_id,
+        current_user.id,
     )
 
 
@@ -39,27 +38,27 @@ def get_today_recommendation(
     status_code=status.HTTP_201_CREATED,
 )
 def refresh_recommendation(
-    payload: RecommendationRefreshRequest,
+    current_user: CurrentUser,
     session: DatabaseSession,
 ) -> RecommendationDetail:
     return recommendation_application_service.refresh_recommendation(
         session,
-        payload.user_id,
+        current_user.id,
     )
 
 
 @router.get(
-    "/api/users/{user_id}/recommendations",
+    "/api/me/recommendations",
     response_model=list[RecommendationDetail],
 )
-def list_recommendation_history(
-    user_id: int,
+def list_current_user_recommendation_history(
+    current_user: CurrentUser,
     session: DatabaseSession,
     limit: HistoryLimit = 30,
 ) -> list[RecommendationDetail]:
     return recommendation_application_service.list_recommendation_history(
         session,
-        user_id,
+        current_user.id,
         limit=limit,
     )
 
@@ -73,12 +72,14 @@ def submit_feedback(
     item_id: int,
     payload: RecommendationFeedbackCreate,
     response: Response,
+    current_user: CurrentUser,
     session: DatabaseSession,
 ) -> RecommendationFeedbackRead:
     submission = recommendation_application_service.submit_feedback(
         session,
         item_id,
         payload,
+        expected_user_id=current_user.id,
     )
     response.status_code = (
         status.HTTP_201_CREATED if submission.created else status.HTTP_200_OK

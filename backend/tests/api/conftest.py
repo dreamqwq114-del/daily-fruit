@@ -1,4 +1,5 @@
 import os
+from uuid import uuid4
 from urllib.parse import urlsplit
 
 import pytest
@@ -8,6 +9,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
 from app.config import Settings
+from app.auth import AuthPrincipal, get_current_principal
 from app.database import get_database_session
 from app.main import app
 from app.seed.seed_fruits import load_seed_dataset, seed_database
@@ -28,11 +30,13 @@ def api_engine() -> Engine:
         version = connection.execute(
             text("SELECT version_num FROM public.alembic_version")
         ).scalar_one()
-    assert version == "0002"
+    assert version == "0004"
     seed_database(engine, load_seed_dataset())
     try:
         yield engine
     finally:
+        with engine.begin() as connection:
+            connection.execute(text("DELETE FROM auth.users"))
         engine.dispose()
 
 
@@ -54,7 +58,22 @@ def api_session(api_engine: Engine) -> Session:
 
 
 @pytest.fixture()
-def client(api_session: Session) -> TestClient:
+def auth_principal() -> AuthPrincipal:
+    return AuthPrincipal(auth_user_id=uuid4(), session_id=uuid4())
+
+
+@pytest.fixture()
+def client(
+    api_engine: Engine,
+    api_session: Session,
+    auth_principal: AuthPrincipal,
+) -> TestClient:
+    with api_engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO auth.users (id) VALUES (:id)"),
+            {"id": auth_principal.auth_user_id},
+        )
+
     def override_database_session():
         try:
             yield api_session
@@ -65,6 +84,7 @@ def client(api_session: Session) -> TestClient:
     app.dependency_overrides[get_database_session] = (
         override_database_session
     )
+    app.dependency_overrides[get_current_principal] = lambda: auth_principal
     try:
         with TestClient(app, raise_server_exceptions=False) as test_client:
             yield test_client

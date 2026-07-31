@@ -18,7 +18,7 @@ def valid_user() -> dict[str, object]:
 
 
 def create_user(client: TestClient) -> dict[str, object]:
-    response = client.post("/api/users", json=valid_user())
+    response = client.post("/api/me", json=valid_user())
     assert response.status_code == 201
     return response.json()
 
@@ -26,12 +26,12 @@ def create_user(client: TestClient) -> dict[str, object]:
 def test_create_get_and_update_user(client: TestClient) -> None:
     created = create_user(client)
 
-    fetched = client.get(f"/api/users/{created['id']}")
+    fetched = client.get("/api/me")
     assert fetched.status_code == 200
     assert fetched.json() == created
 
     updated = client.put(
-        f"/api/users/{created['id']}",
+        "/api/me",
         json={"city": "上海", "price_level": 3},
     )
     assert updated.status_code == 200
@@ -42,9 +42,9 @@ def test_create_get_and_update_user(client: TestClient) -> None:
 def test_unknown_user_and_invalid_payload_have_clear_status(
     client: TestClient,
 ) -> None:
-    assert client.get("/api/users/999999999").status_code == 404
+    assert client.get("/api/me").status_code == 404
     response = client.post(
-        "/api/users",
+        "/api/me",
         json={**valid_user(), "price_level": 9},
     )
     assert response.status_code == 422
@@ -63,7 +63,7 @@ def test_preferences_are_fully_replaced_and_validate_fruits(
     assert len(fruit_ids) == 2
 
     first = client.put(
-        f"/api/users/{user['id']}/fruit-preferences",
+        "/api/me/fruit-preferences",
         json={
             "preferences": [
                 {
@@ -83,7 +83,7 @@ def test_preferences_are_fully_replaced_and_validate_fruits(
     assert len(first.json()) == 2
 
     replaced = client.put(
-        f"/api/users/{user['id']}/fruit-preferences",
+        "/api/me/fruit-preferences",
         json={
             "preferences": [
                 {
@@ -98,17 +98,17 @@ def test_preferences_are_fully_replaced_and_validate_fruits(
     assert [item["fruit_id"] for item in replaced.json()] == [fruit_ids[0]]
 
     missing = client.put(
-        f"/api/users/{user['id']}/fruit-preferences",
+        "/api/me/fruit-preferences",
         json={"preferences": [{"fruit_id": 999999999}]},
     )
     assert missing.status_code == 404
     unchanged = client.get(
-        f"/api/users/{user['id']}/fruit-preferences"
+        "/api/me/fruit-preferences"
     )
     assert [item["fruit_id"] for item in unchanged.json()] == [fruit_ids[0]]
 
     cleared = client.put(
-        f"/api/users/{user['id']}/fruit-preferences",
+        "/api/me/fruit-preferences",
         json={"preferences": []},
     )
     assert cleared.status_code == 200

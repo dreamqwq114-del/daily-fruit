@@ -1,31 +1,43 @@
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 
-import { getUserId } from '../utils/user-session.js'
+import { isAuthenticated } from '../auth/session.js'
 
 const routes = [
   {
     path: '/',
     name: 'today',
     component: () => import('../views/TodayView.vue'),
-    meta: { requiresUser: true },
+    meta: { requiresAuth: true },
+  },
+  {
+    path: '/login',
+    name: 'login',
+    component: () => import('../views/LoginView.vue'),
+    meta: { showNavigation: false },
+  },
+  {
+    path: '/auth/callback',
+    name: 'auth-callback',
+    component: () => import('../views/AuthCallbackView.vue'),
+    meta: { showNavigation: false },
   },
   {
     path: '/onboarding',
     name: 'onboarding',
     component: () => import('../views/OnboardingView.vue'),
-    meta: { showNavigation: false },
+    meta: { showNavigation: false, requiresAuth: true },
   },
   {
     path: '/preferences',
     name: 'preferences',
     component: () => import('../views/PreferencesView.vue'),
-    meta: { requiresUser: true },
+    meta: { requiresAuth: true },
   },
   {
     path: '/history',
     name: 'history',
     component: () => import('../views/HistoryView.vue'),
-    meta: { requiresUser: true },
+    meta: { requiresAuth: true },
   },
   {
     path: '/:pathMatch(.*)*',
@@ -41,13 +53,16 @@ const router = createRouter({
   scrollBehavior: () => ({ top: 0 }),
 })
 
-router.beforeEach((to) => {
-  if (to.meta.requiresUser && !getUserId()) {
+router.beforeEach(async (to) => {
+  const authenticated = await isAuthenticated()
+  if (to.meta.requiresAuth && !authenticated) {
     return {
-      name: 'onboarding',
+      name: 'login',
       query: { next: to.fullPath },
     }
   }
+
+  if (to.name === 'login' && authenticated) return { name: 'today' }
 
   return true
 })

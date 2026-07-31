@@ -1,60 +1,22 @@
 import assert from 'node:assert/strict'
-import { afterEach, beforeEach, test } from 'node:test'
+import { afterEach, test } from 'node:test'
 
 import {
   preferencesToState,
   stateToPreferences,
 } from '../src/utils/fruit-preferences.js'
-import {
-  clearUserId,
-  getUserId,
-  setUserId,
-  USER_ID_KEY,
-} from '../src/utils/user-session.js'
-
-class MemoryStorage {
-  #values = new Map()
-
-  getItem(key) {
-    return this.#values.get(key) ?? null
-  }
-
-  setItem(key, value) {
-    this.#values.set(key, String(value))
-  }
-
-  removeItem(key) {
-    this.#values.delete(key)
-  }
-}
-
 globalThis.window = {
-  localStorage: new MemoryStorage(),
   setTimeout: globalThis.setTimeout,
   clearTimeout: globalThis.clearTimeout,
+  dispatchEvent: () => {},
 }
 
 const { ApiError, apiRequest, ensureApiConfigured } = await import(
   '../src/api/http.js'
 )
 
-beforeEach(() => {
-  clearUserId()
-})
-
 afterEach(() => {
   delete globalThis.fetch
-})
-
-test('user session accepts only positive safe integer ids', () => {
-  setUserId(12)
-  assert.equal(getUserId(), 12)
-
-  window.localStorage.setItem(USER_ID_KEY, '1.5')
-  assert.equal(getUserId(), null)
-
-  window.localStorage.setItem(USER_ID_KEY, '-3')
-  assert.equal(getUserId(), null)
 })
 
 test('fruit preference mapping keeps one normalized state per fruit', () => {
@@ -80,13 +42,33 @@ test('fruit preference mapping keeps one normalized state per fruit', () => {
 })
 
 test('apiRequest returns json for successful responses', async () => {
-  globalThis.fetch = async () =>
-    new Response(JSON.stringify({ status: 'ok' }), {
+  let requestOptions
+  globalThis.fetch = async (_url, options) => {
+    requestOptions = options
+    return new Response(JSON.stringify({ status: 'ok' }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
+  }
 
-  assert.deepEqual(await apiRequest('/health'), { status: 'ok' })
+  assert.deepEqual(
+    await apiRequest('/health', { accessToken: 'test-access-token' }),
+    { status: 'ok' },
+  )
+  assert.equal(requestOptions.headers.Authorization, 'Bearer test-access-token')
+})
+
+test('apiRequest refuses protected requests without a session', async () => {
+  let called = false
+  globalThis.fetch = async () => {
+    called = true
+  }
+
+  await assert.rejects(
+    () => apiRequest('/api/fruits'),
+    (error) => error instanceof ApiError && error.code === 'login_required',
+  )
+  assert.equal(called, false)
 })
 
 test('production requests stop before fetch when no public api is configured', () => {
@@ -130,7 +112,7 @@ test('apiRequest exposes safe conflict details and status', async () => {
     })
 
   await assert.rejects(
-    () => apiRequest('/api/recommendations/refresh'),
+    () => apiRequest('/api/recommendations/refresh', { accessToken: 'test-access-token' }),
     (error) => {
       assert.ok(error instanceof ApiError)
       assert.equal(error.status, 409)
@@ -146,7 +128,7 @@ test('apiRequest turns fetch failures into friendly network errors', async () =>
   }
 
   await assert.rejects(
-    () => apiRequest('/api/fruits'),
+    () => apiRequest('/api/fruits', { accessToken: 'test-access-token' }),
     (error) => {
       assert.ok(error instanceof ApiError)
       assert.equal(error.code, 'network')
@@ -164,7 +146,7 @@ test('apiRequest rejects successful html fallbacks as invalid responses', async 
     })
 
   await assert.rejects(
-    () => apiRequest('/api/fruits'),
+    () => apiRequest('/api/fruits', { accessToken: 'test-access-token' }),
     (error) => {
       assert.ok(error instanceof ApiError)
       assert.equal(error.code, 'invalid_response')
@@ -183,7 +165,7 @@ test('apiRequest aborts requests that exceed the timeout', async () => {
     })
 
   await assert.rejects(
-    () => apiRequest('/api/fruits', { timeoutMs: 5 }),
+    () => apiRequest('/api/fruits', { timeoutMs: 5, accessToken: 'test-access-token' }),
     (error) => {
       assert.ok(error instanceof ApiError)
       assert.equal(error.code, 'timeout')

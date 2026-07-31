@@ -38,6 +38,10 @@
 
 - 禁止提交 `.env`、数据库密码、secret key 或 service role key；
 - 前端禁止持有数据库连接字符串或高权限密钥；
+- Vue 可以使用 Supabase 客户端完成 Auth，但只能使用项目 URL 和公开的
+  publishable key，不得用它直接访问业务表；
+- FastAPI 必须验证 Supabase access token，并从已验证的 `sub` 推导当前用户；
+- 业务 API 不得信任客户端提交的 `user_id` 作为授权依据；
 - `backend/.env` 必须被 Git 忽略；
 - 业务表位于暴露 schema 时必须显式审查 grants 和 RLS；
 - 不能把“连接器返回 0 个项目”解释为数据库为空；
@@ -122,6 +126,8 @@
 - 后续 API 接入必须把 ORM 数据一次性转换为 `RecommendationUser`、
   `RecommendationFruit` 和 `RecommendationContext`，不得让纯算法持有 Session 或
   产生 N+1 查询。
-- 未获得用户对 S5 的明确授权前，不实现 Vue 正式业务页面，不修改远端数据库。
-- 后续前端只能调用现有 FastAPI；不得引入 Supabase 客户端、数据库 URL 或高权限密钥。
+- S5 前端已完成；S6 已获授权接入 Supabase Auth、受保护 FastAPI 和公网业务链路。
+- 前端对业务数据只能调用 FastAPI；Supabase 客户端仅限 Auth，不得包含数据库 URL、
+  secret key 或 service role key。
+- S6 生产迁移只允许新增已审查的 `users.auth_user_id` 绑定，不得修改 seed 或其他表。
 - 如后续任务发现必须改变 schema，立即停止并先更新设计与授权门禁。

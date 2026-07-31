@@ -21,6 +21,11 @@ app = FastAPI(
     title="Daily Fruit API",
     version="0.1.0",
     debug=settings.debug,
+    docs_url=None if settings.app_env == "production" else "/docs",
+    redoc_url=None if settings.app_env == "production" else "/redoc",
+    openapi_url=(
+        None if settings.app_env == "production" else "/openapi.json"
+    ),
 )
 app.add_middleware(
     CORSMiddleware,

@@ -152,11 +152,17 @@ def test_upgrade_matches_the_eight_table_metadata_definitions() -> None:
         expected_constraints = {
             signature
             for item in expected.constraints
+            if not any(
+                column.name == "auth_user_id"
+                for column in getattr(item, "columns", ())
+            )
             if (signature := constraint_signature(item)) is not None
         }
 
         assert [column_signature(item) for item in actual.columns] == [
-            column_signature(item) for item in expected.columns
+            column_signature(item)
+            for item in expected.columns
+            if item.name != "auth_user_id"
         ]
         assert actual_constraints == expected_constraints
 

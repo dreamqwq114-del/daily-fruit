@@ -1,8 +1,10 @@
 from datetime import UTC, datetime
+from uuid import UUID
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.errors import ResourceNotFoundError
+from app.errors import ResourceConflictError, ResourceNotFoundError
 from app.models import User
 from app.repositories import fruit_repository, user_repository
 from app.schemas.user import (
@@ -18,6 +20,23 @@ def create_user(session: Session, payload: UserCreate) -> UserRead:
     user = User(**payload.model_dump())
     user_repository.add_user(session, user)
     session.commit()
+    return UserRead.model_validate(user)
+
+
+def create_user_for_principal(
+    session: Session,
+    payload: UserCreate,
+    auth_user_id: UUID,
+) -> UserRead:
+    if user_repository.get_user_by_auth_user_id(session, auth_user_id):
+        raise ResourceConflictError("当前账号已经创建用户资料")
+    user = User(auth_user_id=auth_user_id, **payload.model_dump())
+    try:
+        user_repository.add_user(session, user)
+        session.commit()
+    except IntegrityError as error:
+        session.rollback()
+        raise ResourceConflictError("当前账号已经创建用户资料") from error
     return UserRead.model_validate(user)
 
 
@@ -95,6 +114,7 @@ def _require_user(session: Session, user_id: int) -> User:
 
 __all__ = [
     "create_user",
+    "create_user_for_principal",
     "get_fruit_preferences",
     "get_user",
     "replace_fruit_preferences",

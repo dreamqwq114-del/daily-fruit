@@ -28,6 +28,15 @@ EXPECTED_TABLES = {
     "public.recommendation_items",
     "public.recommendation_feedback",
 }
+EXPECTED_EXTERNAL_TABLES = {"auth.users"}
+
+
+def business_tables() -> list[Table]:
+    return [
+        target
+        for target in Base.metadata.tables.values()
+        if target.info.get("external") is not True
+    ]
 
 
 def table(name: str) -> Table:
@@ -103,10 +112,9 @@ def assert_numeric(
 
 
 def test_metadata_contains_exactly_eight_public_tables() -> None:
-    assert set(Base.metadata.tables) == EXPECTED_TABLES
-    assert {target.schema for target in Base.metadata.tables.values()} == {
-        "public"
-    }
+    assert set(Base.metadata.tables) == EXPECTED_TABLES | EXPECTED_EXTERNAL_TABLES
+    assert {target.schema for target in business_tables()} == {"public"}
+    assert Base.metadata.tables["auth.users"].info["external"] is True
 
 
 def test_all_orm_relationships_configure_without_database_connection() -> None:
@@ -114,7 +122,7 @@ def test_all_orm_relationships_configure_without_database_connection() -> None:
 
 
 def test_all_primary_keys_are_bigint_identity() -> None:
-    for target in Base.metadata.tables.values():
+    for target in business_tables():
         identifier = target.c.id
         assert identifier.primary_key
         assert isinstance(identifier.type, BigInteger)
@@ -123,7 +131,7 @@ def test_all_primary_keys_are_bigint_identity() -> None:
 
 
 def test_time_columns_are_timezone_aware_and_have_server_defaults() -> None:
-    for target in Base.metadata.tables.values():
+    for target in business_tables():
         created_at = target.c.created_at
         assert isinstance(created_at.type, DateTime)
         assert created_at.type.timezone is True
@@ -272,6 +280,7 @@ def test_foreign_key_delete_rules_are_explicit() -> None:
             "public.users.id",
             "RESTRICT",
         ),
+        ("users", "auth_user_id"): ("auth.users.id", "SET NULL"),
     }
 
     actual: dict[tuple[str, str], tuple[str, str | None]] = {}
@@ -287,7 +296,7 @@ def test_foreign_key_delete_rules_are_explicit() -> None:
 
 
 def test_every_foreign_key_has_a_leftmost_index_path() -> None:
-    for target in Base.metadata.tables.values():
+    for target in business_tables():
         indexed_columns = indexed_leftmost_columns(target)
         for foreign_key in target.foreign_keys:
             assert foreign_key.parent.name in indexed_columns, (
@@ -326,11 +335,11 @@ def test_postgresql_ddl_compiles_without_database_connection() -> None:
 
     table_statements = [
         str(CreateTable(target).compile(dialect=dialect))
-        for target in Base.metadata.sorted_tables
+        for target in business_tables()
     ]
     index_statements = [
         str(CreateIndex(index).compile(dialect=dialect))
-        for target in Base.metadata.sorted_tables
+        for target in business_tables()
         for index in target.indexes
     ]
     ddl = "\n".join(table_statements + index_statements)
@@ -340,5 +349,5 @@ def test_postgresql_ddl_compiles_without_database_connection() -> None:
     assert "JSONB DEFAULT '[]'::jsonb NOT NULL" in ddl
     assert "WHERE status = 'active'" in ddl
     assert "CREATE TABLE public.users" in ddl
-    assert "auth." not in ddl
+    assert "FOREIGN KEY(auth_user_id) REFERENCES auth.users" in ddl
     assert "storage." not in ddl

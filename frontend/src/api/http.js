@@ -6,9 +6,11 @@ const IS_DEVELOPMENT = import.meta.env?.DEV ?? true
 const IS_GITHUB_PAGES =
   typeof __DAILY_FRUIT_GITHUB_PAGES__ !== 'undefined' &&
   __DAILY_FRUIT_GITHUB_PAGES__
+import { getAccessToken, signOut } from '../auth/session.js'
 
 const STATUS_MESSAGES = {
   400: '请求内容有误，请检查后重试。',
+  401: '登录状态已过期，请重新登录。',
   404: '没有找到对应的数据。',
   409: '当前条件下无法完成操作，请调整后重试。',
   422: '填写的信息不完整或格式不正确。',
@@ -79,7 +81,13 @@ async function readPayload(response) {
 
 export async function apiRequest(
   path,
-  { method = 'GET', body, timeoutMs = DEFAULT_TIMEOUT_MS, signal } = {},
+  {
+    method = 'GET',
+    body,
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    signal,
+    accessToken: suppliedAccessToken,
+  } = {},
 ) {
   ensureApiConfigured()
 
@@ -89,9 +97,18 @@ export async function apiRequest(
   signal?.addEventListener('abort', abortFromCaller, { once: true })
 
   try {
+    const accessToken = suppliedAccessToken ?? await getAccessToken()
+    if (!accessToken) {
+      throw new ApiError('请先登录后再继续。', {
+        status: 401,
+        code: 'login_required',
+      })
+    }
+    const headers = { Authorization: `Bearer ${accessToken}` }
+    if (body !== undefined) headers['Content-Type'] = 'application/json'
     const response = await fetch(`${API_BASE_URL}${path}`, {
       method,
-      headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+      headers,
       body: body === undefined ? undefined : JSON.stringify(body),
       credentials: 'omit',
       signal: controller.signal,
@@ -99,6 +116,10 @@ export async function apiRequest(
     const payload = response.status === 204 ? null : await readPayload(response)
 
     if (!response.ok) {
+      if (response.status === 401) {
+        await signOut()
+        window.dispatchEvent(new Event('daily-fruit:auth-required'))
+      }
       throw new ApiError(getResponseMessage(response.status, payload), {
         status: response.status,
         code: 'http_error',

@@ -86,6 +86,22 @@ def migrated_database() -> tuple[Engine, str]:
     assert parsed.path.strip("/") == "daily_fruit_test"
 
     engine = create_engine(database_url, poolclass=NullPool)
+    with engine.begin() as connection:
+        inspector = inspect(connection)
+        if "auth" not in inspector.get_schema_names():
+            connection.execute(text("CREATE SCHEMA auth"))
+        auth_tables = set(inspect(connection).get_table_names(schema="auth"))
+        assert auth_tables <= {"users"}, (
+            f"refusing to alter unknown auth test tables: {auth_tables}"
+        )
+        if "users" not in auth_tables:
+            connection.execute(
+                text(
+                    "CREATE TABLE auth.users ("
+                    "id UUID PRIMARY KEY"
+                    ")"
+                )
+            )
     with engine.connect() as connection:
         existing = set(inspect(connection).get_table_names(schema="public"))
     unknown = existing - EXPECTED_TABLES - {"alembic_version"}
@@ -161,6 +177,19 @@ def test_upgrade_downgrade_upgrade_round_trip(
     run_alembic("upgrade", "head", database_url=database_url)
     run_alembic("check", database_url=database_url)
 
+    with engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0004"
+        users_columns = {
+            item["name"]
+            for item in inspect(connection).get_columns(
+                "users",
+                schema="public",
+            )
+        }
+        assert "auth_user_id" in users_columns
+
 
 def test_actual_indexes_and_foreign_key_delete_rules(
     migrated_database: tuple[Engine, str],
@@ -199,6 +228,7 @@ def test_actual_indexes_and_foreign_key_delete_rules(
         ("recommendation_items", "fruit_id"): "RESTRICT",
         ("recommendation_feedback", "recommendation_item_id"): "CASCADE",
         ("recommendation_feedback", "user_id"): "RESTRICT",
+        ("users", "auth_user_id"): "SET NULL",
     }
 
 

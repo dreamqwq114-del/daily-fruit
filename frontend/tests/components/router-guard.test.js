@@ -1,20 +1,22 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const authApi = vi.hoisted(() => ({ isAuthenticated: vi.fn() }))
+vi.mock('../../src/auth/session.js', () => authApi)
 
 import router from '../../src/router/index.js'
-import { clearUserId, setUserId } from '../../src/utils/user-session.js'
 
-describe('router user guard', () => {
+describe('router auth guard', () => {
   beforeEach(async () => {
-    clearUserId()
-    await router.replace('/onboarding')
+    authApi.isAuthenticated.mockResolvedValue(false)
+    await router.replace('/login')
   })
 
-  it('redirects missing users and allows a valid stored id', async () => {
+  it('redirects guests and allows an authenticated session', async () => {
     await router.push('/history')
-    expect(router.currentRoute.value.name).toBe('onboarding')
+    expect(router.currentRoute.value.name).toBe('login')
     expect(router.currentRoute.value.query.next).toBe('/history')
 
-    setUserId(9)
+    authApi.isAuthenticated.mockResolvedValue(true)
     await router.push('/history')
     expect(router.currentRoute.value.name).toBe('history')
   })

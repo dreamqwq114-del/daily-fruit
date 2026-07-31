@@ -7,10 +7,6 @@ vi.mock('../../src/api/recommendation.js', () => ({
 vi.mock('../../src/api/user.js', () => ({
   getUser: vi.fn().mockResolvedValue({ id: 1, username: '小果' }),
 }))
-vi.mock('../../src/utils/user-session.js', () => ({
-  getUserId: () => 1,
-  clearUserId: vi.fn(),
-}))
 vi.mock('vue-router', () => ({
   useRouter: () => ({ replace: vi.fn() }),
 }))

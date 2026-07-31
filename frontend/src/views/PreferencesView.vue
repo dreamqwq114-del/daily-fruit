@@ -20,7 +20,6 @@ import {
   profileFromUser,
   stateToPreferences,
 } from '../utils/fruit-preferences.js'
-import { clearUserId, getUserId } from '../utils/user-session.js'
 
 const router = useRouter()
 const profile = reactive(createDefaultProfile())
@@ -33,7 +32,6 @@ const successMessage = ref('')
 
 async function handleUserNotFound(error) {
   if (error instanceof ApiError && error.status === 404) {
-    clearUserId()
     await router.replace('/onboarding')
     return true
   }
@@ -43,13 +41,11 @@ async function handleUserNotFound(error) {
 async function loadPreferences() {
   loading.value = true
   errorMessage.value = ''
-  const userId = getUserId()
-
   try {
     const [user, fruitList, preferences] = await Promise.all([
-      getUser(userId),
+      getUser(),
       listFruits(),
-      getFruitPreferences(userId),
+      getFruitPreferences(),
     ])
     Object.assign(profile, profileFromUser(user))
     fruits.value = fruitList
@@ -69,19 +65,15 @@ async function loadPreferences() {
 async function savePreferences() {
   if (submitting.value) return
 
-  const userId = getUserId()
   submitting.value = true
   errorMessage.value = ''
   successMessage.value = ''
 
   try {
-    await updateUser(userId, { ...profile })
+    await updateUser({ ...profile })
 
     try {
-      await replaceFruitPreferences(
-        userId,
-        stateToPreferences(preferenceState.value),
-      )
+      await replaceFruitPreferences(stateToPreferences(preferenceState.value))
     } catch (error) {
       errorMessage.value = `基本信息已保存，但水果偏好保存失败：${error.message}`
       return

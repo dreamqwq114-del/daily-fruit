@@ -9,7 +9,6 @@ import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
 import LoadingState from '../components/LoadingState.vue'
 import RecommendationReasons from '../components/RecommendationReasons.vue'
-import { clearUserId, getUserId } from '../utils/user-session.js'
 
 const router = useRouter()
 const user = ref(null)
@@ -42,18 +41,15 @@ function sortedItems(items) {
 async function loadHistory() {
   loading.value = true
   errorMessage.value = ''
-  const userId = getUserId()
-
   try {
     const [userResult, historyResult] = await Promise.all([
-      getUser(userId),
-      listRecommendationHistory(userId),
+      getUser(),
+      listRecommendationHistory(),
     ])
     user.value = userResult
     history.value = historyResult
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
-      clearUserId()
       await router.replace('/onboarding')
     } else {
       errorMessage.value = error.message

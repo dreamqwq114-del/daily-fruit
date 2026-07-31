@@ -6,6 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 class ApplicationError(Exception):
     status_code = 400
     default_detail = "请求无法完成"
+    headers: dict[str, str] | None = None
 
     def __init__(self, detail: str | None = None) -> None:
         super().__init__(detail or self.default_detail)
@@ -27,6 +28,17 @@ class DatabaseUnavailableError(ApplicationError):
     default_detail = "数据库服务暂时不可用"
 
 
+class AuthenticationError(ApplicationError):
+    status_code = 401
+    default_detail = "登录状态无效或已过期"
+    headers = {"WWW-Authenticate": "Bearer"}
+
+
+class AuthenticationUnavailableError(ApplicationError):
+    status_code = 503
+    default_detail = "认证服务暂时不可用"
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApplicationError)
     async def handle_application_error(
@@ -36,6 +48,7 @@ def register_exception_handlers(app: FastAPI) -> None:
         return JSONResponse(
             status_code=error.status_code,
             content={"detail": error.detail},
+            headers=error.headers,
         )
 
     @app.exception_handler(SQLAlchemyError)
@@ -51,6 +64,8 @@ def register_exception_handlers(app: FastAPI) -> None:
 
 __all__ = [
     "ApplicationError",
+    "AuthenticationError",
+    "AuthenticationUnavailableError",
     "DatabaseUnavailableError",
     "ResourceConflictError",
     "ResourceNotFoundError",

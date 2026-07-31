@@ -17,16 +17,21 @@ def test_cloud_entrypoint_exposes_health() -> None:
 @pytest.mark.parametrize(
     ("method", "path"),
     [
-        ("POST", "/api/users"),
+        ("POST", "/api/me"),
         ("GET", "/api/fruits"),
-        ("GET", "/docs"),
-        ("GET", "/openapi.json"),
+        ("GET", "/api/recommendations/today"),
     ],
 )
-def test_cloud_entrypoint_hides_business_api(
+def test_application_rejects_anonymous_business_api(
     method: str,
     path: str,
 ) -> None:
     response = client.request(method, path)
 
-    assert response.status_code == 404
+    assert response.status_code == 401
+    assert response.headers["www-authenticate"] == "Bearer"
+
+
+def test_test_environment_keeps_local_api_docs() -> None:
+    assert client.get("/docs").status_code == 200
+    assert client.get("/openapi.json").status_code == 200

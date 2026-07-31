@@ -194,11 +194,15 @@ def submit_feedback(
     session: Session,
     item_id: int,
     payload: RecommendationFeedbackCreate,
+    *,
+    expected_user_id: int | None = None,
 ) -> FeedbackSubmission:
     item = recommendation_repository.get_item(session, item_id)
     if item is None:
         raise ResourceNotFoundError("推荐项不存在")
     user_id = item.recommendation.user_id
+    if expected_user_id is not None and user_id != expected_user_id:
+        raise ResourceNotFoundError("推荐项不存在")
     existing = recommendation_repository.get_feedback(
         session,
         item_id=item_id,

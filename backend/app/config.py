@@ -81,6 +81,16 @@ class Settings(BaseSettings):
         alias="TEST_DATABASE_URL",
         repr=False,
     )
+    supabase_url: str | None = Field(
+        default=None,
+        alias="SUPABASE_URL",
+    )
+    supabase_jwt_audience: str = Field(
+        default="authenticated",
+        min_length=1,
+        max_length=100,
+        alias="SUPABASE_JWT_AUDIENCE",
+    )
     database_connect_timeout_seconds: int = Field(
         default=5,
         ge=1,
@@ -125,6 +135,7 @@ class Settings(BaseSettings):
         "database_url",
         "migration_database_url",
         "test_database_url",
+        "supabase_url",
         mode="before",
     )
     @classmethod
@@ -167,7 +178,39 @@ class Settings(BaseSettings):
                     purpose=purpose,
                 )
 
+        if self.supabase_url is not None:
+            parsed_supabase_url = urlsplit(self.supabase_url)
+            host = (parsed_supabase_url.hostname or "").lower()
+            is_local = host in {"127.0.0.1", "localhost"}
+            allowed_schemes = {"http", "https"} if is_local else {"https"}
+            if (
+                parsed_supabase_url.username is not None
+                or parsed_supabase_url.password is not None
+                or parsed_supabase_url.query
+                or parsed_supabase_url.fragment
+                or parsed_supabase_url.path not in {"", "/"}
+                or parsed_supabase_url.scheme not in allowed_schemes
+                or not host
+            ):
+                raise ValueError(
+                    "SUPABASE_URL must be an HTTPS project origin without "
+                    "credentials, query parameters, fragments, or paths"
+                )
+            self.supabase_url = self.supabase_url.rstrip("/")
+
         return self
+
+    @property
+    def supabase_jwt_issuer(self) -> str | None:
+        if self.supabase_url is None:
+            return None
+        return f"{self.supabase_url}/auth/v1"
+
+    @property
+    def supabase_jwks_url(self) -> str | None:
+        if self.supabase_jwt_issuer is None:
+            return None
+        return f"{self.supabase_jwt_issuer}/.well-known/jwks.json"
 
     def database_url_for(self, purpose: DatabasePurpose) -> str | None:
         if purpose == "runtime":

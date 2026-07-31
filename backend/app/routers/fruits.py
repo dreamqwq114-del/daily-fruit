@@ -3,12 +3,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.auth import get_current_principal
 from app.database import get_database_session
 from app.schemas.fruit import FruitDetail, FruitRead
 from app.services import fruit_service
 
 
-router = APIRouter(prefix="/api/fruits", tags=["fruits"])
+router = APIRouter(
+    prefix="/api/fruits",
+    tags=["fruits"],
+    dependencies=[Depends(get_current_principal)],
+)
 DatabaseSession = Annotated[Session, Depends(get_database_session)]
 
 

@@ -91,6 +91,8 @@ def include_object(
     compare_to: object | None,
 ) -> bool:
     del name, reflected
+    if getattr(object_, "info", {}).get("external") is True:
+        return False
     if (
         type_ == "foreign_key_constraint"
         and isinstance(object_, ForeignKeyConstraint)

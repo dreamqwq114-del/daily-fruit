@@ -21,7 +21,6 @@ import {
   profileFromUser,
   stateToPreferences,
 } from '../utils/fruit-preferences.js'
-import { clearUserId, getUserId, setUserId } from '../utils/user-session.js'
 
 const router = useRouter()
 const route = useRoute()
@@ -32,7 +31,7 @@ const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
 const saveMessage = ref('')
-const existingUserId = ref(getUserId())
+const existingUser = ref(false)
 
 function initializeFruitState() {
   preferenceState.value = Object.fromEntries(
@@ -48,25 +47,19 @@ async function loadPage() {
     fruits.value = await listFruits()
     initializeFruitState()
 
-    if (existingUserId.value) {
-      try {
-        const [user, preferences] = await Promise.all([
-          getUser(existingUserId.value),
-          getFruitPreferences(existingUserId.value),
-        ])
-        Object.assign(profile, profileFromUser(user))
-        preferenceState.value = {
-          ...preferenceState.value,
-          ...preferencesToState(preferences),
-        }
-      } catch (error) {
-        if (error instanceof ApiError && error.status === 404) {
-          clearUserId()
-          existingUserId.value = null
-        } else {
-          throw error
-        }
+    try {
+      const [user, preferences] = await Promise.all([
+        getUser(),
+        getFruitPreferences(),
+      ])
+      existingUser.value = true
+      Object.assign(profile, profileFromUser(user))
+      preferenceState.value = {
+        ...preferenceState.value,
+        ...preferencesToState(preferences),
       }
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 404)) throw error
     }
   } catch (error) {
     errorMessage.value = error.message
@@ -83,20 +76,14 @@ async function saveOnboarding() {
   saveMessage.value = ''
 
   try {
-    const user = existingUserId.value
-      ? await updateUser(existingUserId.value, { ...profile })
+    const user = existingUser.value
+      ? await updateUser({ ...profile })
       : await createUser({ ...profile })
 
-    if (!existingUserId.value) {
-      existingUserId.value = user.id
-      setUserId(user.id)
-    }
+    existingUser.value = true
 
     try {
-      await replaceFruitPreferences(
-        user.id,
-        stateToPreferences(preferenceState.value),
-      )
+      await replaceFruitPreferences(stateToPreferences(preferenceState.value))
     } catch (error) {
       saveMessage.value = '基本信息已保存，但水果偏好暂未保存。请再次点击保存重试。'
       errorMessage.value = error.message
@@ -123,9 +110,9 @@ onMounted(loadPage)
 <template>
   <div class="onboarding-page">
     <header class="onboarding-hero">
-      <RouterLink v-if="existingUserId" class="text-link" to="/">返回今日推荐</RouterLink>
+      <RouterLink v-if="existingUser" class="text-link" to="/">返回今日推荐</RouterLink>
       <p class="eyebrow">每天两种 · 刚刚好</p>
-      <h1>{{ existingUserId ? '更新你的水果档案' : '先认识一下你的口味' }}</h1>
+      <h1>{{ existingUser ? '更新你的水果档案' : '先认识一下你的口味' }}</h1>
       <p>
         我们会结合地区、季节、价格、历史和反馈进行推荐。所有推荐理由都来自真实评分规则。
       </p>
@@ -146,7 +133,7 @@ onMounted(loadPage)
       <div class="sticky-submit">
         <p>季节、价格和营养数据仅用于软件功能演示。</p>
         <button class="button button--primary" type="submit" :disabled="submitting">
-          {{ submitting ? '正在保存…' : existingUserId ? '保存修改' : '保存并查看今日推荐' }}
+          {{ submitting ? '正在保存…' : existingUser ? '保存修改' : '保存并查看今日推荐' }}
         </button>
       </div>
     </form>

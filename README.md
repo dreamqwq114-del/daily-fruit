@@ -21,11 +21,12 @@
 - 今日推荐支持同日幂等和并发保护，换一组会替换旧组并记录 change_requested；
 - Repository 批量预加载关联数据，数据库错误统一返回不泄漏内部信息的响应；
 - Vue 通过统一 fetch 客户端调用 FastAPI，包含超时、错误、空状态和防重复提交；
-- 第一版演示 user ID 只保存在 localStorage，不保存用户资料或任何数据库密钥。
+- 阶段六正在接入 Supabase Auth；业务 API 从已验证 JWT 推导当前用户，不再信任浏览器
+  提交的 BIGINT user ID。
 
-阶段三算法仍不访问数据库或网络。阶段五没有修改数据库或 Supabase。FastAPI Cloud
-当前只部署健康检查入口，GitHub Pages 和 Sites 预览仍不会连接该后端，避免把第一版
-无认证业务接口直接开放给网页访客。
+阶段三算法仍不访问数据库或网络。FastAPI Cloud 当前线上版本仍是健康检查入口；S6
+本地代码已改为完整受保护入口，只有在认证、迁移和验收全部通过后才会替换线上版本并
+连接 GitHub Pages。
 
 ## 本地运行
 
@@ -56,20 +57,20 @@ cd backend
 算法入口是 `app.services.recommend_fruits`。它接收内存中的用户、水果和上下文对象，
 每次返回两种不同水果、归一化分数和每项 2 到 4 条理由。传入 `random_seed` 可复现结果。
 
-### 后端业务接口
+### 后端业务接口与认证
 
 启动 FastAPI 后可以在 `http://127.0.0.1:8000/docs` 查看交互式接口文档。当前接口包括：
 
-- `POST /api/users`、`GET/PUT /api/users/{user_id}`；
-- `GET/PUT /api/users/{user_id}/fruit-preferences`；
+- `POST/GET/PUT /api/me`；
+- `GET/PUT /api/me/fruit-preferences`；
 - `GET /api/fruits`、`GET /api/fruits/{fruit_id}`；
-- `GET /api/recommendations/today?user_id=1`；
+- `GET /api/recommendations/today`；
 - `POST /api/recommendations/refresh`；
-- `GET /api/users/{user_id}/recommendations`；
+- `GET /api/me/recommendations`；
 - `POST /api/recommendations/items/{item_id}/feedback`。
 
-第一版通过普通 `user_id` 演示流程，没有正式登录与授权，不应把写接口直接开放到公网。
-Vue 只调用 FastAPI，不能直接操作 Supabase 业务表。
+除 `/health` 外，业务接口要求 Supabase Auth access token。Vue 只调用 FastAPI 处理业务
+数据，Supabase 客户端只负责登录，不直接操作业务表。
 
 ## 数据库配置
 
@@ -85,6 +86,8 @@ DATABASE_MAX_OVERFLOW=5
 FRONTEND_ORIGIN=http://localhost:5173
 APP_ENV=development
 DEBUG=true
+SUPABASE_URL=
+SUPABASE_JWT_AUDIENCE=authenticated
 ```
 
 - `DATABASE_URL`：FastAPI 运行时连接；
@@ -118,7 +121,9 @@ npm run dev
 
 前端路由：
 
-- `/onboarding`：创建或恢复演示用户设置；
+- `/login`：邮箱密码注册和登录；
+- `/auth/callback`：处理邮箱确认后的会话恢复；
+- `/onboarding`：创建或更新当前登录账号的水果档案；
 - `/`：今日两种水果、换一组和反馈；
 - `/preferences`：修改用户与水果偏好；
 - `/history`：查看 active/replaced 推荐、理由与反馈。
@@ -134,8 +139,8 @@ npm run build
 
 - `backend/.env` 已被 Git 忽略，禁止提交；
 - 浏览器端不保存数据库密码、Supabase secret key 或 service role key；
-- 第一版由 FastAPI 连接 PostgreSQL，Vue 不直连业务表；
-- 当前简化用户机制不属于生产级认证方案；
+- Vue 只使用公开 Supabase URL 和 publishable key 完成 Auth；
+- FastAPI 校验 JWT 后连接 PostgreSQL，Vue 不直连业务表；
 - 项目中的季节、价格和部分营养数据用于软件功能演示，不构成医学或专业营养建议。
 
 ## 演示数据口径
@@ -168,9 +173,10 @@ cd backend
 
 ## FastAPI Cloud 后端
 
-后端地址为 `https://daily-fruit.fastapicloud.dev`。部署运行时固定为 Python 3.11，
-云端入口 `backend/main.py` 只注册 `/health`，完整业务应用仍位于 `app.main:app`，
-依赖继续由 `backend/requirements.txt` 管理。2026-07-31 已验证：
+后端地址为 `https://daily-fruit.fastapicloud.dev`。部署运行时固定为 Python 3.11。
+当前已提交线上版本的入口只注册 `/health`；S6 工作树中的 `backend/main.py` 已切换为
+完整且必须登录的 `app.main:app`。依赖继续由 `backend/requirements.txt` 管理。
+2026-07-31 的已上线版本验证结果是：
 
 - `GET /health` 返回 HTTP 200，环境为 `production`；
 - `GET /health?check_database=true` 返回 HTTP 200，数据库状态为 `ok`；
@@ -179,8 +185,7 @@ cd backend
   `backend/.env` 中；
 - 本次部署没有执行迁移、seed 或数据库写入。
 
-该公网地址目前仅用于后端健康验证。第一版用户身份机制不适合生产环境，因此在增加
-认证或演示级写入保护前，不部署创建用户、修改偏好、换一组和反馈等业务接口。
+在 S6 迁移、部署和线上端到端验收完成前，该公网地址仍只应视为健康验证服务。
 
 ## GitHub Pages 部署
 
@@ -229,9 +234,11 @@ Remove-Item Env:DEPLOY_TARGET,Env:GITHUB_REPOSITORY,Env:GITHUB_REPOSITORY_OWNER 
 或部署工作流到 `main` 会自动部署，也可以在 Actions 页面手动运行
 `Deploy frontend to GitHub Pages`（`workflow_dispatch`）。
 
-公开的 FastAPI 地址通过仓库变量 `VITE_API_BASE_URL` 设置。它必须是一个 HTTPS
-网址，例如 `https://api.example.com`，不是秘密；不得把 `DATABASE_URL`、数据库密码
-或任何 Supabase key 放入 `VITE_` 变量。变量未设置时，生产页面不会请求访问者的
+公开配置通过仓库 variables 设置：`VITE_API_BASE_URL`、`VITE_SUPABASE_URL` 和
+`VITE_SUPABASE_PUBLISHABLE_KEY`。它们分别是公开 FastAPI 地址、Supabase 项目 URL 和
+浏览器可用 publishable key。FastAPI 地址必须是 HTTPS，例如
+`https://api.example.com`；不得把 `DATABASE_URL`、数据库密码、secret key 或
+service role key 放入 `VITE_` 变量。变量未设置时，生产页面不会请求访问者的
 localhost，而会显示“在线服务尚未配置”。当前故意不设置该变量，所以 GitHub Pages
 只能展示前端界面，不能完成创建用户、推荐或反馈等在线操作。
 

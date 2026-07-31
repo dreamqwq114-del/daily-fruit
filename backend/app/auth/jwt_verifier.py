@@ -1,0 +1,92 @@
+from functools import lru_cache
+from typing import Any, Protocol
+from uuid import UUID
+
+import jwt
+from jwt import PyJWKClient
+from jwt.exceptions import PyJWTError
+
+from app.auth.principal import AuthPrincipal
+from app.config import Settings, get_settings
+from app.errors import AuthenticationError, AuthenticationUnavailableError
+
+
+ALLOWED_JWT_ALGORITHMS = frozenset({"RS256", "ES256"})
+
+
+class SigningKeyClient(Protocol):
+    def get_signing_key_from_jwt(self, token: str) -> Any: ...
+
+
+class JwtVerifier:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        signing_key_client: SigningKeyClient | None = None,
+    ) -> None:
+        issuer = settings.supabase_jwt_issuer
+        jwks_url = settings.supabase_jwks_url
+        if issuer is None or jwks_url is None:
+            raise AuthenticationUnavailableError()
+        self._issuer = issuer
+        self._audience = settings.supabase_jwt_audience
+        self._signing_key_client = signing_key_client or PyJWKClient(
+            jwks_url,
+            cache_keys=True,
+            cache_jwk_set=True,
+            lifespan=300,
+            timeout=5,
+        )
+
+    def verify(self, token: str) -> AuthPrincipal:
+        try:
+            header = jwt.get_unverified_header(token)
+            algorithm = header.get("alg")
+            if algorithm not in ALLOWED_JWT_ALGORITHMS:
+                raise AuthenticationError()
+            signing_key = self._signing_key_client.get_signing_key_from_jwt(
+                token
+            )
+            claims = jwt.decode(
+                token,
+                signing_key.key,
+                algorithms=[algorithm],
+                audience=self._audience,
+                issuer=self._issuer,
+                options={
+                    "require": [
+                        "aud",
+                        "exp",
+                        "iat",
+                        "iss",
+                        "role",
+                        "session_id",
+                        "sub",
+                    ]
+                },
+            )
+            if claims.get("role") != "authenticated":
+                raise AuthenticationError()
+            return AuthPrincipal(
+                auth_user_id=UUID(str(claims["sub"])),
+                session_id=UUID(str(claims["session_id"])),
+            )
+        except AuthenticationError:
+            raise
+        except (PyJWTError, ValueError, KeyError, TypeError) as error:
+            raise AuthenticationError() from error
+        except Exception as error:
+            raise AuthenticationUnavailableError() from error
+
+
+@lru_cache
+def get_jwt_verifier() -> JwtVerifier:
+    return JwtVerifier(get_settings())
+
+
+__all__ = [
+    "ALLOWED_JWT_ALGORITHMS",
+    "JwtVerifier",
+    "get_jwt_verifier",
+]

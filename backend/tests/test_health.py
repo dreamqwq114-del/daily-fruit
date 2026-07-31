@@ -13,7 +13,7 @@ def test_health_does_not_require_database() -> None:
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
-        "environment": "development",
+        "environment": "test",
         "database": "not_checked",
     }
 

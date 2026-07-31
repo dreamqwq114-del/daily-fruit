@@ -1,13 +1,15 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import date
+from uuid import uuid4
 
 from fastapi.testclient import TestClient
 import pytest
-from sqlalchemy import delete, event, func, select
+from sqlalchemy import delete, event, func, select, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
+from app.auth import AuthPrincipal, get_current_principal
 from app.database import get_database_session
 from app.main import app
 from app.models import Recommendation, User
@@ -32,7 +34,7 @@ def valid_user(username: str = "推荐接口测试") -> dict[str, object]:
 
 
 def create_user(client: TestClient, username: str = "推荐接口测试") -> int:
-    response = client.post("/api/users", json=valid_user(username))
+    response = client.post("/api/me", json=valid_user(username))
     assert response.status_code == 201
     return response.json()["id"]
 
@@ -49,10 +51,7 @@ def fixed_today(monkeypatch):
 def test_today_refresh_feedback_and_history_flow(client: TestClient) -> None:
     user_id = create_user(client)
 
-    first_response = client.get(
-        "/api/recommendations/today",
-        params={"user_id": user_id},
-    )
+    first_response = client.get("/api/recommendations/today")
     assert first_response.status_code == 200
     first = first_response.json()
     assert len(first["items"]) == 2
@@ -60,16 +59,12 @@ def test_today_refresh_feedback_and_history_flow(client: TestClient) -> None:
     assert all(2 <= len(item["reasons"]) <= 4 for item in first["items"])
     assert all(item["fruit"]["nutrition"] for item in first["items"])
 
-    repeated = client.get(
-        "/api/recommendations/today",
-        params={"user_id": user_id},
-    )
+    repeated = client.get("/api/recommendations/today")
     assert repeated.status_code == 200
     assert repeated.json()["id"] == first["id"]
 
     refreshed_response = client.post(
         "/api/recommendations/refresh",
-        json={"user_id": user_id},
     )
     assert refreshed_response.status_code == 201
     refreshed = refreshed_response.json()
@@ -92,7 +87,7 @@ def test_today_refresh_feedback_and_history_flow(client: TestClient) -> None:
     assert duplicate.status_code == 200
     assert duplicate.json()["id"] == feedback.json()["id"]
 
-    history = client.get(f"/api/users/{user_id}/recommendations")
+    history = client.get("/api/me/recommendations")
     assert history.status_code == 200
     assert [item["status"] for item in history.json()] == [
         "active",
@@ -122,10 +117,7 @@ def test_api_accepts_each_feedback_type(
     feedback_type: str,
 ) -> None:
     user_id = create_user(client, f"反馈-{feedback_type}")
-    recommendation = client.get(
-        "/api/recommendations/today",
-        params={"user_id": user_id},
-    ).json()
+    recommendation = client.get("/api/recommendations/today").json()
 
     response = client.post(
         (
@@ -140,17 +132,8 @@ def test_api_accepts_each_feedback_type(
 
 
 def test_invalid_resources_and_refresh_state(client: TestClient) -> None:
-    assert client.get(
-        "/api/recommendations/today",
-        params={"user_id": 999999999},
-    ).status_code == 404
-    assert client.get(
-        "/api/recommendations/today",
-        params={"user_id": 0},
-    ).status_code == 422
-    assert client.get(
-        "/api/users/999999999/recommendations"
-    ).status_code == 404
+    assert client.get("/api/recommendations/today").status_code == 404
+    assert client.get("/api/me/recommendations").status_code == 404
     assert client.post(
         "/api/recommendations/items/999999999/feedback",
         json={"feedback_type": "liked"},
@@ -159,7 +142,6 @@ def test_invalid_resources_and_refresh_state(client: TestClient) -> None:
     user_id = create_user(client, "没有初始推荐")
     assert client.post(
         "/api/recommendations/refresh",
-        json={"user_id": user_id},
     ).status_code == 409
 
 
@@ -177,18 +159,15 @@ def test_all_forbidden_returns_conflict_without_partial_recommendation(
         for fruit in fruits
     ]
     assert client.put(
-        f"/api/users/{user_id}/fruit-preferences",
+        "/api/me/fruit-preferences",
         json={"preferences": preferences},
     ).status_code == 200
 
-    response = client.get(
-        "/api/recommendations/today",
-        params={"user_id": user_id},
-    )
+    response = client.get("/api/recommendations/today")
 
     assert response.status_code == 409
     assert "不足两种" in response.json()["detail"]
-    assert client.get(f"/api/users/{user_id}/recommendations").json() == []
+    assert client.get("/api/me/recommendations").json() == []
 
 
 def test_database_error_response_does_not_leak_details() -> None:
@@ -199,6 +178,10 @@ def test_database_error_response_does_not_leak_details() -> None:
         yield
 
     app.dependency_overrides[get_database_session] = broken_session
+    app.dependency_overrides[get_current_principal] = lambda: AuthPrincipal(
+        auth_user_id=uuid4(),
+        session_id=uuid4(),
+    )
     try:
         with TestClient(app, raise_server_exceptions=False) as test_client:
             response = test_client.get("/api/fruits")
@@ -211,15 +194,41 @@ def test_database_error_response_does_not_leak_details() -> None:
     assert "SELECT" not in response.text
 
 
+def test_feedback_is_hidden_from_another_authenticated_user(
+    client: TestClient,
+    api_engine: Engine,
+) -> None:
+    create_user(client, "所有者")
+    recommendation = client.get("/api/recommendations/today").json()
+    owner_item_id = recommendation["items"][0]["id"]
+
+    other_principal = AuthPrincipal(
+        auth_user_id=uuid4(),
+        session_id=uuid4(),
+    )
+    with api_engine.begin() as connection:
+        connection.execute(
+            text("INSERT INTO auth.users (id) VALUES (:id)"),
+            {"id": other_principal.auth_user_id},
+        )
+    app.dependency_overrides[get_current_principal] = lambda: other_principal
+    assert client.post("/api/me", json=valid_user("其他用户")).status_code == 201
+
+    response = client.post(
+        f"/api/recommendations/items/{owner_item_id}/feedback",
+        json={"feedback_type": "liked"},
+    )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "推荐项不存在"}
+
+
 def test_loaded_today_and_history_have_bounded_query_counts(
     client: TestClient,
     api_engine: Engine,
 ) -> None:
     user_id = create_user(client, "查询计数")
-    client.get(
-        "/api/recommendations/today",
-        params={"user_id": user_id},
-    )
+    client.get("/api/recommendations/today")
     statements: list[str] = []
 
     def count_query(*args):
@@ -227,21 +236,18 @@ def test_loaded_today_and_history_have_bounded_query_counts(
 
     event.listen(api_engine, "before_cursor_execute", count_query)
     try:
-        today = client.get(
-            "/api/recommendations/today",
-            params={"user_id": user_id},
-        )
+        today = client.get("/api/recommendations/today")
         today_count = _business_query_count(statements)
         statements.clear()
-        history = client.get(f"/api/users/{user_id}/recommendations")
+        history = client.get("/api/me/recommendations")
         history_count = _business_query_count(statements)
     finally:
         event.remove(api_engine, "before_cursor_execute", count_query)
 
     assert today.status_code == 200
     assert history.status_code == 200
-    assert today_count <= 9
-    assert history_count <= 8
+    assert today_count <= 10
+    assert history_count <= 9
 
 
 def test_concurrent_today_requests_create_one_active_recommendation(
@@ -249,7 +255,13 @@ def test_concurrent_today_requests_create_one_active_recommendation(
 ) -> None:
     factory = sessionmaker(bind=api_engine, expire_on_commit=False)
     with factory() as setup_session:
+        auth_user_id = uuid4()
+        setup_session.execute(
+            text("INSERT INTO auth.users (id) VALUES (:id)"),
+            {"id": auth_user_id},
+        )
         user = User(
+            auth_user_id=auth_user_id,
             username="并发测试",
             city="苏州",
             region="华东",
@@ -273,6 +285,10 @@ def test_concurrent_today_requests_create_one_active_recommendation(
                 raise
 
     app.dependency_overrides[get_database_session] = session_dependency
+    app.dependency_overrides[get_current_principal] = lambda: AuthPrincipal(
+        auth_user_id=user.auth_user_id,
+        session_id=uuid4(),
+    )
     try:
         with TestClient(app, raise_server_exceptions=False) as test_client:
             with ThreadPoolExecutor(max_workers=2) as executor:
@@ -280,7 +296,6 @@ def test_concurrent_today_requests_create_one_active_recommendation(
                     executor.map(
                         lambda _: test_client.get(
                             "/api/recommendations/today",
-                            params={"user_id": user_id},
                         ),
                         range(2),
                     )

@@ -13,7 +13,6 @@ import EmptyState from '../components/EmptyState.vue'
 import ErrorState from '../components/ErrorState.vue'
 import FruitCard from '../components/FruitCard.vue'
 import LoadingState from '../components/LoadingState.vue'
-import { clearUserId, getUserId } from '../utils/user-session.js'
 
 const router = useRouter()
 const user = ref(null)
@@ -41,7 +40,6 @@ const formattedDate = computed(() => {
 
 async function handleUserNotFound(error) {
   if (error instanceof ApiError && error.status === 404) {
-    clearUserId()
     await router.replace('/onboarding')
     return true
   }
@@ -52,12 +50,10 @@ async function loadToday() {
   loading.value = true
   errorMessage.value = ''
   actionMessage.value = ''
-  const userId = getUserId()
-
   try {
     const [userResult, recommendationResult] = await Promise.all([
-      getUser(userId),
-      getTodayRecommendation(userId),
+      getUser(),
+      getTodayRecommendation(),
     ])
     user.value = userResult
     recommendation.value = recommendationResult
@@ -78,7 +74,7 @@ async function refreshToday() {
   actionTone.value = 'success'
 
   try {
-    recommendation.value = await refreshRecommendation(getUserId())
+    recommendation.value = await refreshRecommendation()
     actionMessage.value = '已经换成一组新的搭配。'
     actionTone.value = 'success'
     window.scrollTo({ top: 0, behavior: 'smooth' })

@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
+from app.auth import CurrentPrincipal, CurrentUser
 from app.database import get_database_session
 from app.schemas.user import (
     UserCreate,
@@ -14,55 +15,60 @@ from app.schemas.user import (
 from app.services import user_service
 
 
-router = APIRouter(prefix="/api/users", tags=["users"])
+router = APIRouter(prefix="/api/me", tags=["users"])
 DatabaseSession = Annotated[Session, Depends(get_database_session)]
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def create_user(
+def create_current_user(
     payload: UserCreate,
+    principal: CurrentPrincipal,
     session: DatabaseSession,
 ) -> UserRead:
-    return user_service.create_user(session, payload)
+    return user_service.create_user_for_principal(
+        session,
+        payload,
+        principal.auth_user_id,
+    )
 
 
-@router.get("/{user_id}", response_model=UserRead)
-def get_user(user_id: int, session: DatabaseSession) -> UserRead:
-    return user_service.get_user(session, user_id)
+@router.get("", response_model=UserRead)
+def get_current_user_profile(current_user: CurrentUser) -> UserRead:
+    return UserRead.model_validate(current_user)
 
 
-@router.put("/{user_id}", response_model=UserRead)
-def update_user(
-    user_id: int,
+@router.put("", response_model=UserRead)
+def update_current_user(
     payload: UserUpdate,
+    current_user: CurrentUser,
     session: DatabaseSession,
 ) -> UserRead:
-    return user_service.update_user(session, user_id, payload)
+    return user_service.update_user(session, current_user.id, payload)
 
 
 @router.get(
-    "/{user_id}/fruit-preferences",
+    "/fruit-preferences",
     response_model=list[UserFruitPreferenceRead],
 )
-def get_fruit_preferences(
-    user_id: int,
+def get_current_user_fruit_preferences(
+    current_user: CurrentUser,
     session: DatabaseSession,
 ) -> list[UserFruitPreferenceRead]:
-    return user_service.get_fruit_preferences(session, user_id)
+    return user_service.get_fruit_preferences(session, current_user.id)
 
 
 @router.put(
-    "/{user_id}/fruit-preferences",
+    "/fruit-preferences",
     response_model=list[UserFruitPreferenceRead],
 )
-def replace_fruit_preferences(
-    user_id: int,
+def replace_current_user_fruit_preferences(
     payload: UserFruitPreferencesUpdate,
+    current_user: CurrentUser,
     session: DatabaseSession,
 ) -> list[UserFruitPreferenceRead]:
     return user_service.replace_fruit_preferences(
         session,
-        user_id,
+        current_user.id,
         payload,
     )
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from typing import Iterable
+from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -16,6 +17,18 @@ def get_user(
     include_preferences: bool = False,
 ) -> User | None:
     statement = select(User).where(User.id == user_id)
+    if include_preferences:
+        statement = statement.options(selectinload(User.fruit_preferences))
+    return session.execute(statement).scalar_one_or_none()
+
+
+def get_user_by_auth_user_id(
+    session: Session,
+    auth_user_id: UUID,
+    *,
+    include_preferences: bool = False,
+) -> User | None:
+    statement = select(User).where(User.auth_user_id == auth_user_id)
     if include_preferences:
         statement = statement.options(selectinload(User.fruit_preferences))
     return session.execute(statement).scalar_one_or_none()
@@ -77,6 +90,7 @@ def replace_preferences(
 __all__ = [
     "add_user",
     "get_user",
+    "get_user_by_auth_user_id",
     "list_preferences",
     "replace_preferences",
 ]

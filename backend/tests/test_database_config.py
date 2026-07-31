@@ -177,6 +177,36 @@ def test_database_url_requires_psycopg_driver() -> None:
         )
 
 
+def test_supabase_auth_urls_are_derived_from_project_origin() -> None:
+    settings = make_settings(
+        SUPABASE_URL="https://project-ref.supabase.co/",
+    )
+
+    assert settings.supabase_url == "https://project-ref.supabase.co"
+    assert settings.supabase_jwt_issuer == (
+        "https://project-ref.supabase.co/auth/v1"
+    )
+    assert settings.supabase_jwks_url == (
+        "https://project-ref.supabase.co/auth/v1/.well-known/jwks.json"
+    )
+
+
+@pytest.mark.parametrize(
+    "supabase_url",
+    [
+        "http://project-ref.supabase.co",
+        "https://user:password@project-ref.supabase.co",
+        "https://project-ref.supabase.co/rest/v1",
+        "https://project-ref.supabase.co?secret=value",
+    ],
+)
+def test_supabase_auth_url_rejects_unsafe_values(
+    supabase_url: str,
+) -> None:
+    with pytest.raises(ValidationError, match="SUPABASE_URL"):
+        make_settings(SUPABASE_URL=supabase_url)
+
+
 def test_engine_factory_uses_separate_pooling_without_connecting(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
