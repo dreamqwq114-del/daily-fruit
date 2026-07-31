@@ -14,7 +14,8 @@
 - `S2-01` 已完成：`742eeeb feat: add safe database configuration contract`；
 - `S2-02` 已完成：`ae83235 feat: define daily fruit database models`；
 - `S2-03` 已完成：`fab7a89 feat: add validated database schemas`；
-- 当前下一任务：`S2-04`；
+- `S2-04` 已完成：`f2e4a21 chore: initialize safe Alembic configuration`；
+- 当前下一任务：`S2-05`；
 - 当前仍禁止远端 DDL、迁移、seed、policy 和 grant 修改。
 
 ## S2-00：恢复目标项目可见性并完成只读门禁

@@ -92,8 +92,10 @@
   metadata、约束、索引和删除策略已通过静态测试；
 - `S2-03` 已由提交 `fab7a89` 完成，Pydantic Schema 和验证测试已与
   ORM 分离；
-- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-04`，只初始化
-  Alembic 安全配置，不生成或执行业务迁移；
+- `S2-04` 已由提交 `f2e4a21` 完成，Alembic 只接受显式的 test 或
+  migration 连接用途，受控文件中不保存数据库 URL；
+- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-05`，只生成并
+  静态审查基础表迁移，不连接或修改远端 Supabase；
 - `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
 - 在安全迁移完成静态审查并获得明确批准前，仍禁止远端 DDL、迁移、
   seed、policy 和 grant 修改。
