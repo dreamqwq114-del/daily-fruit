@@ -297,8 +297,7 @@ p {
 }
 
 .form-field input,
-.form-field select,
-.fruit-preference-row select {
+.form-field select {
   width: 100%;
   min-height: 48px;
   padding: 0 13px;
@@ -308,8 +307,7 @@ p {
 }
 
 .form-field input:hover,
-.form-field select:hover,
-.fruit-preference-row select:hover {
+.form-field select:hover {
   border-color: #92aa98;
 }
 
@@ -353,15 +351,130 @@ p {
   font-size: 0.78rem;
 }
 
-.fruit-preference-grid {
+.fruit-selection-summary {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.fruit-selection-group {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #e1e6dc;
+  border-radius: 18px;
+  background: #fff;
+}
+
+.fruit-selection-group--favorite {
+  border-color: #c9dfce;
+}
+
+.fruit-selection-group--forbidden {
+  border-color: #ead1c7;
+}
+
+.fruit-selection-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
 }
 
-.fruit-preference-row {
+.fruit-selection-heading h2 {
+  margin: 0;
+  font-size: .96rem;
+}
+
+.fruit-selection-heading h2 span {
+  display: inline-grid;
+  min-width: 24px;
+  min-height: 24px;
+  margin-left: 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green-dark);
+  font-size: .75rem;
+}
+
+.fruit-selection-group--forbidden .fruit-selection-heading h2 span {
+  background: #f8e5dd;
+  color: #9a513d;
+}
+
+.text-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--green-dark);
+  font: inherit;
+  font-size: .78rem;
+  cursor: pointer;
+}
+
+.fruit-selection-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.fruit-selection-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid #b7d3bd;
+  border-radius: 999px;
+  background: #f1f8f1;
+  color: var(--green-dark);
+  font: inherit;
+  font-size: .78rem;
+  cursor: pointer;
+}
+
+.fruit-selection-group--forbidden .fruit-selection-chip {
+  border-color: #e5b9aa;
+  background: #fff3ee;
+  color: #9a513d;
+}
+
+.fruit-selection-empty {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: .78rem;
+  line-height: 1.5;
+}
+
+.fruit-search-field {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(112px, 0.65fr);
+  gap: 8px;
+  margin-top: 18px;
+  color: var(--ink);
+  font-size: .88rem;
+  font-weight: 780;
+}
+
+.fruit-search-field input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 13px;
+  border: 1px solid #cbd6ca;
+  border-radius: 13px;
+  background: #fff;
+  font: inherit;
+}
+
+.fruit-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.fruit-choice-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   min-width: 0;
   gap: 10px;
@@ -371,7 +484,7 @@ p {
   background: #fff;
 }
 
-.fruit-preference-row .fruit-initial {
+.fruit-choice-card .fruit-initial {
   width: 38px;
   height: 38px;
   border-radius: 13px 13px 13px 4px;
@@ -395,6 +508,39 @@ p {
   font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.fruit-choice-actions {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.fruit-choice-button {
+  min-height: 36px;
+  padding: 5px 8px;
+  border: 1px solid #cbd6ca;
+  border-radius: 10px;
+  background: #fff;
+  color: var(--muted);
+  font: inherit;
+  font-size: .76rem;
+  cursor: pointer;
+}
+
+.fruit-choice-button--favorite.is-selected {
+  border-color: #6ca77a;
+  background: #eaf6ec;
+  color: var(--green-dark);
+  font-weight: 780;
+}
+
+.fruit-choice-button--forbidden.is-selected {
+  border-color: #d58e78;
+  background: #fff0eb;
+  color: #9a513d;
+  font-weight: 780;
 }
 
 .sticky-submit {
@@ -1065,7 +1211,8 @@ p {
 
   .field-grid--two,
   .preference-sliders,
-  .fruit-preference-grid {
+  .fruit-selection-summary,
+  .fruit-choice-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1102,14 +1249,6 @@ p {
   .feedback-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
     overflow-x: visible;
-  }
-
-  .fruit-preference-row {
-    grid-template-columns: auto minmax(0, 1fr);
-  }
-
-  .fruit-preference-row select {
-    grid-column: 1 / -1;
   }
 
   .portion-row {

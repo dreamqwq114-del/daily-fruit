@@ -2,8 +2,8 @@ import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 
 import {
-  preferencesToState,
-  stateToPreferences,
+  preferencesToSelection,
+  selectionToPreferences,
 } from '../src/utils/fruit-preferences.js'
 globalThis.window = {
   setTimeout: globalThis.setTimeout,
@@ -24,24 +24,44 @@ afterEach(() => {
   delete globalThis.fetch
 })
 
-test('fruit preference mapping keeps one normalized state per fruit', () => {
-  const state = preferencesToState([
+test('fruit preference mapping uses favorite and forbidden selections', () => {
+  const selection = preferencesToSelection([
     { fruit_id: 1, preference_score: 2, is_forbidden: false },
     { fruit_id: 2, preference_score: -1, is_forbidden: false },
     { fruit_id: 3, preference_score: 2, is_forbidden: true },
   ])
 
-  assert.deepEqual(state, {
-    1: 'favorite',
-    2: 'dislike',
-    3: 'forbidden',
+  assert.deepEqual(selection, {
+    favoriteIds: [1],
+    forbiddenIds: [3],
+    legacyPreferences: [
+      { fruit_id: 2, preference_score: -1, is_forbidden: false },
+    ],
   })
 
   assert.deepEqual(
-    stateToPreferences({ 1: 'favorite', 2: 'neutral', 3: 'forbidden' }),
+    selectionToPreferences(selection),
     [
       { fruit_id: 1, preference_score: 2, is_forbidden: false },
+      { fruit_id: 2, preference_score: -1, is_forbidden: false },
       { fruit_id: 3, preference_score: 0, is_forbidden: true },
+    ],
+  )
+})
+
+test('new selections override a legacy preference without dropping other legacy data', () => {
+  assert.deepEqual(
+    selectionToPreferences({
+      favoriteIds: [2],
+      forbiddenIds: [],
+      legacyPreferences: [
+        { fruit_id: 1, preference_score: -1, is_forbidden: false },
+        { fruit_id: 2, preference_score: 1, is_forbidden: false },
+      ],
+    }),
+    [
+      { fruit_id: 1, preference_score: -1, is_forbidden: false },
+      { fruit_id: 2, preference_score: 2, is_forbidden: false },
     ],
   )
 })

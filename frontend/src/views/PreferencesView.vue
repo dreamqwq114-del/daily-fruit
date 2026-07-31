@@ -16,15 +16,16 @@ import LoadingState from '../components/LoadingState.vue'
 import ProfileFields from '../components/ProfileFields.vue'
 import {
   createDefaultProfile,
-  preferencesToState,
+  createDefaultFruitPreferenceSelection,
+  preferencesToSelection,
   profileFromUser,
-  stateToPreferences,
+  selectionToPreferences,
 } from '../utils/fruit-preferences.js'
 
 const router = useRouter()
 const profile = reactive(createDefaultProfile())
 const fruits = ref([])
-const preferenceState = ref({})
+const preferenceSelection = ref(createDefaultFruitPreferenceSelection())
 const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
@@ -55,10 +56,7 @@ async function loadPreferences() {
     ])
     Object.assign(profile, profileFromUser(user))
     fruits.value = fruitList
-    const existingState = preferencesToState(preferences)
-    preferenceState.value = Object.fromEntries(
-      fruitList.map((fruit) => [fruit.id, existingState[fruit.id] ?? 'neutral']),
-    )
+    preferenceSelection.value = preferencesToSelection(preferences)
   } catch (error) {
     errorMessage.value = error.message
   } finally {
@@ -77,7 +75,7 @@ async function savePreferences() {
     await updateUser({ ...profile })
 
     try {
-      await replaceFruitPreferences(stateToPreferences(preferenceState.value))
+      await replaceFruitPreferences(selectionToPreferences(preferenceSelection.value))
     } catch (error) {
       errorMessage.value = `基本信息已保存，但水果偏好保存失败：${error.message}`
       return
@@ -109,7 +107,7 @@ onMounted(loadPreferences)
 
     <form v-else class="profile-form" @submit.prevent="savePreferences">
       <ProfileFields v-model="profile" />
-      <FruitPreferencePicker v-model="preferenceState" :fruits="fruits" />
+      <FruitPreferencePicker v-model="preferenceSelection" :fruits="fruits" />
 
       <p v-if="successMessage" class="inline-message inline-message--success" role="status">
         {{ successMessage }}

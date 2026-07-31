@@ -17,27 +17,22 @@ import LoadingState from '../components/LoadingState.vue'
 import ProfileFields from '../components/ProfileFields.vue'
 import {
   createDefaultProfile,
-  preferencesToState,
+  createDefaultFruitPreferenceSelection,
+  preferencesToSelection,
   profileFromUser,
-  stateToPreferences,
+  selectionToPreferences,
 } from '../utils/fruit-preferences.js'
 
 const router = useRouter()
 const route = useRoute()
 const profile = reactive(createDefaultProfile())
 const fruits = ref([])
-const preferenceState = ref({})
+const preferenceSelection = ref(createDefaultFruitPreferenceSelection())
 const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const existingUser = ref(false)
-
-function initializeFruitState() {
-  preferenceState.value = Object.fromEntries(
-    fruits.value.map((fruit) => [fruit.id, preferenceState.value[fruit.id] ?? 'neutral']),
-  )
-}
 
 async function loadPage() {
   loading.value = true
@@ -45,7 +40,6 @@ async function loadPage() {
 
   try {
     fruits.value = await listFruits()
-    initializeFruitState()
 
     let user
     try {
@@ -59,10 +53,7 @@ async function loadPage() {
     Object.assign(profile, profileFromUser(user))
 
     const preferences = await getFruitPreferences()
-    preferenceState.value = {
-      ...preferenceState.value,
-      ...preferencesToState(preferences),
-    }
+    preferenceSelection.value = preferencesToSelection(preferences)
   } catch (error) {
     errorMessage.value = error.message
   } finally {
@@ -94,7 +85,7 @@ async function saveOnboarding() {
     existingUser.value = true
 
     try {
-      await replaceFruitPreferences(stateToPreferences(preferenceState.value))
+      await replaceFruitPreferences(selectionToPreferences(preferenceSelection.value))
     } catch (error) {
       saveMessage.value = '基本信息已保存，但水果偏好暂未保存。请再次点击保存重试。'
       errorMessage.value = error.message
@@ -134,7 +125,7 @@ onMounted(loadPage)
 
     <form v-else class="profile-form" @submit.prevent="saveOnboarding">
       <ProfileFields v-model="profile" />
-      <FruitPreferencePicker v-model="preferenceState" :fruits="fruits" />
+      <FruitPreferencePicker v-model="preferenceSelection" :fruits="fruits" />
 
       <div v-if="saveMessage || errorMessage" class="inline-message" role="alert">
         <strong v-if="saveMessage">{{ saveMessage }}</strong>
