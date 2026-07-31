@@ -1,0 +1,85 @@
+:root {
+  color: #173226;
+  background: #f4f8f3;
+  font-family:
+    Inter, "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+.page-shell {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 24px 16px;
+}
+
+.hero {
+  width: min(100%, 680px);
+  padding: clamp(24px, 7vw, 56px);
+  border: 1px solid #dce8dc;
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 18px 60px rgb(35 88 55 / 10%);
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: #477b58;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 10vw, 4.2rem);
+  line-height: 1;
+}
+
+.summary {
+  margin: 22px 0;
+  color: #52675b;
+  line-height: 1.75;
+}
+
+.check-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-list li {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #edf6ed;
+}
+
+.check-list li::before {
+  margin-right: 10px;
+  color: #2d7a46;
+  content: "✓";
+  font-weight: 800;
+}
+
+.notice {
+  margin: 24px 0 0;
+  padding-top: 18px;
+  border-top: 1px solid #e6ece6;
+  color: #6d766f;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+

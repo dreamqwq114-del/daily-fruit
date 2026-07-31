@@ -1,0 +1,2 @@
+"""Daily Fruit backend package."""
+
