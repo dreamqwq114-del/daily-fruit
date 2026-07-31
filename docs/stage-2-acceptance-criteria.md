@@ -74,54 +74,54 @@ alembic upgrade head
 
 验收：
 
-- [ ] `alembic upgrade head` 成功；
-- [ ] `alembic current` 指向 head；
-- [ ] `alembic history` 顺序清晰；
-- [ ] `alembic downgrade -1` 成功；
-- [ ] downgrade 后再次 upgrade 成功；
-- [ ] `alembic_version` 与实际结构一致；
-- [ ] 迁移不依赖静默 `IF NOT EXISTS` 掩盖冲突；
-- [ ] 迁移中没有真实密码或 project ref 硬编码；
-- [ ] 没有修改 `auth`、`storage` 系统对象。
+- [x] `alembic upgrade head` 成功；
+- [x] `alembic current` 指向 head；
+- [x] `alembic history` 顺序清晰；
+- [x] `alembic downgrade -1` 成功；
+- [x] downgrade 后再次 upgrade 成功；
+- [x] `alembic_version` 与实际结构一致；
+- [x] 迁移不依赖静默 `IF NOT EXISTS` 掩盖冲突；
+- [x] 迁移中没有真实密码或 project ref 硬编码；
+- [x] 没有修改 `auth`、`storage` 系统对象。
 
 ## 6. 约束与外键
 
-- [ ] 所有 0 到 1 分数拒绝范围外数值；
-- [ ] `price_level` 只允许 1 到 3；
-- [ ] 月份只允许 1 到 12；
-- [ ] 营养值拒绝负数；
-- [ ] `preference_score` 只允许 -1 到 2；
-- [ ] feedback type 只允许定义值；
-- [ ] recommendation status 只允许 `active`、`replaced`；
-- [ ] 同一用户同一天 refresh_number 唯一；
-- [ ] 同一用户同一天最多一个 active 推荐；
-- [ ] 同一推荐 rank 唯一且只允许 1、2；
-- [ ] 同一推荐不能包含重复 fruit_id；
-- [ ] 删除 Recommendation 会级联删除 Items；
-- [ ] 删除 Item 会级联删除 Feedback；
-- [ ] 有历史 Item 的 Fruit 无法被删除；
-- [ ] 有历史 Recommendation 的 User 无法被删除；
-- [ ] 没有孤立外键记录。
+- [x] 所有 0 到 1 分数拒绝范围外数值；
+- [x] `price_level` 只允许 1 到 3；
+- [x] 月份只允许 1 到 12；
+- [x] 营养值拒绝负数；
+- [x] `preference_score` 只允许 -1 到 2；
+- [x] feedback type 只允许定义值；
+- [x] recommendation status 只允许 `active`、`replaced`；
+- [x] 同一用户同一天 refresh_number 唯一；
+- [x] 同一用户同一天最多一个 active 推荐；
+- [x] 同一推荐 rank 唯一且只允许 1、2；
+- [x] 同一推荐不能包含重复 fruit_id；
+- [x] 删除 Recommendation 会级联删除 Items；
+- [x] 删除 Item 会级联删除 Feedback；
+- [x] 有历史 Item 的 Fruit 无法被删除；
+- [x] 有历史 Recommendation 的 User 无法被删除；
+- [x] 没有孤立外键记录。
 
 ## 7. 索引
 
-- [ ] 每个常用外键方向都有可用索引；
-- [ ] 用户推荐历史查询使用 `(user_id, recommendation_date DESC, refresh_number DESC)`；
-- [ ] active 推荐使用部分唯一索引；
-- [ ] 地区季节查询使用以 `region` 开头的索引；
-- [ ] 索引没有与唯一约束无意义重复；
-- [ ] performance advisor 没有未解释的高优先级问题。
+- [x] 每个常用外键方向都有可用索引；
+- [x] 用户推荐历史查询使用 `(user_id, recommendation_date DESC, refresh_number DESC)`；
+- [x] active 推荐使用部分唯一索引；
+- [x] 地区季节查询使用以 `region` 开头的索引；
+- [x] 索引没有与唯一约束无意义重复；
+- [x] performance advisor 没有未解释的高优先级问题。
 
 ## 8. RLS 与权限
 
-- [ ] 八张业务表 RLS 状态已读取并与设计一致；
-- [ ] 第一版 `anon`、`authenticated` 不能通过 Data API 访问业务表；
-- [ ] 没有宽泛 `USING (true)` policy；
-- [ ] 没有把 `TO authenticated` 误当作行级所有权控制；
-- [ ] 没有依赖 `user_metadata` 做授权；
-- [ ] grants 与 RLS 在同一安全迁移中审查；
-- [ ] security advisor 没有未解释的高优先级问题；
-- [ ] FastAPI 使用的数据库权限和绕过 RLS 风险已记录。
+- [x] 八张业务表 RLS 状态已读取并与设计一致；
+- [x] 第一版 `anon`、`authenticated` 不能通过 Data API 访问业务表；
+- [x] 没有宽泛 `USING (true)` policy；
+- [x] 没有把 `TO authenticated` 误当作行级所有权控制；
+- [x] 没有依赖 `user_metadata` 做授权；
+- [x] grants 与 RLS 在同一安全迁移中审查；
+- [x] security advisor 没有未解释的高优先级问题；
+- [x] FastAPI 使用的数据库权限和绕过 RLS 风险已记录。
 
 ## 9. Seed
 
@@ -156,13 +156,13 @@ cd ..\frontend
 npm run build
 ```
 
-- [ ] 后端测试全通过；
+- [x] 后端测试全通过；
 - [ ] 前端生产构建成功；
 - [ ] 数据库错误不会向客户端泄漏；
-- [ ] 迁移后重新读取 Supabase 实际 schema；
-- [ ] ORM 与实际 Supabase schema 一致；
-- [ ] 读取迁移记录、RLS、policies、grants 和 advisors；
-- [ ] 重复/孤立记录查询返回 0；
+- [x] 迁移后重新读取 Supabase 实际 schema；
+- [x] ORM 与实际 Supabase schema 一致；
+- [x] 读取迁移记录、RLS、policies、grants 和 advisors；
+- [x] 重复/孤立记录查询返回 0；
 - [ ] Git 工作树只包含预期变更；
 - [ ] 用户确认结果后才提交或进入下一任务。
 

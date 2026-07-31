@@ -193,22 +193,58 @@ Performance advisor：没有发现问题。
 | S2-01 本地配置契约和连接保护 | 已完成 | 提交 `742eeeb`，17 项后端测试通过 |
 | S2-02 本地 ORM metadata | 已完成 | 提交 `ae83235`，完整后端测试 28 项通过 |
 | S2-03 本地 Pydantic Schema | 已完成 | 提交 `fab7a89`，完整后端测试 61 项通过 |
-| S2-04 初始化 Alembic 文件 | 允许 | 不生成业务 migration，不连接 Supabase |
-| 对 Supabase 执行迁移 | 不允许 | 先批准安全修复方案并复核实际 grants/RLS |
-| 写入 seed 或业务数据 | 不允许 | 迁移、结构复核和幂等 seed 测试通过后再批准 |
+| S2-04 初始化 Alembic 文件 | 已完成 | 提交 `f2e4a21` |
+| S2-05 基础迁移 | 已完成 | 提交 `ddbc214` |
+| S2-06 本地 PostgreSQL 验证 | 已完成 | 提交 `36c3e29`，upgrade/downgrade/check 成功 |
+| S2-07 安全迁移 | 已完成 | 提交 `a3a417d`，本地 RLS/grants 实测通过 |
+| S2-08 目标 Supabase 迁移 | 已完成 | `public.alembic_version=0002`，远端复核通过 |
+| 写入 seed 或业务数据 | 不允许 | 先完成 S2-09 数据审查和 S2-10 本地幂等测试 |
 
-阶段 1.5 的“项目身份未知”阻塞已经解除；数据库实施仍受安全警告和逐任务审批约束。
+阶段 1.5 的“项目身份未知”阻塞已经解除；基础结构和安全迁移已经落地，
+seed 仍受数据审查和本地幂等测试门禁约束。
 
 ## 9. 下一步
 
-Luna 的下一个任务应为 `S2-04：初始化 Alembic 安全配置`：
+Luna 的下一个任务应为 `S2-09：准备和验证演示数据文件`。该任务只创建
+受控数据文件和静态验证测试，不连接数据库、不实现 seed 写入。
 
-- 固定 Alembic 依赖并创建最小配置和模板；
-- URL 只从安全配置注入，不写入 `alembic.ini`；
-- 迁移命令必须显式选择 `test` 或 `migration` 用途；
-- 不生成业务 migration；
-- 不连接本地或远端数据库；
-- 不执行 SQL、迁移或 seed；
-- 完成后运行指定测试并独立提交。
+## 10. S2-08 迁移执行与复核（2026-07-31）
 
-在任何远端数据库写入任务之前，还应单独准备一个可审查的安全迁移设计，说明如何最小范围撤销 `public.rls_auto_enable()` 对 `PUBLIC`、`anon`、`authenticated` 的执行权限，并验证 `ensure_rls` 仍能由数据库事件触发器正常工作。
+写入前再次确认：
+
+- 连接器只返回 `Daily Fruit`；
+- project ref 为 `frzbbpocyzlqxljsrsiw`；
+- organization ref 为 `gacwsgimtxvfyoyokjqs`；
+- `public` 用户表为 0，八个目标表均不存在；
+- Supabase 迁移记录和 `public.alembic_version` 均不存在；
+- `ensure_rls` 仍启用，原两项函数执行权限 WARN 仍存在。
+
+执行方式：本机没有保存数据库密码，因此从已提交 Alembic migration
+离线生成 SQL，经 Supabase migration 接口按两次事务应用；没有在
+Dashboard 手写另一套 DDL，也没有写入 seed。
+
+Supabase 迁移记录：
+
+- `20260731102105_alembic_0001_create_daily_fruit_tables`；
+- `20260731102133_alembic_0002_secure_daily_fruit_tables`。
+
+执行后实际结果：
+
+- `public.alembic_version = 0002`；
+- 八张业务表全部存在且共 0 行；
+- 8 个主键、9 个外键、8 个唯一约束、29 个 CHECK 约束；
+- 业务表共有 22 个索引（含主键和唯一约束索引）；
+- 八张业务表全部启用 RLS，policy 数为 0；
+- `anon`、`authenticated` 对八张表的 CRUD 权限行数为 0；
+- 两个角色对八个 identity sequence 的权限行数为 0；
+- `PUBLIC`、`anon`、`authenticated` 均不能执行
+  `public.rls_auto_enable()`；
+- `ensure_rls` event trigger 仍启用；
+- 重复/孤立业务记录为 0；
+- 没有修改 `auth` 或 `storage` schema。
+
+Security advisor 原两项 WARN 已消失。当前只有 9 条
+`rls_enabled_no_policy` INFO，这是第一版刻意的 deny-by-default 状态；
+不应通过添加宽泛 policy 消除。Performance advisor 的 5 条
+`unused_index` INFO 来自刚创建且尚无业务查询的空表，不能作为删除
+必要外键/历史查询索引的依据。
