@@ -4,7 +4,7 @@
 审计范围：`daily-fruit` 本地仓库与已连接的 Supabase 项目
 
 数据库写入：0  
-结论：**目标项目身份和空业务结构已经确认；S2-01 已完成，允许准备 S2-02 本地 ORM metadata，但远端迁移前必须先处理并复核现有安全警告。**
+结论：**目标项目身份和空业务结构已经确认；S2-02 已完成，允许准备 S2-03 Pydantic Schema，但远端迁移前必须先处理并复核现有安全警告。**
 
 ## 1. 本地仓库状态
 
@@ -191,8 +191,8 @@ Performance advisor：没有发现问题。
 | 工作 | 是否允许 | 条件 |
 |---|---|---|
 | S2-01 本地配置契约和连接保护 | 已完成 | 提交 `742eeeb`，17 项后端测试通过 |
-| S2-02 本地 ORM metadata | 允许 | 只定义 Python metadata，不连接数据库 |
-| S2-03 本地 Pydantic Schema | 暂缓 | 先完成并验收 S2-02 |
+| S2-02 本地 ORM metadata | 已完成 | 提交 `ae83235`，完整后端测试 28 项通过 |
+| S2-03 本地 Pydantic Schema | 允许 | 只定义和测试 Schema，不连接数据库 |
 | 初始化 Alembic 文件 | 暂缓 | 按任务列表逐项执行 |
 | 对 Supabase 执行迁移 | 不允许 | 先批准安全修复方案并复核实际 grants/RLS |
 | 写入 seed 或业务数据 | 不允许 | 迁移、结构复核和幂等 seed 测试通过后再批准 |
@@ -201,13 +201,12 @@ Performance advisor：没有发现问题。
 
 ## 9. 下一步
 
-Luna 的下一个任务应为 `S2-02：创建 SQLAlchemy metadata 和 ORM
-Model`：
+Luna 的下一个任务应为 `S2-03：创建数据库 Pydantic Schema`：
 
-- 只修改 `backend/app/models/` 和
-  `backend/tests/test_model_metadata.py` 中允许的文件；
-- 只在 Python metadata 中定义八张目标表；
-- 不创建 Pydantic Schema、Repository、Service 或 Router；
+- 只修改 `backend/app/schemas/` 和 `backend/tests/test_schemas.py`；
+- 验证分数、月份、价格、status、feedback type 和 reasons 结构；
+- 保持 SQLAlchemy Model 与 Pydantic Schema 分离；
+- 不创建 Repository、Service 或 Router；
 - 不初始化 Alembic；
 - 不连接本地或远端数据库；
 - 不执行 SQL、迁移或 seed；

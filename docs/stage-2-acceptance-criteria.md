@@ -51,13 +51,13 @@ git grep -n "DATABASE_URL"
 
 ## 4. ORM 与 Schema
 
-- [ ] Model 与 Pydantic Schema 分离；
+- [x] SQLAlchemy Model 位于独立的 `app/models/`，不包含 Pydantic Schema；
 - [ ] Router 不包含推荐算法或 SQLAlchemy 查询；
 - [ ] Repository 负责查询；
 - [ ] Service 负责编排、验证和事务；
-- [ ] SQLAlchemy metadata 包含八张目标表；
-- [ ] ORM 类型、nullable、默认值、约束和外键与设计文档一致；
-- [ ] `recommendation_items.reasons` 使用 JSONB；
+- [x] SQLAlchemy metadata 包含八张目标表；
+- [x] ORM 类型、nullable、默认值、约束和外键与设计文档一致；
+- [x] `recommendation_items.reasons` 使用 JSONB；
 - [ ] reasons 的 Pydantic 结构可稳定序列化。
 
 ## 5. Alembic

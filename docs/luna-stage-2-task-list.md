@@ -12,7 +12,8 @@
 
 - `S2-00` 已完成：`3d71816 docs: record live Supabase audit`；
 - `S2-01` 已完成：`742eeeb feat: add safe database configuration contract`；
-- 当前下一任务：`S2-02`；
+- `S2-02` 已完成：`ae83235 feat: define daily fruit database models`；
+- 当前下一任务：`S2-03`；
 - 当前仍禁止远端 DDL、迁移、seed、policy 和 grant 修改。
 
 ## S2-00：恢复目标项目可见性并完成只读门禁
@@ -475,5 +476,5 @@ python -m app.seed.seed_fruits
 
 ## Luna 的下一个任务
 
-在用户明确确认后执行 **S2-02**。该任务只能创建和测试 SQLAlchemy
-metadata/ORM Model，不得连接或修改 Supabase，不得初始化 Alembic。
+在用户明确确认后执行 **S2-03**。该任务只能创建和测试 Pydantic
+Schema，不得连接或修改 Supabase，不得初始化 Alembic。
