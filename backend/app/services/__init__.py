@@ -8,6 +8,7 @@ from app.services.recommendation_service import (
     month_is_in_range,
     normalize_nutrition_profiles,
     nutrition_complement_score,
+    recommend_fruits,
     score_candidates,
     select_recommendation_pair,
 )
@@ -48,6 +49,7 @@ __all__ = [
     "month_is_in_range",
     "normalize_nutrition_profiles",
     "nutrition_complement_score",
+    "recommend_fruits",
     "score_candidates",
     "select_recommendation_pair",
 ]

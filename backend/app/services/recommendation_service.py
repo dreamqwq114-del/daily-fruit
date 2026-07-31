@@ -9,11 +9,18 @@ from app.services.recommendation_types import (
     PairSelection,
     RecommendationContext,
     RecommendationFruit,
+    RecommendationItemResult,
+    RecommendationResult,
     RecommendationUser,
     ScoredFruit,
     ScoreBreakdown,
     SeasonEvaluation,
     SeasonWindow,
+)
+from app.schemas.recommendation import (
+    ReasonCode,
+    ReasonComponent,
+    RecommendationReason,
 )
 
 
@@ -336,6 +343,191 @@ def select_recommendation_pair(
     )
 
 
+def recommend_fruits(
+    fruits: Iterable[RecommendationFruit],
+    user: RecommendationUser,
+    context: RecommendationContext,
+) -> RecommendationResult:
+    selection = select_recommendation_pair(fruits, user, context)
+    first_reasons = _build_reasons(
+        selection.first,
+        user,
+        complement_score=None,
+    )
+    second_reasons = _build_reasons(
+        selection.second,
+        user,
+        complement_score=selection.complement_score,
+    )
+    first_item = RecommendationItemResult(
+        fruit=selection.first.fruit,
+        score=selection.first.base_score,
+        rank=1,
+        reasons=first_reasons,
+        base_score=selection.first.base_score,
+    )
+    second_item = RecommendationItemResult(
+        fruit=selection.second.fruit,
+        score=selection.second_score,
+        rank=2,
+        reasons=second_reasons,
+        base_score=selection.second.base_score,
+        complement_score=selection.complement_score,
+    )
+    return RecommendationResult(
+        items=(first_item, second_item),
+        total_score=clamp_score(
+            (first_item.score + second_item.score) / 2
+        ),
+    )
+
+
+def _build_reasons(
+    scored: ScoredFruit,
+    user: RecommendationUser,
+    *,
+    complement_score: float | None,
+) -> tuple[RecommendationReason, ...]:
+    fruit = scored.fruit
+    scores = scored.scores
+    candidates: list[tuple[float, int, RecommendationReason]] = []
+    order = 0
+
+    def add(
+        contribution: float,
+        code: ReasonCode,
+        message: str,
+        component: ReasonComponent,
+    ) -> None:
+        nonlocal order
+        candidates.append(
+            (
+                contribution,
+                order,
+                RecommendationReason(
+                    code=code,
+                    message=message,
+                    component=component,
+                ),
+            )
+        )
+        order += 1
+
+    if complement_score is not None and complement_score >= 0.40:
+        add(
+            complement_score * SECOND_COMPLEMENT_WEIGHT,
+            ReasonCode.NUTRITION_COMPLEMENT,
+            "与另一种水果的营养特点形成互补",
+            ReasonComponent.COMPLEMENT_SCORE,
+        )
+    if scored.season.is_in_season:
+        add(
+            scores.season_score * BASE_SCORE_WEIGHTS["season_score"],
+            ReasonCode.IN_SEASON,
+            "当前处于适宜购买月份",
+            ReasonComponent.SEASON_SCORE,
+        )
+
+    if scores.feedback_adjustment > 0:
+        add(
+            scores.preference_score
+            * BASE_SCORE_WEIGHTS["preference_score"],
+            ReasonCode.FEEDBACK_MATCH,
+            "你过去的正向反馈提高了这项推荐的匹配度",
+            ReasonComponent.FEEDBACK_ADJUSTMENT,
+        )
+    else:
+        taste_code, taste_message = _best_taste_reason(fruit, user)
+        add(
+            scores.preference_score
+            * BASE_SCORE_WEIGHTS["preference_score"],
+            taste_code,
+            taste_message,
+            ReasonComponent.PREFERENCE_SCORE,
+        )
+
+    add(
+        scores.nutrition_diversity_score
+        * BASE_SCORE_WEIGHTS["nutrition_diversity_score"],
+        ReasonCode.NUTRITION_DIVERSITY,
+        "营养特征参与了本组的多样性搭配",
+        ReasonComponent.NUTRITION_DIVERSITY_SCORE,
+    )
+    if scores.history_diversity_score >= 0.80:
+        add(
+            scores.history_diversity_score
+            * BASE_SCORE_WEIGHTS["history_diversity_score"],
+            ReasonCode.NOT_RECENTLY_RECOMMENDED,
+            "最近一段时间没有推荐过",
+            ReasonComponent.HISTORY_DIVERSITY_SCORE,
+        )
+    if scores.price_match_score >= 0.75:
+        add(
+            scores.price_match_score
+            * BASE_SCORE_WEIGHTS["price_match_score"],
+            ReasonCode.PRICE_MATCH,
+            "符合你的价格范围",
+            ReasonComponent.PRICE_MATCH_SCORE,
+        )
+    if scores.convenience_score >= 0.75:
+        add(
+            scores.convenience_score
+            * BASE_SCORE_WEIGHTS["convenience_score"],
+            ReasonCode.CONVENIENT,
+            "食用便利性符合你的偏好",
+            ReasonComponent.CONVENIENCE_SCORE,
+        )
+
+    candidates.sort(key=lambda item: (-item[0], item[1]))
+    return tuple(item[2] for item in candidates[:4])
+
+
+def _best_taste_reason(
+    fruit: RecommendationFruit,
+    user: RecommendationUser,
+) -> tuple[ReasonCode, str]:
+    dimensions = (
+        (
+            "甜度",
+            fruit.sweet_score,
+            user.sweet_preference,
+            ReasonCode.SWEET_MATCH,
+            "符合你偏甜的口味",
+        ),
+        (
+            "酸度",
+            fruit.sour_score,
+            user.sour_preference,
+            ReasonCode.SOUR_MATCH,
+            "符合你偏酸的口味",
+        ),
+        (
+            "柔软度",
+            fruit.soft_score,
+            user.soft_preference,
+            ReasonCode.SOFT_MATCH,
+            "符合你偏软的口感",
+        ),
+        (
+            "脆度",
+            fruit.crisp_score,
+            user.crisp_preference,
+            ReasonCode.CRISP_MATCH,
+            "符合你偏脆的口感",
+        ),
+    )
+    name, fruit_value, user_value, code, positive_message = max(
+        dimensions,
+        key=lambda item: 1.0 - abs(item[1] - item[2]),
+    )
+    closeness = 1.0 - abs(fruit_value - user_value)
+    if fruit_value >= 0.60 and user_value >= 0.60:
+        return code, positive_message
+    if closeness >= 0.60:
+        return code, f"{name}特征与你设置的口味偏好较接近"
+    return code, f"已按你设置的{name}偏好参与综合评分"
+
+
 def _score_fruit(
     fruit: RecommendationFruit,
     user: RecommendationUser,
@@ -537,6 +729,7 @@ __all__ = [
     "month_is_in_range",
     "normalize_nutrition_profiles",
     "nutrition_complement_score",
+    "recommend_fruits",
     "score_candidates",
     "select_recommendation_pair",
 ]
