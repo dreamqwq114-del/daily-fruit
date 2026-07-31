@@ -54,7 +54,11 @@ def api_session(api_engine: Engine) -> Session:
 @pytest.fixture()
 def client(api_session: Session) -> TestClient:
     def override_database_session():
-        yield api_session
+        try:
+            yield api_session
+        except Exception:
+            api_session.rollback()
+            raise
 
     app.dependency_overrides[get_database_session] = (
         override_database_session

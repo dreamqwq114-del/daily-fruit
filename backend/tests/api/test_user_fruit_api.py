@@ -135,7 +135,7 @@ def test_fruit_list_and_detail_hide_inactive(
         text("UPDATE public.fruits SET is_active=false WHERE id=:id"),
         {"id": inactive_id},
     )
-    api_session.flush()
+    api_session.commit()
     assert client.get(f"/api/fruits/{inactive_id}").status_code == 404
     listed_ids = {item["id"] for item in client.get("/api/fruits").json()}
     assert inactive_id not in listed_ids
