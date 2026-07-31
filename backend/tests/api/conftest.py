@@ -1,0 +1,66 @@
+import os
+from urllib.parse import urlsplit
+
+import pytest
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
+
+from app.config import Settings
+from app.database import get_database_session
+from app.main import app
+
+
+@pytest.fixture(scope="session")
+def api_engine() -> Engine:
+    database_url = os.getenv("TEST_DATABASE_URL", "").strip()
+    if not database_url:
+        pytest.skip("TEST_DATABASE_URL is not configured")
+    settings = Settings(_env_file=None, TEST_DATABASE_URL=database_url)
+    parsed = urlsplit(settings.test_database_url or "")
+    assert parsed.hostname in {"127.0.0.1", "localhost"}
+    assert parsed.path.strip("/") == "daily_fruit_test"
+
+    engine = create_engine(database_url)
+    with engine.connect() as connection:
+        version = connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one()
+    assert version == "0002"
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture()
+def api_session(api_engine: Engine) -> Session:
+    connection = api_engine.connect()
+    transaction = connection.begin()
+    session = Session(
+        bind=connection,
+        join_transaction_mode="create_savepoint",
+        expire_on_commit=False,
+    )
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture()
+def client(api_session: Session) -> TestClient:
+    def override_database_session():
+        yield api_session
+
+    app.dependency_overrides[get_database_session] = (
+        override_database_session
+    )
+    try:
+        with TestClient(app, raise_server_exceptions=False) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
