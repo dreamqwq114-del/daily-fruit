@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import math
+import random
 from collections.abc import Iterable, Mapping
 
 from app.services.recommendation_types import (
     NutritionProfile,
+    PairSelection,
     RecommendationContext,
     RecommendationFruit,
     RecommendationUser,
@@ -50,6 +52,9 @@ FEEDBACK_ADJUSTMENTS = {
 }
 MIN_FEEDBACK_ADJUSTMENT = -0.35
 MAX_FEEDBACK_ADJUSTMENT = 0.25
+NEAR_TOP_THRESHOLD = 0.02
+SECOND_BASE_WEIGHT = 0.70
+SECOND_COMPLEMENT_WEIGHT = 0.30
 
 
 class RecommendationError(Exception):
@@ -237,6 +242,98 @@ def calculate_base_score(scores: ScoreBreakdown) -> float:
         for component, weight in BASE_SCORE_WEIGHTS.items()
     )
     return clamp_score(total)
+
+
+def nutrition_complement_score(
+    first: NutritionProfile,
+    second: NutritionProfile,
+) -> float:
+    first_values = [float(getattr(first, name)) for name in NUTRITION_FEATURES]
+    second_values = [
+        float(getattr(second, name)) for name in NUTRITION_FEATURES
+    ]
+    _validate_unit_scores(
+        {f"first_{name}": value for name, value in zip(
+            NUTRITION_FEATURES,
+            first_values,
+            strict=True,
+        )}
+    )
+    _validate_unit_scores(
+        {f"second_{name}": value for name, value in zip(
+            NUTRITION_FEATURES,
+            second_values,
+            strict=True,
+        )}
+    )
+
+    gaps = [1.0 - value for value in first_values]
+    gap_total = sum(gaps)
+    coverage = (
+        0.5
+        if math.isclose(gap_total, 0.0)
+        else sum(
+            gap * candidate
+            for gap, candidate in zip(gaps, second_values, strict=True)
+        )
+        / gap_total
+    )
+    contrast = sum(
+        abs(candidate - selected)
+        for selected, candidate in zip(
+            first_values,
+            second_values,
+            strict=True,
+        )
+    ) / len(NUTRITION_FEATURES)
+    return clamp_score(coverage * 0.80 + contrast * 0.20)
+
+
+def select_recommendation_pair(
+    fruits: Iterable[RecommendationFruit],
+    user: RecommendationUser,
+    context: RecommendationContext,
+) -> PairSelection:
+    scored = score_candidates(fruits, user, context)
+    top_score = scored[0].base_score
+    near_top = [
+        item
+        for item in scored
+        if top_score - item.base_score <= NEAR_TOP_THRESHOLD
+    ]
+    first = (
+        near_top[0]
+        if context.random_seed is None
+        else random.Random(context.random_seed).choice(near_top)
+    )
+
+    normalized = normalize_nutrition_profiles(
+        item.fruit for item in scored
+    )
+    ranked_seconds: list[tuple[float, float, ScoredFruit]] = []
+    for candidate in scored:
+        if candidate.fruit.id == first.fruit.id:
+            continue
+        complement = nutrition_complement_score(
+            normalized[first.fruit.id],
+            normalized[candidate.fruit.id],
+        )
+        second_score = clamp_score(
+            candidate.base_score * SECOND_BASE_WEIGHT
+            + complement * SECOND_COMPLEMENT_WEIGHT
+        )
+        ranked_seconds.append((second_score, complement, candidate))
+
+    ranked_seconds.sort(
+        key=lambda item: (-item[0], item[2].fruit.id)
+    )
+    second_score, complement_score, second = ranked_seconds[0]
+    return PairSelection(
+        first=first,
+        second=second,
+        second_score=second_score,
+        complement_score=complement_score,
+    )
 
 
 def _score_fruit(
@@ -439,5 +536,7 @@ __all__ = [
     "filter_eligible_fruits",
     "month_is_in_range",
     "normalize_nutrition_profiles",
+    "nutrition_complement_score",
     "score_candidates",
+    "select_recommendation_pair",
 ]

@@ -97,6 +97,14 @@ class ScoredFruit:
 
 
 @dataclass(frozen=True, slots=True)
+class PairSelection:
+    first: ScoredFruit
+    second: ScoredFruit
+    second_score: float
+    complement_score: float
+
+
+@dataclass(frozen=True, slots=True)
 class RecommendationItemResult:
     fruit: RecommendationFruit
     score: float
@@ -115,6 +123,7 @@ class RecommendationResult:
 __all__ = [
     "FruitPreference",
     "NutritionProfile",
+    "PairSelection",
     "RecommendationContext",
     "RecommendationFruit",
     "RecommendationItemResult",

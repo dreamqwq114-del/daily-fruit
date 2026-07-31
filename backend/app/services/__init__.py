@@ -7,11 +7,14 @@ from app.services.recommendation_service import (
     filter_eligible_fruits,
     month_is_in_range,
     normalize_nutrition_profiles,
+    nutrition_complement_score,
     score_candidates,
+    select_recommendation_pair,
 )
 from app.services.recommendation_types import (
     FruitPreference,
     NutritionProfile,
+    PairSelection,
     RecommendationContext,
     RecommendationFruit,
     RecommendationItemResult,
@@ -28,6 +31,7 @@ __all__ = [
     "InvalidRecommendationInputError",
     "NoRecommendationCandidatesError",
     "NutritionProfile",
+    "PairSelection",
     "RecommendationContext",
     "RecommendationError",
     "RecommendationFruit",
@@ -43,5 +47,7 @@ __all__ = [
     "filter_eligible_fruits",
     "month_is_in_range",
     "normalize_nutrition_profiles",
+    "nutrition_complement_score",
     "score_candidates",
+    "select_recommendation_pair",
 ]
