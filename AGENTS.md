@@ -106,8 +106,12 @@
   RLS、grants、约束、索引、迁移记录和 advisors 已复核；
 - `S2-09` 已由提交 `cb935b6` 完成，24 种水果及营养、季节演示文件
   已通过静态范围、自然键和口径校验；
-- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-10`，只实现
-  seed 并在 `daily_fruit_test` 验证 dry-run、事务和幂等性；
+- `S2-10` 已由提交 `1174603` 完成，seed 的 dry-run、事务回滚、
+  UTF-8 SQL 输出和两次本地幂等执行已通过测试；
+- S2-11 写入前再次确认唯一目标 project ref、远端 schema 版本为
+  `0002`，且 fruits、nutrition、seasons 和行为表计数均为 0；
+- 用户已明确授权按顺序完成剩余 S2 任务；当前执行 `S2-11`，只向该
+  精确项目写入已验证的 24/24/48 演示数据并完成最终审计；
 - `public.rls_auto_enable()` 的两项 security advisor 警告尚未修复；
-- 当前仍禁止远端 seed，以及任何未包含在已提交迁移中的 DDL、policy
-  或 grant 修改。
+- 当前禁止用户、推荐和反馈 seed，以及任何未包含在已提交迁移中的
+  DDL、policy 或 grant 修改。

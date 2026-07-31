@@ -20,9 +20,10 @@
 - `S2-07` 已完成：`a3a417d feat: secure daily fruit database access`；
 - `S2-08` 已完成：`741edcc docs: record applied Supabase migrations`；
 - `S2-09` 已完成：`cb935b6 data: add validated fruit demo dataset`；
-- 当前下一任务：`S2-10`；
-- 当前只允许在 `daily_fruit_test` 实现和验证 seed，仍禁止远端 seed 和
-  范围外 DDL、policy、grant 修改。
+- `S2-10` 已完成：`1174603 feat: add transactional idempotent fruit seed`；
+- 当前下一任务：`S2-11`；
+- 当前只允许向已确认目标写入 fruits、fruit_nutritions、fruit_seasons
+  演示数据并审计，仍禁止行为数据 seed 和范围外数据库修改。
 
 ## S2-00：恢复目标项目可见性并完成只读门禁
 
