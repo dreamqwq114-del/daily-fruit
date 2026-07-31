@@ -34,7 +34,9 @@ globalThis.window = {
   clearTimeout: globalThis.clearTimeout,
 }
 
-const { ApiError, apiRequest } = await import('../src/api/http.js')
+const { ApiError, apiRequest, ensureApiConfigured } = await import(
+  '../src/api/http.js'
+)
 
 beforeEach(() => {
   clearUserId()
@@ -85,6 +87,39 @@ test('apiRequest returns json for successful responses', async () => {
     })
 
   assert.deepEqual(await apiRequest('/health'), { status: 'ok' })
+})
+
+test('production requests stop before fetch when no public api is configured', () => {
+  let called = false
+  globalThis.fetch = async () => {
+    called = true
+  }
+
+  assert.throws(
+    () =>
+      ensureApiConfigured({
+        apiBaseUrl: '',
+        isDevelopment: false,
+        isGitHubPages: true,
+      }),
+    (error) => {
+      assert.ok(error instanceof ApiError)
+      assert.equal(error.code, 'api_not_configured')
+      assert.equal(error.message, '在线服务尚未配置')
+      return true
+    },
+  )
+  assert.equal(called, false)
+})
+
+test('non-Pages production builds keep their existing relative API behavior', () => {
+  assert.doesNotThrow(() =>
+    ensureApiConfigured({
+      apiBaseUrl: '',
+      isDevelopment: false,
+      isGitHubPages: false,
+    }),
+  )
 })
 
 test('apiRequest exposes safe conflict details and status', async () => {

@@ -165,3 +165,61 @@ cd backend
 把数据库密码写入命令、README 或 Git。
 
 详细设计见 [docs/stage-1-plan.md](docs/stage-1-plan.md)。
+
+## GitHub Pages 部署
+
+GitHub Pages 只托管 `frontend` 生成的 Vue 静态文件。FastAPI 必须在后续阶段
+独立部署，并继续由 FastAPI 连接 Supabase PostgreSQL；浏览器不能直接访问业务表，
+也不能持有数据库密码、Supabase secret key 或 service role key。
+
+项目站点地址为：
+
+`https://dreamqwq114-del.github.io/daily-fruit/`
+
+本地开发仍使用根路径和 Vite proxy：
+
+```powershell
+cd frontend
+npm ci
+npm run dev
+```
+
+验证普通 Sites 构建：
+
+```powershell
+npm test
+npm run build
+```
+
+在 PowerShell 中验证 GitHub Pages 静态构建：
+
+```powershell
+$env:DEPLOY_TARGET = "github-pages"
+$env:GITHUB_REPOSITORY = "dreamqwq114-del/daily-fruit"
+$env:GITHUB_REPOSITORY_OWNER = "dreamqwq114-del"
+npm run build
+npm run preview -- --host 127.0.0.1
+```
+
+预览地址为 `http://127.0.0.1:4173/daily-fruit/`。结束预览后，如果继续在同一
+PowerShell 中开发，可以清理本次构建变量：
+
+```powershell
+Remove-Item Env:DEPLOY_TARGET,Env:GITHUB_REPOSITORY,Env:GITHUB_REPOSITORY_OWNER `
+  -ErrorAction SilentlyContinue
+```
+
+仓库的 `Settings → Pages → Source` 使用 **GitHub Actions**。推送 `frontend/**`
+或部署工作流到 `main` 会自动部署，也可以在 Actions 页面手动运行
+`Deploy frontend to GitHub Pages`（`workflow_dispatch`）。
+
+公开的 FastAPI 地址通过仓库变量 `VITE_API_BASE_URL` 设置。它必须是一个 HTTPS
+网址，例如 `https://api.example.com`，不是秘密；不得把 `DATABASE_URL`、数据库密码
+或任何 Supabase key 放入 `VITE_` 变量。变量未设置时，生产页面不会请求访问者的
+localhost，而会显示“在线服务尚未配置”。因此 FastAPI 尚未部署时，GitHub Pages
+只能展示前端界面，不能完成创建用户、推荐或反馈等在线操作。
+
+FastAPI 后续上线时，还必须把
+`https://dreamqwq114-del.github.io` 加入后端允许的 CORS 来源，再设置
+`VITE_API_BASE_URL` 并重新运行部署工作流。当前 GitHub Pages 部署不会修改或重新
+发布现有 ChatGPT Site，也不会修改 Supabase。

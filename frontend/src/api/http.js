@@ -1,5 +1,11 @@
 const DEFAULT_TIMEOUT_MS = 10_000
-const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? '').replace(/\/$/, '')
+const API_BASE_URL = (import.meta.env?.VITE_API_BASE_URL ?? '')
+  .trim()
+  .replace(/\/+$/, '')
+const IS_DEVELOPMENT = import.meta.env?.DEV ?? true
+const IS_GITHUB_PAGES =
+  typeof __DAILY_FRUIT_GITHUB_PAGES__ !== 'undefined' &&
+  __DAILY_FRUIT_GITHUB_PAGES__
 
 const STATUS_MESSAGES = {
   400: '请求内容有误，请检查后重试。',
@@ -17,6 +23,18 @@ export class ApiError extends Error {
     this.name = 'ApiError'
     this.status = status
     this.code = code
+  }
+}
+
+export function ensureApiConfigured({
+  apiBaseUrl = API_BASE_URL,
+  isDevelopment = IS_DEVELOPMENT,
+  isGitHubPages = IS_GITHUB_PAGES,
+} = {}) {
+  if (isGitHubPages && !apiBaseUrl && !isDevelopment) {
+    throw new ApiError('在线服务尚未配置', {
+      code: 'api_not_configured',
+    })
   }
 }
 
@@ -63,6 +81,8 @@ export async function apiRequest(
   path,
   { method = 'GET', body, timeoutMs = DEFAULT_TIMEOUT_MS, signal } = {},
 ) {
+  ensureApiConfigured()
+
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort('timeout'), timeoutMs)
   const abortFromCaller = () => controller.abort('cancelled')

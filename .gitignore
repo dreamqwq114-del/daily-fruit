@@ -9,6 +9,9 @@ backend/**/*.py[cod]
 frontend/node_modules/
 frontend/dist/
 frontend/.wrangler/
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
 
 # Editors and operating-system files
 .idea/
