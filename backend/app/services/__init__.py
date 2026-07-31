@@ -2,9 +2,12 @@ from app.services.recommendation_service import (
     InvalidRecommendationInputError,
     NoRecommendationCandidatesError,
     RecommendationError,
+    calculate_base_score,
     evaluate_season,
+    filter_eligible_fruits,
     month_is_in_range,
     normalize_nutrition_profiles,
+    score_candidates,
 )
 from app.services.recommendation_types import (
     FruitPreference,
@@ -35,7 +38,10 @@ __all__ = [
     "ScoreBreakdown",
     "SeasonEvaluation",
     "SeasonWindow",
+    "calculate_base_score",
     "evaluate_season",
+    "filter_eligible_fruits",
     "month_is_in_range",
     "normalize_nutrition_profiles",
+    "score_candidates",
 ]
