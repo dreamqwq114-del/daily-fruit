@@ -1,29 +1,29 @@
 <script setup>
-const completedChecks = [
-  'Vue 3 与 Vite 最小入口',
-  'FastAPI /health',
-  '安全环境变量模板',
-  '阶段一架构与实施计划',
-]
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+
+import AppNavigation from './components/AppNavigation.vue'
+
+const route = useRoute()
+const showNavigation = computed(() => route.meta.showNavigation !== false)
 </script>
 
 <template>
-  <main class="page-shell">
-    <section class="hero" aria-labelledby="page-title">
-      <p class="eyebrow">阶段一 · 项目骨架</p>
-      <h1 id="page-title">每日水果推荐</h1>
-      <p class="summary">
-        当前只提供可启动骨架。水果数据、推荐算法和正式页面将在数据库审计完成后分阶段实现。
-      </p>
+  <div class="app-shell">
+    <header v-if="showNavigation" class="app-header">
+      <RouterLink class="brand" to="/" aria-label="每日水果推荐首页">
+        <span class="brand-mark" aria-hidden="true">果</span>
+        <span>
+          <strong>每日水果</strong>
+          <small>今天吃什么，交给好选择</small>
+        </span>
+      </RouterLink>
+    </header>
 
-      <ul class="check-list">
-        <li v-for="item in completedChecks" :key="item">{{ item }}</li>
-      </ul>
+    <main class="app-main">
+      <RouterView />
+    </main>
 
-      <p class="notice">
-        本项目不会在浏览器中保存数据库密码或 Supabase 高权限密钥。
-      </p>
-    </section>
-  </main>
+    <AppNavigation v-if="showNavigation" />
+  </div>
 </template>
-
