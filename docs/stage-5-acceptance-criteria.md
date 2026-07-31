@@ -57,8 +57,8 @@
 
 ## 2026-07-31 验收结果
 
-- 前端工具测试：`7 passed`，覆盖 user ID、偏好映射、成功响应、409、网络失败、
-  请求超时和 Sites HTML fallback；
+- 前端工具与 Worker 测试：`9 passed`，覆盖 user ID、偏好映射、成功响应、409、
+  网络失败、请求超时、Sites HTML fallback、页面路由回退和 API 不回退；
 - 前端组件测试：`9 passed`，覆盖路由门禁、反馈按钮、onboarding 部分失败恢复、
   今日两卡、刷新/反馈防重复、用户 404、数据库 503 和历史空状态；
 - `npm run build` 成功；
