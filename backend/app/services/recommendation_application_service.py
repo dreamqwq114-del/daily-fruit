@@ -42,12 +42,7 @@ from app.services.recommendation_service import (
     RecommendationError,
     recommend_fruits,
 )
-from app.services.recommendation_types import (
-    RecommendationContext,
-    RecommendationFruit,
-    RecommendationResult,
-    RecommendationUser,
-)
+from app.services.recommendation_types import RecommendationResult
 
 
 # 这些是数据库查询和短期冷却窗口，不是 recommendation_service 中历史/反馈
@@ -63,6 +58,10 @@ DEFAULT_HISTORY_LIMIT = 30
 class FeedbackSubmission:
     feedback: RecommendationFeedbackRead
     created: bool
+
+
+class RecommendationInvariantError(RuntimeError):
+    """推荐核心违反必须始终成立的内部约束。"""
 
 
 def get_today_recommendation(
@@ -134,12 +133,13 @@ def refresh_recommendation(
     *,
     today: date | None = None,
 ) -> RecommendationDetail:
-    """把旧组标记 replaced，记录换组事件并生成不同组合。
+    """把旧组标记 replaced，并生成不同组合。
 
-    刷新在同一个用户锁内完成：锁定 active → 改为 ``replaced`` → 幂等写入
-    ``change_requested`` → flush → 递增 refresh_number → 排除上一组并计算
-    新组合 → 持久化 active → commit。``change_requested`` 是一次会话/刷新
-    事件，不会进入长期反馈调整。
+    刷新在同一个用户锁内完成：锁定 active → 改为 ``replaced`` → flush
+    → 递增 refresh_number → 排除上一组并计算新组合 → 持久化 active
+    → commit。如果核心抛出推荐错误或不变量异常，
+    本事务不会 commit；FastAPI Session 依赖会回滚已 flush 的 ``replaced``
+    状态和刷新事件，使原 active 推荐保持不变。
     """
 
     recommendation_date = today or current_app_date()
@@ -166,24 +166,7 @@ def refresh_recommendation(
     previous_ids = {item.fruit_id for item in active.items}
     # 旧推荐仍保留在历史中，只改变生命周期状态；items/feedback 不删除。
     active.status = "replaced"
-    first_item = min(active.items, key=lambda item: item.rank)
-    change_feedback = recommendation_repository.get_feedback(
-        session,
-        item_id=first_item.id,
-        user_id=user_id,
-        feedback_type="change_requested",
-    )
-    if change_feedback is None:
-        recommendation_repository.add_feedback(
-            session,
-            RecommendationFeedback(
-                recommendation_item_id=first_item.id,
-                user_id=user_id,
-                feedback_type="change_requested",
-                comment=None,
-            ),
-        )
-    # flush 让状态更新和 change_requested 在生成新组合前落入当前事务，
+    # flush 让 replaced 状态在生成新组合前落入当前事务，
     # 但此时仍可由后续异常整体 rollback；commit 只在新推荐成功后执行。
     session.flush()
 
@@ -377,45 +360,14 @@ def _calculate_recommendation(
     except RecommendationError as error:
         raise ResourceConflictError(str(error)) from error
 
-    if previous_ids and _result_ids(result) == previous_ids:
-        result = _different_pair_if_possible(
-            domain_fruits,
-            domain_user,
-            context,
-            previous_ids,
-            fallback=result,
+    # excluded_pair 是推荐核心必须遵守的硬约束。
+    # 如果核心仍返回旧组合，说明算法不变量被破坏；应用层不再改变候选集
+    # 或偷偷重算，而是暴露内部错误，避免把错误结果持久化成新推荐。
+    if previous_ids is not None and _result_ids(result) == previous_ids:
+        raise RecommendationInvariantError(
+            "手动换组后推荐核心仍返回原水果组合"
         )
     return result
-
-
-def _different_pair_if_possible(
-    fruits: list[RecommendationFruit],
-    user: RecommendationUser,
-    context: RecommendationContext,
-    previous_ids: set[int],
-    *,
-    fallback: RecommendationResult,
-) -> RecommendationResult:
-    """刷新后若仍返回原组合，尝试排除其中一个水果寻找替代组。
-
-    这是应用层的最后保险：纯算法已经收到 ``excluded_pair``，但如果可行
-    候选极少仍返回原组合，就分别排除上一组中的一个水果重算。只有成功
-    生成不同 pair 的结果才加入 alternatives；全部失败时保留原 fallback，
-    因而该函数不能保证在候选不足时一定换组。
-    """
-
-    alternatives: list[RecommendationResult] = []
-    for excluded_id in sorted(previous_ids):
-        candidates = [
-            fruit for fruit in fruits if fruit.id != excluded_id
-        ]
-        try:
-            candidate = recommend_fruits(candidates, user, context)
-        except RecommendationError:
-            continue
-        if _result_ids(candidate) != previous_ids:
-            alternatives.append(candidate)
-    return max(alternatives, key=lambda item: item.total_score, default=fallback)
 
 
 def _persist_recommendation(

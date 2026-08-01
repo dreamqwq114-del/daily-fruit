@@ -5,6 +5,7 @@ import pytest
 from app.services import (
     FruitPreference,
     HistoryEvent,
+    NoRecommendationCandidatesError,
     NutritionProfile,
     PairSelection,
     RecommendationContext,
@@ -274,6 +275,35 @@ def test_excluded_pair_is_never_restored_during_relaxation() -> None:
     result = select_recommendation_pair(fruits, make_user(), context)
 
     assert _pair_ids(result) != frozenset({1, 2})
+
+
+def test_refresh_never_returns_excluded_pair() -> None:
+    fruits = [
+        make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
+        for index in range(1, 4)
+    ]
+    context = RecommendationContext(
+        month=7,
+        excluded_pair=frozenset({1, 2}),
+    )
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert _pair_ids(result) != frozenset({1, 2})
+
+
+def test_refresh_fails_when_only_excluded_pair_is_legal() -> None:
+    fruits = [
+        make_fruit(1, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+        make_fruit(2, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+    ]
+    context = RecommendationContext(
+        month=7,
+        excluded_pair=frozenset({1, 2}),
+    )
+
+    with pytest.raises(NoRecommendationCandidatesError):
+        select_recommendation_pair(fruits, make_user(), context)
 
 
 def test_old_pair_can_return_after_cooldown_period() -> None:
