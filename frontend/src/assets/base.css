@@ -299,6 +299,29 @@ p {
   gap: 8px;
 }
 
+.basic-card {
+  align-content: start;
+  min-height: 132px;
+  padding: 14px;
+  border: 1px solid #d4dfd2;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.basic-card:focus-within {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgba(39, 111, 79, 0.12);
+}
+
+.basic-card--checkbox {
+  cursor: pointer;
+}
+
+.basic-card--checkbox > .checkbox-field {
+  font-size: initial;
+  font-weight: initial;
+}
+
 .form-field > span,
 .range-heading strong {
   font-size: 0.88rem;

@@ -23,6 +23,8 @@ describe('ProfileFields', () => {
     ])
     expect(wrapper.find('select[name="discovery_level"]').exists()).toBe(true)
     expect(wrapper.find('[role="radiogroup"][aria-label="尝鲜偏好"]').exists()).toBe(false)
+    expect(wrapper.findAll('.basic-card')).toHaveLength(6)
+    expect(wrapper.find('.basic-card--checkbox').text()).toContain('愿意通过网购购买水果')
     expect(wrapper.find('select[name="discovery_level"]').element.closest('fieldset').querySelector('legend').textContent)
       .toBe('你的基本信息')
     expect(wrapper.find('.horizon-field').element.closest('fieldset').querySelector('legend').textContent)

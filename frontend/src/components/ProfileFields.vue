@@ -76,7 +76,7 @@ const preferenceFields = [
   <fieldset class="form-section">
     <legend>你的基本信息</legend>
     <div class="field-grid field-grid--basic">
-      <label class="form-field">
+      <label class="form-field basic-card">
         <span>怎么称呼你</span>
         <input
           v-model.trim="model.username"
@@ -88,7 +88,7 @@ const preferenceFields = [
           required
         />
       </label>
-      <label class="form-field">
+      <label class="form-field basic-card">
         <span>所在地区</span>
         <select v-model="model.region" name="region" required>
           <option v-for="region in regions" :key="region.value" :value="region.value">
@@ -96,7 +96,7 @@ const preferenceFields = [
           </option>
         </select>
       </label>
-      <label class="form-field">
+      <label class="form-field basic-card">
         <span>价格偏好</span>
         <select v-model.number="model.price_level" name="price_level" required>
           <option v-for="option in priceOptions" :key="option.value" :value="option.value">
@@ -104,7 +104,7 @@ const preferenceFields = [
           </option>
         </select>
       </label>
-      <div class="form-field market-access-field">
+      <label class="form-field basic-card market-access-field">
         <span>购买条件</span>
         <select v-model.number="model.market_access_level" name="market_access_level" required>
           <option v-for="option in marketAccessOptions" :key="option.value" :value="option.value">
@@ -112,7 +112,18 @@ const preferenceFields = [
           </option>
         </select>
         <small>{{ selectedMarketAccess.description }}</small>
-        <label class="checkbox-field">
+      </label>
+      <label class="form-field basic-card">
+        <span>尝鲜偏好</span>
+        <select v-model.number="model.discovery_level" name="discovery_level" required>
+          <option v-for="option in discoveryOptions" :key="option.value" :value="option.value">
+            {{ option.title }}
+          </option>
+        </select>
+      </label>
+      <label class="form-field basic-card basic-card--checkbox">
+        <span>网购意愿</span>
+        <span class="checkbox-field">
           <input
             v-model="model.accepts_online_purchase"
             name="accepts_online_purchase"
@@ -122,15 +133,7 @@ const preferenceFields = [
             <strong>愿意通过网购购买水果</strong>
             <small>包括电商、生鲜配送或即时零售平台</small>
           </span>
-        </label>
-      </div>
-      <label class="form-field form-field--wide">
-        <span>尝鲜偏好</span>
-        <select v-model.number="model.discovery_level" name="discovery_level" required>
-          <option v-for="option in discoveryOptions" :key="option.value" :value="option.value">
-            {{ option.title }}
-          </option>
-        </select>
+        </span>
       </label>
     </div>
   </fieldset>
