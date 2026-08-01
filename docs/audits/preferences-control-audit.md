@@ -54,7 +54,8 @@ deployed JavaScript chunk contains the new horizon control and preference
 field bindings. The authenticated 375px/768px/1440px visual check remains a
 manual follow-up if the browser session becomes available.
 
-Deployment evidence for this slider revision will be recorded after the
-GitHub Pages workflow completes. The previous successful run predates this
-native range-slider change and is not treated as evidence for the current
-revision.
+Deployment evidence: GitHub Actions run `30685834387` completed successfully
+for commit `e8c3d24`; the public URL returned HTTP 200 and the deployed
+`fruit-preferences-Cy9GtxPc.js` contains the native range input, the
+`consumption_horizon_days` binding, and the `2/4/7` mapping. The deployed
+chunk contains no legacy `horizon-segmented` control.

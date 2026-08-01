@@ -35,10 +35,10 @@ values and save path.
 - Production build: `npm run build` passed after stopping the local preview
   process that had locked `frontend/dist` on Windows (`EPERM` was an environment
   lock, not a compile failure).
-- GitHub Actions run `30685149610` completed the build and Pages deploy for
-  commit `8efbf9e`; the public site returned HTTP 200 and its deployed
-  JavaScript chunk contains the new `尝鲜偏好`、`食用时间` and
-  `口感与食用偏好` labels.
+- GitHub Actions run `30685834387` completed the build and Pages deploy for
+  commit `e8c3d24`; the public site returned HTTP 200 and its deployed
+  preference chunk contains a native `type="range"` input bound to
+  `consumption_horizon_days`, with no legacy `horizon-segmented` control.
 - The layout uses two CSS grid columns on desktop/tablet, wide rows for name
   and discovery, and one-column grids below 680px. The horizon slider stays
   full-width on small screens, avoiding text-driven horizontal overflow.
