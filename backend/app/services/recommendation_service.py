@@ -1,10 +1,12 @@
 """纯 Python 水果推荐算法。
 
 输入是 recommendation_types 中的不可变数据对象，输出是两种水果及
-可解释理由；本模块不访问数据库、网络或 FastAPI。流程为：硬过滤 →
-营养归一化 → 单水果评分 → 枚举合法水果对 → 在近优组合中按 seed 选择。
+可解释理由；本模块不访问数据库、网络或 FastAPI。完整管线是：输入验证
+→ 地区/月度季节与供应判断 → 硬过滤 → 营养归一化 → 单水果评分
+→ 枚举合法水果对 → 组合评分 → 在近优组合中按 seed 选择 → 理由生成。
 购买条件字段 ``market_access_level`` 和 ``accepts_online_purchase`` 没有
-进入 RecommendationUser，因此当前只保存、不参与排序。
+进入 RecommendationUser，因此当前只保存、不参与排序。注释描述的是
+当前实现，不把产品理想规则写成已完成的算法行为。
 """
 
 from __future__ import annotations
@@ -40,6 +42,8 @@ from app.services.recommendation_types import (
 
 MISSING_SEASON_SCORE = 0.35
 # energy 用于完整营养归一化和数据置信度；组合互补只使用下方五个特征。
+# 这两个列表刻意不同：营养数据覆盖率需要能量，pair complement 不把
+# 能量和维生素/矿物质差异混成同一个业务概念。
 NUTRITION_FEATURES = (
     "energy",
     "vitamin_c",
@@ -55,6 +59,8 @@ NUTRITION_PAIR_FEATURES = (
     "folate",
     "carotenoids",
 )
+# 基础分的六个子分数总权重必须为 1；反馈不是第七个归一化子分数，而是
+# 在加权基础分之后以有界 adjustment 叠加，避免正负反馈改变权重体系。
 BASE_SCORE_WEIGHTS = {
     "explicit_preference": 0.30,
     "taste_match": 0.25,
@@ -63,12 +69,16 @@ BASE_SCORE_WEIGHTS = {
     "convenience_score": 0.10,
     "history_diversity_score": 0.05,
 }
+# pair 分首先使用两种水果个人分的平均值，再加入互补、感官差异和组合新颖度。
+# 这也是为什么不能先选第一名，再贪心选一个“第二名”替代完整组合枚举。
 PAIR_SCORE_WEIGHTS = {
     "individual_mean": 0.70,
     "nutrition_pair": 0.15,
     "sensory_category_diversity": 0.10,
     "pair_novelty": 0.05,
 }
+# change_requested 记录换组事件，但不代表用户长期喜欢或不喜欢某种水果。
+# 反馈权重和衰减窗口是启发式参数；修改它们会改变排序和理由，应单独测试。
 FEEDBACK_ADJUSTMENTS = {
     "liked": 0.08,
     "eaten": 0.0,
@@ -79,6 +89,7 @@ FEEDBACK_ADJUSTMENTS = {
     "change_requested": 0.0,
     "never_tried": 0.0,
 }
+# 衰减 tau 是算法语义，不等于 Application Service 查询最近多少天的数据。
 FEEDBACK_DECAY_DAYS = {
     "liked": 120.0,
     "disliked": 180.0,
@@ -88,12 +99,16 @@ FEEDBACK_DECAY_DAYS = {
 }
 MIN_FEEDBACK_ADJUSTMENT = -0.15
 MAX_FEEDBACK_ADJUSTMENT = 0.15
+# 近优阈值只控制可复现随机选择的候选集合，不会把任意低分组合变成随机结果。
 PAIR_NEAR_TOP_THRESHOLD = 0.03
 EXPLORATION_COLD_START_PENALTY = 0.08
+# history 的展示和吃过次数分别衰减；Repository 的日期窗口只决定传入哪些事件。
 HISTORY_SHOWN_WEIGHT = 0.12
 HISTORY_EATEN_WEIGHT = 0.18
 HISTORY_SHOWN_TAU_DAYS = 7.0
 HISTORY_EATEN_TAU_DAYS = 10.0
+# 跨天水果冷却只看昨天；今天的换组由 excluded_pair 负责，不能重复计算。
+FRUIT_COOLDOWN_DAYS = 1
 
 
 class RecommendationError(Exception):
@@ -129,6 +144,13 @@ def month_is_in_range(month: int, start_month: int, end_month: int) -> bool:
 
 
 def _region_rank(window: SeasonWindow, *, city: str, region: str) -> int:
+    """把季节记录映射为当前实现使用的地区优先级。
+
+    当前顺序是 city=4、province=3、area=2、national=1；没有明确
+    ``region_level`` 的旧行会按地区文本做较低优先级兼容。这里先决定
+    最高地区层级，月份是否命中在 ``evaluate_season`` 的下一步判断，
+    因而“更具体但当月不命中”的记录不会自动退回更宽泛层级。
+    """
     if window.region == city and window.region_level == "city":
         return 4
     if window.region == region and window.region_level == "province":
@@ -151,7 +173,15 @@ def evaluate_season(
     month: int,
     city: str = "",
 ) -> SeasonEvaluation:
-    """按城市/地区/全国优先级选择季节窗口；缺失数据只降分。"""
+    """按城市/地区/全国优先级选择季节窗口；缺失数据只降分。
+
+    先筛出可匹配的地区记录，再取最高层级；在该层级内优先月份命中的
+    窗口，并按 ``season_score``、``availability_score`` 选最高者。已有
+    记录但当月不命中时返回 ``score=0``、``is_in_season=False``；完全没有
+    相关记录时返回 ``MISSING_SEASON_SCORE`` 和 ``supply_status=unknown``。
+    ``unavailable`` 与 off-season 不同：前者由候选过滤硬排除，后者仍可
+    进入评分，只是季节分为 0。
+    """
 
     if not region.strip():
         raise InvalidRecommendationInputError("地区不能为空")
@@ -185,6 +215,8 @@ def evaluate_season(
             supply_status="unknown",
         )
 
+    # 当前实现先按地区层级取最高 rank，再在该层级内看月份；这是稳定的
+    # 地区优先策略，但也意味着城市记录不命中月份时不会回退到省/区域记录。
     best_rank = max(rank for rank, _ in relevant)
     specific = [season for rank, season in relevant if rank == best_rank]
     matching = [
@@ -207,6 +239,7 @@ def evaluate_season(
 
 
 def _portion_value(value: float | None, portion_grams: float) -> float | None:
+    """将一个营养字段按建议份量比例换算，保留缺失值。"""
     if value is None:
         return None
     numeric = float(value)
@@ -216,6 +249,7 @@ def _portion_value(value: float | None, portion_grams: float) -> float | None:
 
 
 def _quantile(values: list[float], probability: float) -> float:
+    """计算归一化所需的线性插值分位点；空集合是输入错误。"""
     if not values:
         raise InvalidRecommendationInputError("营养归一化缺少有效数据")
     ordered = sorted(values)
@@ -238,6 +272,8 @@ def normalize_nutrition_profiles(
     ``default_portion_grams`` 会参与比例换算；演示 CSV 是无物理单位分数，
     所以该换算是当前已知的语义技术债，而非真实克/毫克计算。
     """
+    # 归一化基准使用完整 active 水果库，而不是已经被用户偏好裁剪后的
+    # 候选集，避免同一水果因用户画像变化而改变其相对营养分数。
     fruit_list = list(fruits)
     fruit_ids = [fruit.id for fruit in fruit_list]
     if any(fruit_id <= 0 for fruit_id in fruit_ids):
@@ -277,6 +313,8 @@ def normalize_nutrition_profiles(
                 else None,
                 fruit.default_portion_grams,
             )
+            # 缺失营养不会被伪造成 0 或 0.5；pair 评分会用 known coverage
+            # 单独表达“有多少维度有数据”。
             if raw is None:
                 values[feature] = None
                 continue
@@ -295,11 +333,20 @@ def filter_eligible_fruits(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> list[RecommendationFruit]:
-    """执行 inactive、禁止、明确不愿尝试、明确不喜欢和不可供应过滤。"""
+    """执行评分前的硬过滤。
+
+    ``inactive``、supporting 角色（除非上下文显式允许）、forbidden、
+    ``willing_to_try=False``、配置启用的明确不喜欢、保守模式下明确没吃过，
+    以及供应状态 ``unavailable`` 会在评分前被移除。硬约束不能只靠降分，
+    否则候选不足或其它水果分数更低时仍可能回到最终组合。当前代码并未
+    把 ``has_tried=None`` 当成没吃过，也没有读取购买条件字段。
+    """
 
     fruit_list = list(fruits)
     _validate_inputs(fruit_list, user, context)
     eligible: list[RecommendationFruit] = []
+    # 先做硬过滤，再让后续 score_candidates 处理软偏好；排序只为保证
+    # 没有随机 seed 时的 tie-break 稳定，不代表这里已经完成最终排名。
     for fruit in fruit_list:
         if not fruit.is_active:
             continue
@@ -335,7 +382,11 @@ def score_candidates(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> list[ScoredFruit]:
-    """先过滤，再把每个候选映射为可解释的 ScoreBreakdown。"""
+    """先过滤，再把每个候选映射为可解释的 ScoreBreakdown。
+
+    营养归一化仍基于全部 active 水果；只有过滤后的水果进入单水果评分。
+    算法需要至少两个候选，候选不足会抛出领域错误而不是返回重复水果。
+    """
 
     fruit_list = list(fruits)
     eligible = filter_eligible_fruits(fruit_list, user, context)
@@ -359,7 +410,12 @@ def score_candidates(
 
 
 def calculate_base_score(scores: ScoreBreakdown) -> float:
-    """应用集中定义的单水果权重，并叠加有界反馈调整。"""
+    """应用集中定义的单水果权重，并叠加有界反馈调整。
+
+    当前公式是 ``sum(weight_i * score_i) + feedback_adjustment``，结果再
+    clamp 到 0～1。反馈不参与基础权重和校验，但必须受全局上下界限制；
+    这样理由可以分别解释“匹配得分”和“历史反馈修正”。
+    """
 
     if not math.isclose(sum(BASE_SCORE_WEIGHTS.values()), 1.0):
         raise RuntimeError("推荐基础权重之和必须为 1")
@@ -385,11 +441,18 @@ def nutrition_complement_score(
     first: NutritionProfile,
     second: NutritionProfile,
 ) -> float:
-    """计算两种水果的营养覆盖、多样性和缺失数据置信度。"""
+    """计算两种水果的营养覆盖、多样性和缺失数据置信度。
+
+    ``coverage`` 取每个特征两者的较高值，``diversity`` 取两者差异，
+    ``confidence`` 按双方都已知的维度比例缩放。它只服务 pair complement，
+    不等同于单水果的 nutrition richness；缺少共同特征时返回 0，而不是
+    把缺失解释成营养不足或额外奖励。
+    """
     pairs = [
         (getattr(first, feature, None), getattr(second, feature, None))
         for feature in NUTRITION_PAIR_FEATURES
     ]
+    # 只有两种水果都具备的维度才有可比性；单边缺失不参与差异计算。
     known = [(float(left), float(right)) for left, right in pairs if left is not None and right is not None]
     if not known:
         return 0.0
@@ -404,6 +467,12 @@ def _pair_novelty(
     second_id: int,
     context: RecommendationContext,
 ) -> float:
+    """为已排除、近期出现或历史组合返回不同强度的新颖度。
+
+    ``excluded_pair`` 是换一组的硬排除；``previous_pairs`` 只降分，历史
+    水果事件则用于更细粒度地降低近期重复。优先使用带日期的
+    ``history_events``，没有事件时才退回旧的 ``recent_fruit_ids``。
+    """
     pair = frozenset({first_id, second_id})
     if context.excluded_pair is not None and pair == context.excluded_pair:
         return 0.0
@@ -419,6 +488,7 @@ def _sensory_category_diversity(
     first: RecommendationFruit,
     second: RecommendationFruit,
 ) -> float:
+    """用类别、食用方式和四个口感维度衡量组合差异。"""
     category_difference = 1.0 if first.category != second.category else 0.0
     mode_difference = 1.0 if first.consumption_mode != second.consumption_mode else 0.0
     taste_distance = sum(
@@ -433,35 +503,98 @@ def _pair_is_legal(
     second: RecommendationFruit,
     user: RecommendationUser,
     context: RecommendationContext,
-    scored: list[ScoredFruit],
+    *,
+    enforce_pair_cooldown: bool,
+    blocked_recent_fruit_ids: frozenset[int],
 ) -> bool:
+    """判断两个水果能否组成当前推荐组合。
+
+    参数说明：
+    - ``first`` / ``second``：准备组成组合的两个 ``RecommendationFruit``。
+    - ``user``：当前用户的 ``RecommendationUser``，包含尝鲜等级和水果偏好。
+    - ``context``：本次推荐的上下文，包括手动换组和短期组合冷却。
+    - ``enforce_pair_cooldown``：是否启用最近几天的完整组合硬冷却。
+    - ``blocked_recent_fruit_ids``：当前阶段要尽量避开的跨天水果 ID。
+
+    返回值：
+    - ``True``：该组合满足硬性规则，可以继续计算组合分数。
+    - ``False``：该组合违反硬性规则，不能进入候选组合列表。
+
+    ``filter_eligible_fruits`` 已经负责 inactive、forbidden、unavailable 等
+    单水果硬过滤；本函数补充短期重复和需要同时观察两个水果的尝鲜组合规则。
+    注意：``has_tried`` 有三种状态：
+    - ``True``：用户明确吃过；
+    - ``False``：用户明确没吃过；
+    - ``None``：未知，不能当成没吃过或吃过。
+    """
+
+    # 用 frozenset 表示无序的水果组合：A+B 和 B+A 被视为同一组。
     pair = frozenset({first.id, second.id})
+
+    # 换一组时，核心算法不能再次返回被排除的上一组组合。
     if context.excluded_pair is not None and pair == context.excluded_pair:
         return False
+
+    # 正常阶段不允许最近几天已经出现过的完整组合；候选不足时由调用方
+    # 关闭该开关，进入第三阶段放宽跨天组合冷却。
+    if enforce_pair_cooldown and pair in context.cooldown_pairs:
+        return False
+
+    # 第一阶段尽量不让昨天出现过的单个水果连续出现；第二阶段传入空集合
+    # 以便在候选不足时保留组合冷却、放宽单水果冷却。
+    if first.id in blocked_recent_fruit_ids or second.id in blocked_recent_fruit_ids:
+        return False
+
+    # 读取用户保存的水果偏好；字典的键是 fruit_id。
     preferences = user.fruit_preferences
+
+    # 只取当前这两个水果各自的偏好，列表中的元素可能是 None，表示用户没有填写偏好。
     pair_preferences = [preferences.get(first.id), preferences.get(second.id)]
-    explicit_untried = [
-        preference
+
+    explicit_untried_count = sum(
+        preference is not None and preference.has_tried is False
         for preference in pair_preferences
-        if preference is not None and preference.has_tried is False
-    ]
-    if user.discovery_level == 0 and explicit_untried:
-        return False
-    if user.discovery_level in {1, 2} and len(explicit_untried) > 1:
-        return False
-    known_tried_exists = any(
-        preference is not None and preference.has_tried is True
-        for item in scored
-        for preference in [preferences.get(item.fruit.id)]
     )
-    if user.discovery_level == 1 and known_tried_exists and not any(
-        preference is not None and preference.has_tried is True
-        for preference in pair_preferences
-    ):
+
+    # has_tried 的语义：
+    # True  = 用户明确吃过
+    # False = 用户明确没吃过
+    # None  = 用户尚未提供信息，不能当作“没吃过”
+    #
+    # 保守模式：组合中不能包含明确没吃过的水果。
+    if user.discovery_level == 0 and explicit_untried_count > 0:
         return False
-    if user.discovery_level == 2 and len(explicit_untried) == 2:
+
+    # 均衡和尝鲜模式：一组最多包含一个明确没吃过的水果。
+    # 不再强制组合必须包含 has_tried=True 的水果，
+    # 避免少数已标记为吃过的水果成为每组必须出现的锚点。
+    if user.discovery_level in {1, 2} and explicit_untried_count > 1:
         return False
+
+    # 所有硬性规则均通过，组合可以进入后续评分。
     return True
+
+
+def _recently_shown_fruit_ids(
+    context: RecommendationContext,
+    *,
+    days: int,
+) -> frozenset[int]:
+    """提取跨天短窗口内出现过的水果，不把当天记录算入冷却。
+
+    ``history_events`` 使用业务日期而不是写入时间；严格使用
+    ``0 < difference <= days``，因此当天“换一组”由 ``excluded_pair`` 处理，
+    不会和跨天冷却混在一起。没有事件时返回空集合，兼容旧的纯算法调用。
+    """
+
+    if days < 0:
+        raise InvalidRecommendationInputError("冷却天数不能为负数")
+    today = context.today or date.today()
+    return frozenset(
+        event.fruit_id
+        for event in context.history_events
+        if 0 < (today - event.occurred_on).days <= days
+    )
 
 
 def select_recommendation_pair(
@@ -469,35 +602,86 @@ def select_recommendation_pair(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> PairSelection:
-    """枚举所有合法组合，按组合公式排序并稳定选择近优组合。"""
+    """枚举所有合法组合，按组合公式排序并稳定选择近优组合。
+
+    对 ``n`` 个单水果候选枚举 ``n * (n - 1) / 2`` 个无序 pair，避免
+    “先选冠军、再贪心选第二名”漏掉营养或感官互补更好的组合。组合硬过滤
+    按“昨天水果 → 最近 3 天完整组合 → 跨天组合冷却”分层放宽，但
+    ``excluded_pair`` 在任何阶段都不恢复。排序先按 pair_score 再按水果 ID
+    稳定打破平分；提供 ``random_seed`` 时只在最高分上下
+    ``PAIR_NEAR_TOP_THRESHOLD`` 的集合内选择。
+    """
 
     fruit_list = list(fruits)
     scored = score_candidates(fruit_list, user, context)
     normalized = normalize_nutrition_profiles(
         [fruit for fruit in fruit_list if fruit.is_active]
     )
-    pairs: list[tuple[float, float, float, float, ScoredFruit, ScoredFruit]] = []
-    for first, second in combinations(scored, 2):
-        if not _pair_is_legal(first.fruit, second.fruit, user, context, scored):
-            continue
-        nutrition_pair = nutrition_complement_score(
-            normalized.get(first.fruit.id, NutritionProfile()),
-            normalized.get(second.fruit.id, NutritionProfile()),
+    recently_shown = _recently_shown_fruit_ids(
+        context,
+        days=FRUIT_COOLDOWN_DAYS,
+    )
+
+    def build_pairs(
+        *,
+        enforce_pair_cooldown: bool,
+        blocked_recent_fruit_ids: frozenset[int],
+    ) -> list[tuple[float, float, float, float, ScoredFruit, ScoredFruit]]:
+        """在一个冷却阶段枚举全部组合；阶段只改变硬过滤，不改变评分。"""
+
+        candidates: list[
+            tuple[float, float, float, float, ScoredFruit, ScoredFruit]
+        ] = []
+        for first, second in combinations(scored, 2):
+            if not _pair_is_legal(
+                first.fruit,
+                second.fruit,
+                user,
+                context,
+                enforce_pair_cooldown=enforce_pair_cooldown,
+                blocked_recent_fruit_ids=blocked_recent_fruit_ids,
+            ):
+                continue
+            nutrition_pair = nutrition_complement_score(
+                normalized.get(first.fruit.id, NutritionProfile()),
+                normalized.get(second.fruit.id, NutritionProfile()),
+            )
+            sensory = _sensory_category_diversity(first.fruit, second.fruit)
+            novelty = _pair_novelty(first.fruit.id, second.fruit.id, context)
+            pair_score = clamp_score(
+                PAIR_SCORE_WEIGHTS["individual_mean"]
+                * ((first.base_score + second.base_score) / 2)
+                + PAIR_SCORE_WEIGHTS["nutrition_pair"] * nutrition_pair
+                + PAIR_SCORE_WEIGHTS["sensory_category_diversity"] * sensory
+                + PAIR_SCORE_WEIGHTS["pair_novelty"] * novelty
+            )
+            candidates.append(
+                (pair_score, nutrition_pair, sensory, novelty, first, second)
+            )
+        return candidates
+
+    # 第一阶段：最近 3 天完整组合不重复，并尽量避开昨天的单个水果。
+    pairs = build_pairs(
+        enforce_pair_cooldown=True,
+        blocked_recent_fruit_ids=recently_shown,
+    )
+    # 第二阶段：候选不足时允许昨天的水果再次出现，但保留完整组合冷却。
+    if not pairs:
+        pairs = build_pairs(
+            enforce_pair_cooldown=True,
+            blocked_recent_fruit_ids=frozenset(),
         )
-        sensory = _sensory_category_diversity(first.fruit, second.fruit)
-        novelty = _pair_novelty(first.fruit.id, second.fruit.id, context)
-        pair_score = clamp_score(
-            PAIR_SCORE_WEIGHTS["individual_mean"]
-            * ((first.base_score + second.base_score) / 2)
-            + PAIR_SCORE_WEIGHTS["nutrition_pair"] * nutrition_pair
-            + PAIR_SCORE_WEIGHTS["sensory_category_diversity"] * sensory
-            + PAIR_SCORE_WEIGHTS["pair_novelty"] * novelty
+    # 第三阶段：限制仍过多时放开跨天组合冷却；excluded_pair 仍是硬约束。
+    if not pairs:
+        pairs = build_pairs(
+            enforce_pair_cooldown=False,
+            blocked_recent_fruit_ids=frozenset(),
         )
-        pairs.append((pair_score, nutrition_pair, sensory, novelty, first, second))
     if not pairs:
         raise NoRecommendationCandidatesError(
             "没有满足熟悉度和可推荐规则的水果组合，请调整尝鲜设置"
         )
+    # 先固定顺序，再对近优集合做带 seed 的选择，保证同一上下文可复现。
     pairs.sort(
         key=lambda item: (
             -item[0],
@@ -534,7 +718,12 @@ def recommend_fruits(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> RecommendationResult:
-    """生成恰好两个水果，并从相同评分贡献构造推荐理由。"""
+    """生成恰好两个水果，并从相同评分贡献构造推荐理由。
+
+    这里是纯算法对外的主入口：它只组合领域对象，不负责写库、事务或
+    API 状态码。返回的 ``total_score`` 是 pair 分，单项 ``score`` 仍保留
+    各水果的 base score，理由由同一批子分数计算，避免理由与排序脱节。
+    """
 
     selection = select_recommendation_pair(fruits, user, context)
     first_reasons = _build_reasons(selection.first, user, selection)
@@ -572,6 +761,13 @@ def _build_reasons(
     user: RecommendationUser,
     selection: PairSelection,
 ) -> tuple[RecommendationReason, ...]:
+    """按实际贡献排序理由，并限制返回条数。
+
+    探索理由表达“尚未尝试”这一状态，不等于用户喜欢它；显式喜欢理由
+    只有在熟悉水果且偏好分达到阈值时才出现。pair/nutrition 理由使用组合
+    分贡献，强制把正反馈塞进前四项可能改变纯贡献排序，这是当前实现的
+    解释取舍而非新的评分规则。
+    """
     fruit = scored.fruit
     scores = scored.scores
     candidates: list[tuple[float, int, RecommendationReason]] = []
@@ -583,6 +779,8 @@ def _build_reasons(
         message: str,
         component: ReasonComponent,
     ) -> None:
+        # 用绝对贡献排序可以同时展示正向匹配和负向修正，但 message/code
+        # 仍必须与真实 component 对应，不能把缺失或未知写成偏好。
         nonlocal order
         candidates.append(
             (
@@ -718,6 +916,13 @@ def _explicit_preference_score(
     fruit: RecommendationFruit,
     user: RecommendationUser,
 ) -> float:
+    """将单水果偏好映射为 0～1 的个人匹配先验。
+
+    当前兼容逻辑对 ``has_tried=False`` 直接使用 commonness，不读取
+    ``preference_score``；其它状态只要有 preference_score 就会读取，
+    因而 UNKNOWN 行若同时带有偏好分也会影响排序。这是当前实现事实，
+    与“偏好分只描述已吃过水果”的理想语义并不完全一致，本任务不改动它。
+    """
     preference = user.fruit_preferences.get(fruit.id)
     if preference is None:
         return clamp_score(0.35 + 0.10 * fruit.commonness_score)
@@ -741,7 +946,12 @@ def _exploration_adjustment(
     fruit: RecommendationFruit,
     user: RecommendationUser,
 ) -> float:
-    """Lower unfamiliar exploration fruits, unless the user explicitly likes one."""
+    """Lower unfamiliar exploration fruits, unless the user explicitly likes one.
+
+    这里的“explicitly liked”当前只检查 preference_score>=1，没有再次要求
+    ``has_tried=True``；这与 FruitPreference 的理想字段语义存在边界差异，
+    但保持现状是为了不在注释任务中改变排序。
+    """
     if fruit.daily_recommendation_role != "exploration":
         return 0.0
     preference = user.fruit_preferences.get(fruit.id)
@@ -766,6 +976,13 @@ def _feedback_events_for(
     fruit_id: int,
     context: RecommendationContext,
 ) -> list[FeedbackEvent]:
+    """优先返回带时间的反馈事件，旧聚合输入只作兼容 fallback。
+
+    ``feedback_by_fruit`` 没有原始时间，因此 fallback 会用当天零点合成
+    事件，等价于不再提供真实历史衰减信息；新调用者应传入
+    ``feedback_events``。时间戳不能在每次运行时重新生成，否则同一历史
+    反馈会被反复当作“刚发生”。
+    """
     if context.feedback_events:
         return [event for event in context.feedback_events if event.fruit_id == fruit_id]
     now = datetime.combine(context.today or date.today(), datetime.min.time(), tzinfo=UTC)
@@ -779,6 +996,7 @@ def _feedback_adjustment(
     fruit_id: int,
     context: RecommendationContext,
 ) -> float:
+    """按反馈类型和发生时间累计有界调整，不把刷新事件当长期偏好。"""
     today = context.today or date.today()
     adjustment = 0.0
     for event in _feedback_events_for(fruit_id, context):
@@ -799,6 +1017,12 @@ def _history_freshness(
     fruit_id: int,
     context: RecommendationContext,
 ) -> float:
+    """将展示/吃过历史转成 0～1 新鲜度。
+
+    有带日期的 ``history_events`` 时按每个日期事件指数衰减；没有该水果
+    的聚合事件时再使用旧的 recent_fruit_ids 位置 fallback。查询窗口之外
+    的历史根本不会到达这里，因此窗口长度与 tau 不能互相替代。
+    """
     today = context.today or date.today()
     events = [event for event in context.history_events if event.fruit_id == fruit_id]
     if events:
@@ -821,6 +1045,14 @@ def _score_fruit(
     context: RecommendationContext,
     nutrition: NutritionProfile,
 ) -> ScoredFruit:
+    """计算一个候选的全部子分数并生成可解释的单水果结果。
+
+    ``availability_and_season`` 由 0.45*season + 0.55*availability 组成；
+    convenience 先由水果自身的可携带/处理/脏乱/储存属性推导，再按用户
+    convenience_preference 调整。当前基础公式不读取市场购买条件，也不把
+    ``nutrition_diversity_score`` 单独加权；这些字段的存在不能被解释成已
+    参与排序。
+    """
     season = evaluate_season(
         fruit.seasons,
         region=user.region,
@@ -874,6 +1106,13 @@ def _validate_inputs(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> None:
+    """在任何过滤/评分前验证算法边界，不负责修正业务数据。
+
+    这里验证数值范围、ID 唯一性、角色、历史/反馈时间和反馈类型；它没有
+    把 ``preference_score`` 与 ``has_tried`` 绑定，也没有把缺失营养补成
+    数值。调用方应把验证失败当作输入合同错误，而不是通过降低分数继续
+    生成推荐。
+    """
     if not 1 <= context.month <= 12:
         raise InvalidRecommendationInputError("月份必须在 1 到 12 之间")
     if not user.region.strip():
@@ -955,6 +1194,7 @@ def _validate_inputs(
 
 
 def _validate_unit_scores(values: Mapping[str, float | None]) -> None:
+    """验证可选的单位区间分数；``None`` 表示未提供，不代表 0。"""
     for name, value in values.items():
         if value is None:
             continue
