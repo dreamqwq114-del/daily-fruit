@@ -14,7 +14,7 @@ describe('ProfileFields', () => {
     expect(wrapper.find('input[name="city"]').exists()).toBe(false)
     expect(wrapper.find('input[name="username"]').exists()).toBe(true)
     expect(wrapper.findAll('select[name="region"] option')).toHaveLength(8)
-    expect(wrapper.findAll('input[type="range"]')).toHaveLength(5)
+    expect(wrapper.findAll('input[type="range"]')).toHaveLength(6)
     expect(wrapper.find('input[name="convenience_preference"]').exists()).toBe(true)
     expect(wrapper.findAll('fieldset')).toHaveLength(2)
     expect(wrapper.findAll('legend').map((legend) => legend.text())).toEqual([
@@ -40,10 +40,12 @@ describe('ProfileFields', () => {
     expect(wrapper.findAll('select[name="discovery_level"] option').map((option) => option.element.value))
       .toEqual(['0', '1', '2'])
     expect(wrapper.find('select[name="discovery_level"]').element.value).toBe('1')
-    expect(wrapper.find('.horizon-segmented').findAll('button').map((button) => button.attributes('data-horizon-days')))
-      .toEqual(['2', '4', '7'])
-    expect(wrapper.find('.horizon-segmented').findAll('button').map((button) => button.attributes('aria-checked')))
-      .toEqual(['false', 'true', 'false'])
+    const horizonSlider = wrapper.find('input[name="consumption_horizon_days"]')
+    expect(horizonSlider.attributes('type')).toBe('range')
+    expect(horizonSlider.attributes('min')).toBe('0')
+    expect(horizonSlider.attributes('max')).toBe('2')
+    expect(horizonSlider.attributes('step')).toBe('1')
+    expect(horizonSlider.element.value).toBe('1')
   })
 
   it('switches discovery and horizon values without adding duplicate controls', async () => {
@@ -53,12 +55,12 @@ describe('ProfileFields', () => {
     })
 
     await wrapper.find('select[name="discovery_level"]').setValue('2')
-    await wrapper.find('.horizon-segmented').findAll('button')[0].trigger('click')
+    await wrapper.find('input[name="consumption_horizon_days"]').setValue('0')
 
     expect(model.discovery_level).toBe(2)
     expect(model.consumption_horizon_days).toBe(2)
     expect(wrapper.findAll('[name="discovery_level"]')).toHaveLength(1)
-    expect(wrapper.findAll('[name="consumption_horizon_days"]')).toHaveLength(0)
+    expect(wrapper.findAll('[name="consumption_horizon_days"]')).toHaveLength(1)
 
     const names = wrapper.findAll('[name]').map((element) => element.attributes('name'))
     expect(new Set(names).size).toBe(names.length)

@@ -1,7 +1,7 @@
 # Preferences layout audit
 
 Date: 2026-08-01
-Auditor: independent read-only subagent (`/root/preferences_audit`)
+Auditor: independent read-only subagent (`/root/control_slider_audit`)
 
 ## Scope
 
@@ -13,22 +13,21 @@ changed in this task.
 
 | Check | Result |
 | --- | --- |
-| Discovery cards are inside `你的基本信息` | Pass |
-| Horizon cards are inside `口感与食用偏好` | Pass |
+| Discovery control is inside `你的基本信息` | Pass |
+| Horizon slider is inside `口感与食用偏好` | Pass |
 | Old independent discovery and horizon fieldsets removed | Pass |
 | One `discovery_level` and one `consumption_horizon_days` state path | Pass |
 | Numeric values and API payload path unchanged | Pass |
 | Defaults remain discovery `1` and horizon `4` | Pass |
 | No duplicate form names/IDs; city remains absent from the UI | Pass |
-| Radio-group semantics, visible selection, Tab/Enter/Space support | Pass |
+| Select/range semantics, visible selection, keyboard support | Pass |
 | Recommendation algorithm and backend files unchanged | Pass |
 | 375/768/1440 layout risk review | Pass by CSS review; live browser evidence limited below |
 
-The subagent found one low-priority accessibility enhancement: the custom
-radio groups do not implement optional Arrow-key movement from the full ARIA
-Authoring Practices pattern. Each native button remains independently
-Tab-focusable and supports Enter/Space, which meets this task's explicit
-keyboard requirement; no blocking issue was found.
+The later control pass replaced the custom choice groups with a native
+discovery select and a native three-stop horizon range input. This removes the
+previous custom-radio Arrow-key limitation while preserving the same field
+values and save path.
 
 ## Verification evidence
 
@@ -41,8 +40,8 @@ keyboard requirement; no blocking issue was found.
   JavaScript chunk contains the new `尝鲜偏好`、`食用时间` and
   `口感与食用偏好` labels.
 - The layout uses two CSS grid columns on desktop/tablet, wide rows for name
-  and discovery, and one-column grids below 680px. Horizon cards become a
-  single column on small screens, avoiding text-driven horizontal overflow.
+  and discovery, and one-column grids below 680px. The horizon slider stays
+  full-width on small screens, avoiding text-driven horizontal overflow.
 
 ## Browser boundary
 

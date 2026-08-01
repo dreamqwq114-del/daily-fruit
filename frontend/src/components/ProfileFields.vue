@@ -1,4 +1,6 @@
 <script setup>
+import { computed } from 'vue'
+
 const model = defineModel({ type: Object, required: true })
 
 const regions = [
@@ -29,6 +31,21 @@ const horizonOptions = [
   { value: 4, title: '3～5 天', description: '日常适中' },
   { value: 7, title: '一周左右', description: '希望选择相对耐放的水果' },
 ]
+
+const horizonIndex = computed({
+  get() {
+    const index = horizonOptions.findIndex(
+      (option) => option.value === Number(model.value.consumption_horizon_days),
+    )
+    return index === -1 ? 1 : index
+  },
+  set(index) {
+    const option = horizonOptions[Number(index)]
+    model.value.consumption_horizon_days = option?.value ?? 4
+  },
+})
+
+const selectedHorizon = computed(() => horizonOptions[horizonIndex.value] ?? horizonOptions[1])
 
 const preferenceFields = [
   { key: 'sweet_preference', label: '偏甜', low: '清淡', high: '喜欢甜味' },
@@ -106,25 +123,24 @@ const preferenceFields = [
         />
         <span class="range-hints"><small>{{ field.low }}</small><small>{{ field.high }}</small></span>
       </label>
-      <div class="horizon-field">
-        <span class="choice-field__label">食用时间</span>
-        <span class="choice-field__help">通常多久吃完购买的水果</span>
-        <div class="horizon-segmented" role="radiogroup" aria-label="通常多久吃完购买的水果">
-          <button
-            v-for="option in horizonOptions"
-            :key="option.value"
-            class="horizon-segment"
-            :class="{ 'is-selected': model.consumption_horizon_days === option.value }"
-            type="button"
-            role="radio"
-            :aria-checked="model.consumption_horizon_days === option.value"
-            :data-horizon-days="option.value"
-            @click="model.consumption_horizon_days = option.value"
-          >
-            <strong>{{ option.title }}</strong>
-            <small>{{ option.description }}</small>
-          </button>
-        </div>
+      <div class="horizon-field range-field">
+        <span class="range-heading">
+          <strong>食用时间</strong>
+          <output>{{ selectedHorizon.title }}</output>
+        </span>
+        <span class="horizon-field__help">通常多久吃完购买的水果</span>
+        <input
+          v-model.number="horizonIndex"
+          name="consumption_horizon_days"
+          type="range"
+          min="0"
+          max="2"
+          step="1"
+          aria-label="通常多久吃完购买的水果"
+          :aria-valuetext="`${selectedHorizon.title}，${selectedHorizon.description}`"
+        />
+        <span class="range-hints"><small>1～2 天</small><small>一周左右</small></span>
+        <small class="horizon-slider-description">{{ selectedHorizon.description }}</small>
       </div>
     </div>
   </fieldset>

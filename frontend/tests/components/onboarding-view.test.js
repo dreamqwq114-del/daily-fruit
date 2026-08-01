@@ -89,7 +89,7 @@ describe('OnboardingView', () => {
     await flushPromises()
 
     await wrapper.find('select[name="discovery_level"]').setValue('2')
-    await wrapper.find('.horizon-segmented').findAll('button')[0].trigger('click')
+    await wrapper.find('input[name="consumption_horizon_days"]').setValue('0')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 

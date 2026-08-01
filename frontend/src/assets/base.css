@@ -326,74 +326,32 @@ p {
   gap: 24px 30px;
 }
 
-.choice-field,
 .horizon-field {
   display: grid;
   min-width: 0;
   gap: 8px;
 }
 
-.choice-field__label {
-  color: var(--ink);
-  font-size: 0.88rem;
-  font-weight: 780;
-}
-
-.choice-field__help {
+.horizon-field__help {
   margin-top: -2px;
   color: var(--muted);
   font-size: 0.78rem;
   line-height: 1.45;
 }
 
-.horizon-segmented {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
-  min-width: 0;
-  padding: 3px;
-  border: 1px solid #cbd6ca;
-  border-radius: 16px;
-  background: #eef4eb;
-}
-
-.horizon-segment {
-  display: grid;
-  min-width: 0;
-  min-height: 76px;
-  align-content: center;
-  gap: 6px;
-  padding: 10px 12px;
-  border: 1px solid transparent;
-  border-radius: 12px;
-  background: transparent;
-  color: var(--ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: border-color 160ms ease, background 160ms ease, transform 160ms ease;
-}
-
-.horizon-segment:hover {
-  border-color: #8db09a;
-  background: #fff;
-  transform: translateY(-1px);
-}
-
-.horizon-segment.is-selected {
-  border-color: var(--green);
-  background: var(--green-soft);
-  box-shadow: inset 0 0 0 1px var(--green);
-}
-
-.horizon-segment strong {
-  font-size: 0.88rem;
-}
-
-.horizon-segment small {
+.horizon-slider-description {
   color: var(--muted);
   font-size: 0.74rem;
   line-height: 1.4;
+}
+
+.horizon-field input[type="range"] {
+  margin-top: 2px;
+}
+
+.horizon-field .range-hints small {
+  color: var(--muted);
+  font-size: 0.78rem;
 }
 
 .range-field {
@@ -1489,10 +1447,6 @@ p {
   .fruit-selection-summary,
   .fruit-choice-grid,
   .fruit-picker-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .horizon-segmented {
     grid-template-columns: 1fr;
   }
 

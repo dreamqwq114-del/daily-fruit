@@ -1,7 +1,7 @@
 # Preferences control audit
 
 Date: 2026-08-01
-Auditor: independent read-only subagent (`/root/preferences_audit`)
+Auditor: independent read-only subagent (`/root/control_slider_audit`)
 
 ## Results
 
@@ -9,7 +9,7 @@ Auditor: independent read-only subagent (`/root/preferences_audit`)
 | --- | --- |
 | Discovery is a native select like price preference | Pass |
 | Discovery values remain 0/1/2 with default 1 | Pass |
-| Horizon is a three-segment control | Pass |
+| Horizon is a three-stop range slider | Pass |
 | Horizon values remain exactly 2/4/7 with default 4 | Pass |
 | Existing profile state and API payload are reused | Pass |
 | Existing data can be echoed without API changes | Pass |
@@ -18,19 +18,18 @@ Auditor: independent read-only subagent (`/root/preferences_audit`)
 | Tab/Enter/Space and visible selected state | Pass |
 | 375/768/1440 responsive layout review | Pass by CSS review |
 
-The audit confirmed that the horizon buttons only assign
-`model.consumption_horizon_days`; they do not introduce a second state. The
-onboarding save path still sends the same `{ ...profile }` payload, and the
-preference page uses the same model path.
+The audit confirmed that the horizon range slider derives an index from the
+existing `consumption_horizon_days` field and maps its three positions to
+`2/4/7`; it does not introduce a second state. The onboarding save path still
+sends the same `{ ...profile }` payload, and the preference page uses the same
+model path.
 
 ## Non-blocking accessibility notes
 
-The custom horizon radio group does not implement optional Arrow-key movement
-and roving tabindex from the complete ARIA Authoring Practices pattern. Each
-native button is independently reachable with Tab and supports Enter/Space,
-which satisfies the requested keyboard behavior. At widths below 680px the
-three segments stack vertically to avoid text-driven horizontal overflow; this
-is intentional responsive behavior.
+The native horizon range input supports Tab, Arrow-key, Home/End, and direct
+keyboard adjustment. Its output label and end hints make the three valid
+positions visible. At widths below 680px the slider remains full-width and the
+labels wrap safely without horizontal overflow.
 
 ## Verification
 
@@ -55,6 +54,7 @@ deployed JavaScript chunk contains the new horizon control and preference
 field bindings. The authenticated 375px/768px/1440px visual check remains a
 manual follow-up if the browser session becomes available.
 
-Deployment evidence: GitHub Actions run `30685587770` completed successfully
-for commit `0ff4a4e`; public URL:
-`https://dreamqwq114-del.github.io/daily-fruit/`.
+Deployment evidence for this slider revision will be recorded after the
+GitHub Pages workflow completes. The previous successful run predates this
+native range-slider change and is not treated as evidence for the current
+revision.
