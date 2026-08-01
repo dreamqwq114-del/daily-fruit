@@ -91,7 +91,6 @@ describe('TodayView', () => {
     userApi.getUser.mockResolvedValue({
       id: 1,
       username: '小果',
-      city: '苏州',
       region: '华东',
     })
     recommendationApi.getTodayRecommendation.mockResolvedValue(makeRecommendation())
@@ -112,6 +111,7 @@ describe('TodayView', () => {
     expect(wrapper.findAll('.fruit-card')).toHaveLength(2)
     expect(wrapper.text()).toContain('苹果')
     expect(wrapper.text()).toContain('橙子')
+    expect(wrapper.text()).toContain('华东')
   })
 
   it('prevents duplicate refresh and feedback submissions', async () => {
