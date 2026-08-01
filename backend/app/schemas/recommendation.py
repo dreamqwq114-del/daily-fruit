@@ -1,3 +1,5 @@
+"""推荐 API 的枚举、评分、理由、反馈和 pair 结构合同。"""
+
 from datetime import date
 from enum import StrEnum
 from typing import Annotated
@@ -15,11 +17,15 @@ from app.schemas.fruit import FruitDetail
 
 
 class RecommendationStatus(StrEnum):
+    """推荐生命周期；active 是当天可见组，replaced 是历史旧组。"""
+
     ACTIVE = "active"
     REPLACED = "replaced"
 
 
 class FeedbackType(StrEnum):
+    """前端可提交的反馈事件类型。"""
+
     EATEN = "eaten"
     LIKED = "liked"
     DISLIKED = "disliked"
@@ -30,6 +36,8 @@ class FeedbackType(StrEnum):
 
 
 class ReasonCode(StrEnum):
+    """推荐理由的稳定代码，便于前端展示和回归测试。"""
+
     IN_SEASON = "in_season"
     SWEET_MATCH = "sweet_match"
     SOUR_MATCH = "sour_match"
@@ -50,6 +58,8 @@ class ReasonCode(StrEnum):
 
 
 class ReasonComponent(StrEnum):
+    """理由对应的评分贡献组件。"""
+
     SEASON_SCORE = "season_score"
     PREFERENCE_SCORE = "preference_score"
     NUTRITION_DIVERSITY_SCORE = "nutrition_diversity_score"
@@ -68,6 +78,8 @@ class ReasonComponent(StrEnum):
 
 
 class RecommendationReason(ApiSchema):
+    """结构化理由：代码、文案、评分组件和归一化贡献。"""
+
     code: ReasonCode
     message: Annotated[str, Field(min_length=1, max_length=200)]
     component: ReasonComponent
@@ -108,6 +120,8 @@ class RecommendationBase(ApiSchema):
 def _validate_recommendation_pair(
     items: list[RecommendationItemCreate | RecommendationItemRead],
 ) -> list[RecommendationItemCreate | RecommendationItemRead]:
+    """保证每组推荐恰好有 rank 1/2 且水果不重复。"""
+
     if {item.rank for item in items} != {1, 2}:
         raise ValueError("Recommendation items must have ranks 1 and 2")
     if len({item.fruit_id for item in items}) != 2:
@@ -127,6 +141,8 @@ class RecommendationCreate(RecommendationBase):
         cls,
         items: list[RecommendationItemCreate],
     ) -> list[RecommendationItemCreate]:
+        """在创建请求边界再次验证两项组合。"""
+
         return list(_validate_recommendation_pair(items))
 
 
@@ -144,6 +160,8 @@ class RecommendationRead(RecommendationBase):
         cls,
         items: list[RecommendationItemRead],
     ) -> list[RecommendationItemRead]:
+        """验证从数据库读出的推荐仍满足两项合同。"""
+
         return list(_validate_recommendation_pair(items))
 
 
@@ -152,6 +170,8 @@ class RecommendationRefreshRequest(ApiSchema):
 
 
 class RecommendationFeedbackCreate(ApiSchema):
+    """用户反馈请求；comment 可选且限制长度。"""
+
     feedback_type: FeedbackType
     comment: Annotated[str, Field(max_length=1000)] | None = None
 
@@ -182,6 +202,8 @@ class RecommendationDetail(RecommendationBase):
         cls,
         items: list[RecommendationItemDetail],
     ) -> list[RecommendationItemDetail]:
+        """验证带水果详情的最终 API 响应仍是两个不同水果。"""
+
         return list(_validate_recommendation_pair(items))
 
 

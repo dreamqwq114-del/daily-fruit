@@ -1,3 +1,5 @@
+"""推荐业务编排：加载数据、控制事务、调用纯算法并持久化结果。"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -59,6 +61,8 @@ def get_today_recommendation(
     *,
     today: date | None = None,
 ) -> RecommendationDetail:
+    """复用当天 active 推荐；不存在时在用户锁内创建一组。"""
+
     recommendation_date = today or current_app_date()
     recommendation_repository.acquire_user_lock(session, user_id)
     user = user_repository.get_user(
@@ -108,6 +112,8 @@ def refresh_recommendation(
     *,
     today: date | None = None,
 ) -> RecommendationDetail:
+    """把旧组标记 replaced，记录换组事件并生成不同组合。"""
+
     recommendation_date = today or current_app_date()
     recommendation_repository.acquire_user_lock(session, user_id)
     user = user_repository.get_user(
@@ -178,6 +184,8 @@ def list_recommendation_history(
     *,
     limit: int = DEFAULT_HISTORY_LIMIT,
 ) -> list[RecommendationDetail]:
+    """读取当前用户的推荐历史，具体预加载由 Repository 负责。"""
+
     if user_repository.get_user(session, user_id) is None:
         raise ResourceNotFoundError("用户不存在")
     return [
@@ -197,6 +205,8 @@ def submit_feedback(
     *,
     expected_user_id: int | None = None,
 ) -> FeedbackSubmission:
+    """校验 item 所属用户后幂等写入反馈，防止跨用户提交。"""
+
     item = recommendation_repository.get_item(session, item_id)
     if item is None:
         raise ResourceNotFoundError("推荐项不存在")
@@ -239,6 +249,8 @@ def _calculate_recommendation(
     *,
     previous_ids: set[int] | None = None,
 ) -> RecommendationResult:
+    """把数据库快照组装成纯算法上下文，并转换领域错误为 API 冲突。"""
+
     fruits = fruit_repository.list_active_fruits(session)
     domain_fruits = [
         fruit_to_recommendation_input(fruit) for fruit in fruits
@@ -317,6 +329,8 @@ def _different_pair_if_possible(
     *,
     fallback: RecommendationResult,
 ) -> RecommendationResult:
+    """刷新后若仍返回原组合，尝试排除其中一个水果寻找替代组。"""
+
     alternatives: list[RecommendationResult] = []
     for excluded_id in sorted(previous_ids):
         candidates = [
@@ -338,6 +352,8 @@ def _persist_recommendation(
     refresh_number: int,
     result: RecommendationResult,
 ) -> Recommendation:
+    """把算法结果和 JSONB reasons 映射为 ORM，等待外层事务提交。"""
+
     recommendation = Recommendation(
         user_id=user_id,
         recommendation_date=recommendation_date,
@@ -382,6 +398,8 @@ def _load_detail(
     session: Session,
     recommendation_id: int,
 ) -> RecommendationDetail:
+    """提交后重新加载完整水果/反馈关系，生成 API 详情。"""
+
     session.expire_all()
     recommendation = recommendation_repository.get_recommendation(
         session,
@@ -397,6 +415,8 @@ def _stable_seed(
     recommendation_date: date,
     refresh_number: int,
 ) -> int:
+    """由用户、日期和刷新序号构成可复现的近优组合 seed。"""
+
     return (
         recommendation_date.toordinal() * 1_000_003
         + user_id * 101

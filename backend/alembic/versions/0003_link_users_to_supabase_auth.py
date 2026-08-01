@@ -18,6 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """增加 public.users 到 Supabase auth.users 的可空 UUID 绑定。"""
     op.add_column(
         "users",
         sa.Column("auth_user_id", sa.Uuid(), nullable=True),
@@ -42,6 +43,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """按相反顺序删除 FK、唯一约束和 auth_user_id 列。"""
     op.drop_constraint(
         "fk_users_auth_user_id_users",
         "users",

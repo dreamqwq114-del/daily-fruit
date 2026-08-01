@@ -19,6 +19,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """扩展水果身份、供应、熟悉度和详细便利性字段。"""
     op.add_column(
         "fruits",
         sa.Column("code", sa.String(length=60), nullable=True),
@@ -308,6 +309,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """按依赖相反顺序删除 V2 新增的水果/偏好对象。"""
     op.execute(
         sa.text(
             "DO $$ BEGIN "

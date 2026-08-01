@@ -1,152 +1,198 @@
-# daily-fruit 项目长期规则
+# Daily Fruit Agent 执行规则
 
-本文件适用于整个 `daily-fruit` 仓库。
+本文件面向在本仓库工作的代码 Agent。它规定长期边界，不记录某次部署、migration 版本、project ref、提交哈希或阶段验收结果。面向人的项目说明见 [README.md](README.md)。
 
-## 1. 范围
+## 1. 项目使命
 
-- 只修改当前明确任务允许的文件；
-- 不读取、复用或修改 `daily-fruit` 以外的 Supabase 项目；
-- 每次只执行一个可验收的小任务；
-- 不为了匹配示例目录进行无意义移动或重构；
-- 开始前读取相关代码、设计文档和当前 Git 状态。
+Daily Fruit 的目标是让推荐结果更可能被用户愿意吃、实际买得到，并通过减少重复、考虑消费节奏与反馈来降低浪费。推荐必须可解释。复杂模型、框架数量和“技术含量”不是目标本身。
 
-## 2. 分层
+## 2. 事实来源优先级
 
-- Vue 只通过 HTTP 调用 FastAPI，不直接操作水果、用户偏好、推荐历史等业务表；
-- Router 只处理 HTTP 输入、响应和依赖注入；
-- Service 处理业务逻辑、推荐算法、授权检查和事务编排；
-- Repository 处理数据库查询和持久化；
-- SQLAlchemy Model 与 Pydantic Schema 必须分离；
-- 推荐算法不得写在 Router 或 Vue 中；
-- API 请求统一放在 `frontend/src/api/`。
+发生冲突时，按以下顺序判断当前事实：
 
-## 3. 数据库与迁移
+1. 当前运行代码；
+2. Alembic migration 与目标环境的真实 schema；
+3. 自动化测试；
+4. 环境变量示例与部署工作流；
+5. 较新的设计或审计文档；
+6. README 与本文件；
+7. 旧阶段说明、旧提交信息和历史快照。
 
-- Alembic 是业务数据库结构的主要版本管理工具；
-- 不在 Supabase Dashboard 手工改表后遗漏迁移；
-- 不修改 Supabase `auth`、`storage` 等系统 schema；
-- 未确认目标 project ref 前禁止数据库写操作；
-- 每次数据库操作前显示并核对 project ref；
-- 未完成现有结构、迁移、RLS、policies、grants 和数据审计前禁止建表；
-- 不使用 `IF NOT EXISTS` 掩盖未知同名对象；
-- 不删除未知表、字段、策略、数据或迁移记录；
-- 生产数据优先通过向前迁移修复，不直接 destructive downgrade；
-- 任何 DROP、TRUNCATE、不可逆 ALTER 或批量删除必须停止并向用户汇报；
-- 数据库写入失败后读取完整错误，进行最小修复，不通过删功能绕过。
+每项任务都要重新核实当前 Git 状态、migration head、目标环境和字段使用状态。连接器看不到项目不代表数据库为空；无法确认目标身份或权限时停止，不得猜测。
 
-## 4. Supabase 安全
+## 3. 架构边界
 
-- 禁止提交 `.env`、数据库密码、secret key 或 service role key；
-- 前端禁止持有数据库连接字符串或高权限密钥；
-- Vue 可以使用 Supabase 客户端完成 Auth，但只能使用项目 URL 和公开的
-  publishable key，不得用它直接访问业务表；
-- FastAPI 必须验证 Supabase access token，并从已验证的 `sub` 推导当前用户；
-- 业务 API 不得信任客户端提交的 `user_id` 作为授权依据；
-- `backend/.env` 必须被 Git 忽略；
-- 业务表位于暴露 schema 时必须显式审查 grants 和 RLS；
-- 不能把“连接器返回 0 个项目”解释为数据库为空；
-- 身份、组织、project ref 或权限不确定时立即停止；
-- 不猜测目标项目，不连接名称相似的项目；
-- service role key 不是 PostgreSQL `DATABASE_URL`；
-- 日志、README、测试输出不得包含完整连接字符串。
+- `frontend/`：Vue 页面、组件、路由、Auth 和统一 HTTP 客户端。浏览器只通过 FastAPI 访问业务数据。
+- `backend/app/routers/`：HTTP 输入、响应、依赖注入与状态码；不得承载推荐算法或数据库细节。
+- `backend/app/auth/`：JWT 验证与认证主体解析；不得在这里混入业务授权规则。
+- `backend/app/services/`：业务规则与应用编排。
+- `backend/app/repositories/`：数据库查询、锁与持久化。
+- `backend/app/models/`：SQLAlchemy ORM。
+- `backend/app/schemas/`：Pydantic 请求和响应合同；必须与 ORM 分离。
+- `backend/alembic/`：数据库结构版本管理。
+- `data/` 与 `backend/app/seed/`：演示源数据及其校验、导入。
+- `backend/tests/`、`frontend/tests/`：回归合同。
+- `.github/workflows/`：CI 与静态前端部署。
 
-## 5. 测试隔离
+关键服务职责：
 
-- 单元测试默认不得访问网络或正式数据库；
-- 数据库集成测试使用可丢弃 PostgreSQL，不使用 SQLite 替代 PostgreSQL 特性；
-- 测试代码默认拒绝 Supabase 正式 host；
-- Alembic downgrade 只在可丢弃测试库验证；
-- seed 先 dry-run，再在测试库连续运行两次验证幂等；
-- 不在测试 fixture 中 truncate 或 drop 正式数据库对象。
+- `recommendation_service.py`：纯推荐逻辑；不得持有数据库 `Session`、发查询或访问网络。
+- `recommendation_application_service.py`：加载上下文、事务、并发控制、刷新和持久化编排。
+- `recommendation_mapper.py`：把 ORM 及查询结果转换为算法类型。
+- `recommendation_types.py`：纯算法输入输出合同。
+- `user_service.py`：用户资料和水果偏好更新语义。
+- `api_mapper.py`：内部对象到 API 响应的映射。
 
-## 6. 修改与验收
+若仓库结构与本文件不一致，以代码为准，并在任务范围允许时更新文档；不要为匹配文档而无意义移动代码。
 
-修改前：
+## 4. 修改前流程
 
-1. 检查 Git 状态；
-2. 阅读允许修改的文件；
-3. 简述本任务将修改什么；
-4. 确认停止条件。
+重要任务必须先：
 
-修改后：
+1. 检查 `git status`，记录已有修改和未跟踪文件；
+2. 阅读目标文件、调用者、被调用者和相关测试；
+3. 追踪从前端、Schema、Service、Repository 到数据库的完整数据流；
+4. 区分“当前事实”“用户目标”和“历史计划”；
+5. 明确假设、风险、允许修改范围与停止条件；
+6. 定义可执行的验收方式和回滚方案；
+7. 再进行最小范围修改。
 
-1. 列出修改文件；
-2. 运行与改动相称的测试；
-3. 前端变化运行 `npm run build`；
-4. 后端变化运行 `pytest`；
-5. 数据库变化运行 Alembic 和 Supabase 实际结构复核；
-6. 扫描秘密；
-7. 报告测试结果、风险和未完成事项。
+禁止只打开一个文件就直接重构。诊断任务默认只读；用户只要求解释时，不得顺手实现修复。
 
-不得把静态审查描述为运行时验证，也不得把本地测试描述为 Supabase 验证。
+## 5. 任务风险等级
 
-## 7. 当前门禁
+- 低风险：文案、样式、局部 UI 和不改变数据合同的文档调整。
+- 中风险：API、Pydantic Schema、Repository、资料保存/回显和跨层数据合同。
+- 高风险：推荐算法、migration、Auth、RLS、grants、并发、seed 和用户历史数据。
 
-截至 `docs/stage-1.5-supabase-audit.md` 的当前记录：
+跨类别任务按最高风险定级；触及认证/授权、生产数据或破坏性操作一律按高风险处理。高风险任务必须先建立可复现基线，补充或运行回归测试，安排独立只读审计，并给出回滚方案。没有可靠基线时不得把“测试通过”解释为行为正确。
 
-- 已确认唯一目标项目为 `Daily Fruit`，project ref 为
-  `frzbbpocyzlqxljsrsiw`；
-- 已完成 `public` schema、迁移、扩展、RLS、policies、grants、数据和
-  advisors 的只读审计；
-- S2-08 写入前确认目标项目没有业务表或业务数据，八个计划表名没有
-  冲突；
-- `S2-00` 已由提交 `3d71816` 完成；
-- `S2-01` 已由提交 `742eeeb` 完成，runtime、migration 和 test URL
-  已隔离，测试 URL 默认拒绝 Supabase 正式域名；
-- `S2-02` 已由提交 `ae83235` 完成，八张业务表的 SQLAlchemy
-  metadata、约束、索引和删除策略已通过静态测试；
-- `S2-03` 已由提交 `fab7a89` 完成，Pydantic Schema 和验证测试已与
-  ORM 分离；
-- `S2-04` 已由提交 `f2e4a21` 完成，Alembic 只接受显式的 test 或
-  migration 连接用途，受控文件中不保存数据库 URL；
-- `S2-05` 已由提交 `ddbc214` 完成，基础迁移只包含八张业务表及批准的
-  约束和索引，未包含远端操作或系统 schema 变化；
-- `S2-06` 已由提交 `36c3e29` 完成，基础迁移已在 `daily_fruit_test`
-  实测 upgrade、downgrade、结构一致性、约束和删除策略；
-- `S2-07` 已由提交 `a3a417d` 完成，安全迁移已在本地实测八表 RLS、
-  deny-by-default、表/序列 revoke 和已知函数权限修复；
-- S2-08 写入前只读复核再次确认唯一目标为 `Daily Fruit`
-  (`frzbbpocyzlqxljsrsiw`)，`public` 用户表、迁移和业务数据仍为空；
-- `S2-08` 已完成，远端 `public.alembic_version=0002`，八张业务表、
-  RLS、grants、约束、索引、迁移记录和 advisors 已复核；
-- `S2-09` 已由提交 `cb935b6` 完成，24 种水果及营养、季节演示文件
-  已通过静态范围、自然键和口径校验；
-- `S2-10` 已由提交 `1174603` 完成，seed 的 dry-run、事务回滚、
-  UTF-8 SQL 输出和两次本地幂等执行已通过测试；
-- S2-11 写入前再次确认唯一目标 project ref、远端 schema 版本为
-  `0002`，且 fruits、nutrition、seasons 和行为表计数均为 0；
-- `S2-11` 已完成：远端 seed 连续执行两次后计数稳定为 24/24/48，
-  重复、孤立和非法范围记录均为 0，行为表均为空；
-- `public.rls_auto_enable()` 的两项 security advisor WARN 已修复，
-  event trigger 仍启用；当前 advisor 只剩已解释的 INFO；
-- S3 推荐算法已完成并通过专项及全量回归；本阶段没有连接或修改 Supabase，也没有
-  新增迁移、seed、Repository、Router、正式 API 或 Vue 页面。
-- S4 后端 API 已完成并通过本地 PostgreSQL 全量测试；本阶段没有修改远端 Supabase，
-  也没有新增 schema migration。
-- 后续 API 接入必须把 ORM 数据一次性转换为 `RecommendationUser`、
-  `RecommendationFruit` 和 `RecommendationContext`，不得让纯算法持有 Session 或
-  产生 N+1 查询。
-- S5 前端已完成；S6 已获授权接入 Supabase Auth、受保护 FastAPI 和公网业务链路。
-- 前端对业务数据只能调用 FastAPI；Supabase 客户端仅限 Auth，不得包含数据库 URL、
-  secret key 或 service role key。
-- S6 生产迁移只允许新增已审查的 `users.auth_user_id` 绑定，不得修改 seed 或其他表。
-- S6 已部署：远端迁移为 `0004`；V2 阶段后续迁移为 `0005`，FastAPI Cloud 业务 API 强制 JWT，GitHub Pages 已连接；
-  后续不得退回 localStorage user ID 或公开无认证写接口。
-- 不得启用 Supabase 匿名登录；后端必须拒绝 `is_anonymous=true` 的 token。
-- 阶段七明确关闭注册邮箱确认；注册必须立即返回 session，不得恢复注册确认邮件，除非先完成新的安全设计审查。
-- 关闭注册确认不等于关闭密码找回邮件；`/auth/callback` 保留给未来的找回流程。
-- GitHub Pages 发布必须在构建时验证公开 API URL、Supabase URL 和 publishable key，
-  任何一项缺失都不得生成可部署产物。
-- 如后续任务发现必须改变 schema，立即停止并先更新设计与授权门禁。
-## V2 recommendation rules
+## 6. 推荐算法规则
 
-- `RecommendationUser`, `RecommendationFruit` and `RecommendationContext` are
-  the pure-algorithm boundary; the algorithm must not hold a database session.
-- V2 fruit identity, familiarity, availability and score fields are owned by
-  SQLAlchemy/Alembic and must stay synchronized with the actual Daily Fruit
-  Supabase project before seed or migration work.
-- `has_tried=NULL` means unknown; do not silently convert it to tried or
-  forbidden. A favorite and an explicit not-tried answer are an invalid
-  combination at the API boundary.
-- Run backend tests, frontend tests/build, migration SQL checks and a secret
-  scan after changes. Do not claim seed idempotence without running it twice.
+- 不得随手设置或修改权重；权重和为 1 只说明缩放关系，不证明算法合理。
+- 必须区分硬约束、单水果个人匹配分和水果对组合分。
+- 必须区分未知、普通、没吃过、不喜欢、明确不愿尝试和禁止食用。
+- 算法验证不能只看单元测试；必须构造差异化用户画像，检查推荐塌缩、全局冠军和对输入不敏感的问题。
+- 反例至少覆盖低预算、重便利、明确不喜欢、禁止食用、没吃过、不愿尝试、买不到、近期重复和负反馈。
+- 算法修改必须验证确定性、候选为空、缺失值、季节跨年、历史衰减、反馈衰减和组合互补。
+- 不得把规则系统称为机器学习，不得把推荐分称为概率、准确率或医学评分。
+- 新字段进入算法前必须定义业务语义、数据来源、缺失值语义、硬/软约束角色、测试画像和权重依据。
+- 不得为了“技术含量”盲目引入神经网络、LLM、向量数据库或复杂随机策略。
+
+算法变更报告必须包含：修改前后公式、字段语义、代表性反例、输出分布或排序变化、回归结果和已知限制。
+
+## 7. 用户数据语义
+
+- `preference_score`：显式口味态度；空值表示未表达，不能自动当作 0。
+- `is_forbidden`：安全硬约束；为 true 时不得推荐。
+- `has_tried`：是否吃过；`null` 是未知，不等于 false。
+- `willing_to_try`：是否愿意尝试；`null` 是未知，只有明确 false 才是拒绝。
+- `discovery_level`：整体尝鲜倾向，不等于单个水果的熟悉度。
+- `consumption_horizon_days`：用户消费周期；字段存在不代表已参与推荐，也不代表水果保鲜期。
+- `market_access_level`：线下购买条件，不等于实时库存或供应状态。
+- `accepts_online_purchase`：是否接受网购，不等于该水果线上可买到。
+
+必须遵守：
+
+- `null` 不等于 false；未选择不等于普通，也不等于没吃过。
+- 不喜欢不一定代表吃过；`eaten` 不等于 `liked`。
+- `unavailable` 是购买条件反馈，不是口味偏好。
+- `change_requested` 是一次刷新事件，不是长期负反馈。
+- 字段存在于数据库、Schema 或页面，不代表推荐算法已经读取它。宣称字段影响推荐前必须定位到 mapper 和评分/过滤代码及测试。
+
+## 8. 数据更新规则
+
+- 资料更新使用字段级更新，采用 `exclude_unset` 或等价机制，避免用默认值覆盖未提交字段。
+- 水果偏好采用合并更新；不得先删除全部偏好再重建。
+- 不得在普通资料保存中覆盖 `has_tried` 与 `willing_to_try`。
+- 不得为未选择水果批量写入 `preference_score=0`；未表达应保持未知语义。
+- 数字枚举必须以数字提交，不能把展示中文写入 API 或数据库。
+- 批量更新必须事务一致；失败时完整回滚，不得留下半批数据。
+- 重复保存与 seed 必须幂等。
+- 用户只能访问自己的资料、偏好、推荐和反馈；不得以客户端 `user_id` 作为授权依据。
+
+## 9. 数据库与 Migration
+
+- 所有业务 schema 变化由 Alembic 管理；Dashboard 中的紧急 SQL 也必须同步形成可审计 migration。
+- 写操作前重新确认目标项目、数据库主机、连接用途、当前版本、现有表和数据；AGENTS 不硬编码版本或 project ref。
+- 不确定数据库目标、账号、组织或权限时立即停止。
+- 不直接修改生产表，不删除未知对象，不修改 Supabase 系统 schema。
+- `downgrade` 只在可丢弃数据库中验证；生产修复优先使用经过审查的向前 migration。
+- seed 先运行只读 dry-run，再在可丢弃测试库连续运行两次验证幂等；生产 seed 需要单独授权和目标确认。
+- ORM、migration 与真实数据库的相关字段和约束语义必须一致；API 的 Pydantic Schema 可以按接口最小暴露，但不得与持久化语义冲突。发现漂移先报告，不得用 `IF NOT EXISTS` 掩盖未知冲突。
+- DROP、TRUNCATE、不可逆 ALTER、批量删除或任何可能损失用户数据的操作必须获得明确授权并准备恢复方案。
+
+## 10. Auth 与安全
+
+- Supabase service role、数据库密码和连接串只允许位于后端安全环境；禁止进入前端、日志、截图、文档和 Git。
+- 所有 `VITE_` 变量都视为公开，只能包含公开 API URL、Supabase URL 和 publishable key 等浏览器配置。
+- 不提交 `.env`；提交前扫描 staged diff 和历史新增内容中的 secret。
+- FastAPI 必须验证 JWT，并从已验证 `sub` 推导用户身份；不得信任客户端提交的 `user_id`。
+- 每个涉及用户数据的接口都要检查未登录、过期/错误 token、对象归属和批量越权。
+- 审查 CORS、RLS、policies、grants 与后端角色边界；RLS 已启用不等于策略正确，也不等于浏览器一定有权限。
+- 除非经过明确安全设计，不启用匿名登录；后端必须拒绝匿名 token。
+- 邮箱确认策略是可变部署配置。开启或关闭都必须单独审计注册、账号恢复、邮箱所有权和限流风险，不得在长期规则中永久写死。
+- 不公开真实邮箱、UID、token、完整 JWT、project ref 或连接串。
+
+## 11. 前端规则
+
+- 手机优先；所有重要页面至少检查 375、768 和 1440 像素宽度。
+- 统一 API 请求放在 `frontend/src/api/`；页面和组件不得重复手写相同 fetch 流程。
+- 不重复收集同一语义，不强迫用户逐项填写所有水果。
+- 内部枚举、布尔值和数据库字段名不得直接当作用户文案。
+- 未接入算法的字段不得声称已经影响推荐排序。
+- 保存、反馈或刷新失败时不得显示成功；按钮提交期间要防重复触发。
+- 必须处理 loading、error、empty、超时、未登录、后端不可用和 local state 丢失。
+- 选择控件应可键盘操作，不只依赖颜色表达状态；避免横向溢出和过小点击区域。
+
+## 12. 最低测试矩阵
+
+| 修改类型 | 最低验证 |
+| --- | --- |
+| 推荐算法 | 固定画像、反例、候选为空、输出分布、确定性和原因一致性 |
+| API / Schema | 正常、非法输入、部分更新、错误回滚和越权 |
+| Migration | disposable PostgreSQL 上 upgrade、downgrade、约束、索引和旧数据兼容 |
+| Seed | dry-run、目标保护、事务回滚、连续两次执行幂等 |
+| 前端 | 加载/错误/空状态、保存、回显、重复提交、键盘可访问性、375/768/1440 响应式和无横向溢出 |
+| Auth | 未登录、错误/过期 token、匿名 token、跨用户对象访问 |
+| 并发推荐 | 同一用户同一天只保留一个 active，刷新序号和旧状态正确 |
+
+运行与改动范围相称的完整测试；前端逻辑变更至少在 `frontend/` 运行 `npm test` 和 `npm run build`，后端变更至少在 `backend/` 运行 `python -m pytest`。测试数据库未配置导致的 skip 必须如实报告。不得删除、跳过或弱化测试来绕过失败。
+
+## 13. Subagent 审计
+
+- 高风险任务使用独立只读 subagent；算法、数据、数据库和安全尽量由不同审计者检查。
+- subagent 不得修改文件，除非用户明确授权独立实现分工。
+- 环境不支持 subagent 时不得伪造独立审计，改为报告待人工复核清单。
+- 审计问题按 P0/P1/P2/P3 分级：P0 为数据损失或严重安全问题，P1 为阻断正确性，P2 为重要但可控风险，P3 为改进建议。
+- P0 和 P1 必须修复或明确阻塞；修复后重新运行对应验证。
+
+## 14. Git 规则
+
+- 不覆盖、回滚、暂存或提交用户已有的无关改动。
+- 禁止 `git reset --hard`、未经授权的文件恢复和 force push。
+- 不提交 `.env`、secret、`node_modules`、构建产物、缓存、日志或 `__pycache__`。
+- 一个提交只解决一个主题；提交前检查 `git diff`、`git diff --cached` 和文件范围。
+- 只有用户明确要求时才 commit 或 push；不得把“完成修改”解释为自动发布授权。
+
+## 15. 文档规则
+
+- README 面向开发者、访问者和贡献者；AGENTS 面向执行任务的模型。
+- 文档描述当前事实，计划必须明确放在 Roadmap 或待办，不得写成已实现。
+- 不把启发式参数写成统计结论，不把静态审查写成运行验证。
+- 文档中的路径、命令、环境变量、API 和部署地址必须能够从当前仓库或实际环境核实。
+- 文档任务不得顺手修改代码、数据库或部署；避免创建大量重复的阶段文档和一次性台账。
+- 不在耐久文档中固化当前 migration 版本、project ref、临时账号、日期或 commit hash。
+
+## 16. 停止条件
+
+出现以下任一情况必须停止并报告，不得猜测或绕过：
+
+- 目标数据库、Supabase 项目、账号、组织或环境无法确认；
+- 操作可能丢失、覆盖或错误关联用户数据；
+- 需要破坏性 migration、生产 downgrade 或未知范围的批量写入；
+- Auth、字段、权限、RLS 或 grants 语义不清；
+- 当前代码、migration、ORM 与真实数据库互相冲突；
+- 用户已有改动可能被覆盖或无法与本任务隔离；
+- 无法判断字段真实语义或是否已进入算法；
+- 测试失败原因不明，或只能通过删除功能、放宽安全控制或弱化测试继续。

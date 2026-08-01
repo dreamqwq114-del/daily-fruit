@@ -1,3 +1,4 @@
+/* 全局视觉 token：米白背景、深绿文字和浅绿选中态由组件共同复用。 */
 :root {
   color: #17352a;
   background: #f7f4eb;
@@ -30,6 +31,7 @@ html {
   background: var(--cream);
 }
 
+/* 页面禁止横向溢出；移动端布局通过下面的 media query 收窄网格。 */
 body {
   margin: 0;
   min-width: 320px;
@@ -252,6 +254,7 @@ p {
   gap: 20px;
 }
 
+/* ProfileFields 等表单组件使用统一 fieldset/card 间距。 */
 .form-section {
   min-width: 0;
   margin: 0;
@@ -1443,6 +1446,7 @@ p {
   color: white;
 }
 
+/* 平板宽度：双列表单逐步收紧，保持点击区域和说明文字可读。 */
 @media (max-width: 820px) {
   .recommendation-grid,
   .history-items {
@@ -1463,6 +1467,7 @@ p {
   }
 }
 
+/* 手机宽度：主要网格改为单列，避免水果卡片和偏好控件横向滚动。 */
 @media (max-width: 680px) {
   .app-header {
     padding-top: 15px;
@@ -1563,6 +1568,7 @@ p {
   }
 }
 
+/* 小屏兜底：缩短边距，适配约 375px 宽浏览器。 */
 @media (max-width: 420px) {
   .feedback-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1587,6 +1593,7 @@ p {
   }
 }
 
+/* 尊重系统减少动画设置，避免滚动/过渡对用户造成负担。 */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

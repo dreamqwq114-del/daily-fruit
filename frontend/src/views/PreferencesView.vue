@@ -1,4 +1,5 @@
 <script setup>
+// 偏好页与建档页复用同一套 profile/水果偏好状态和 API；这里仅更新已有用户。
 import { onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -32,6 +33,7 @@ const errorMessage = ref('')
 const successMessage = ref('')
 
 async function handleUserNotFound(error) {
+  // 有效登录但尚未建立 public.users 资料时，回到建档页完成绑定。
   if (error instanceof ApiError && error.status === 404) {
     await router.replace('/onboarding')
     return true
@@ -40,6 +42,7 @@ async function handleUserNotFound(error) {
 }
 
 async function loadPreferences() {
+  // 用户资料与水果目录/偏好并行读取，减少页面等待时间。
   loading.value = true
   errorMessage.value = ''
   try {
@@ -65,6 +68,7 @@ async function loadPreferences() {
 }
 
 async function savePreferences() {
+  // 先保存 profile，再保存水果偏好；按钮锁定期间不允许重复提交。
   if (submitting.value) return
 
   submitting.value = true
@@ -75,6 +79,7 @@ async function savePreferences() {
     await updateUser({ ...profile })
 
     try {
+      // 后端偏好接口是 merge，不会删除熟悉度字段。
       await replaceFruitPreferences(selectionToPreferences(preferenceSelection.value))
     } catch (error) {
       errorMessage.value = `基本信息已保存，但水果偏好保存失败：${error.message}`

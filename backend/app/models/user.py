@@ -1,3 +1,10 @@
+"""用户资料与水果偏好 ORM。
+
+业务用户使用 BIGINT 主键；``auth_user_id`` 只保存 Supabase Auth 的 UUID
+映射。该文件描述数据库约束和关系，不负责认证或推荐排序。偏好表保留
+熟悉度字段，即使页面清空喜欢/不喜欢，也不会删除历史语义。
+"""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -33,6 +40,8 @@ AUTH_USERS_TABLE = Table(
     schema="auth",
     info={"external": True},
 )
+# 这是外部的 Supabase ``auth.users`` 表，只用于声明外键目标；Alembic
+# 不应尝试创建或修改 Supabase 管理的 auth schema。
 
 if TYPE_CHECKING:
     from app.models.fruit import Fruit
@@ -43,6 +52,8 @@ if TYPE_CHECKING:
 
 
 class User(TimestampMixin, Base):
+    """public.users 的用户资料和推荐输入字段。"""
+
     __tablename__ = "users"
     __table_args__ = (
         CheckConstraint(
@@ -161,6 +172,8 @@ class User(TimestampMixin, Base):
 
 
 class UserFruitPreference(TimestampMixin, Base):
+    """用户对单个水果的态度、禁止状态和熟悉度信号。"""
+
     __tablename__ = "user_fruit_preferences"
     __table_args__ = (
         UniqueConstraint(

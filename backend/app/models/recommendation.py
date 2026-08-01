@@ -1,3 +1,9 @@
+"""推荐、推荐项和用户反馈 ORM。
+
+Recommendation 保存一次组合的日期、刷新序号和状态；items 保存评分、
+结构化理由和水果快照关联；feedback 通过 item 与 user 双外键保护归属。
+"""
+
 from __future__ import annotations
 
 from datetime import date
@@ -29,6 +35,8 @@ if TYPE_CHECKING:
 
 
 class Recommendation(CreatedAtMixin, Base):
+    """一组推荐及其 active/replaced 生命周期。"""
+
     __tablename__ = "recommendations"
     __table_args__ = (
         UniqueConstraint(
@@ -93,6 +101,8 @@ Index(
 
 
 class RecommendationItem(CreatedAtMixin, Base):
+    """推荐中的一个水果，rank 保证一组最多按 1/2 排列。"""
+
     __tablename__ = "recommendation_items"
     __table_args__ = (
         UniqueConstraint(
@@ -183,6 +193,8 @@ class RecommendationItem(CreatedAtMixin, Base):
 
 
 class RecommendationFeedback(CreatedAtMixin, Base):
+    """用户对推荐项的幂等反馈事件。"""
+
     __tablename__ = "recommendation_feedback"
     __table_args__ = (
         UniqueConstraint(

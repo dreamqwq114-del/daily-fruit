@@ -1,3 +1,10 @@
+"""用户资料与水果偏好的 API 输入/输出合同。
+
+Pydantic Schema 与 SQLAlchemy Model 分离：Schema 负责请求边界、默认值、
+枚举范围和跨字段冲突；Service 再把经过验证的数据写入 ORM。未提供的
+``UserUpdate`` 字段不会被提交，因此支持安全的部分更新。
+"""
+
 from decimal import Decimal
 from typing import Annotated, Literal
 
@@ -22,6 +29,8 @@ MarketAccessLevel = Annotated[StrictInt, Field(ge=1, le=3)]
 
 
 class UserBase(ApiSchema):
+    """创建和读取用户资料共用的业务字段。"""
+
     username: Username
     region: LocationName
     sweet_preference: NormalizedScore | None = None
@@ -43,6 +52,8 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(ApiSchema):
+    """只包含调用方明确提交的字段，避免默认值覆盖已有资料。"""
+
     username: Username | None = None
     city: LocationName | None = None
     region: LocationName | None = None
@@ -59,6 +70,8 @@ class UserUpdate(ApiSchema):
 
     @model_validator(mode="after")
     def require_non_null_update(self) -> "UserUpdate":
+        """拒绝空 JSON 或显式 null，保持字段级更新语义清晰。"""
+
         if not self.model_fields_set:
             raise ValueError("At least one user field must be provided")
         if any(
@@ -77,6 +90,8 @@ class UserRead(UserBase):
 
 
 class UserFruitPreferenceInput(ApiSchema):
+    """单个水果偏好的输入；熟悉度字段可选以兼容旧客户端。"""
+
     fruit_id: PositiveId
     preference_score: OptionalPreferenceScore = None
     is_forbidden: bool = False
@@ -85,6 +100,8 @@ class UserFruitPreferenceInput(ApiSchema):
 
     @model_validator(mode="after")
     def reject_untried_favorite(self) -> "UserFruitPreferenceInput":
+        """阻止“特别喜欢且明确没吃过”或“喜欢且禁止”这类矛盾组合。"""
+
         if self.preference_score == 2 and self.has_tried is False:
             raise ValueError(
                 "A fruit marked as especially loved cannot also be marked as not tried"
@@ -97,6 +114,8 @@ class UserFruitPreferenceInput(ApiSchema):
 
 
 class UserFruitPreferencesUpdate(ApiSchema):
+    """偏好批量合并请求；同一水果只能出现一次，特别喜欢最多五个。"""
+
     preferences: list[UserFruitPreferenceInput] = Field(default_factory=list)
 
     @field_validator("preferences")
@@ -105,6 +124,8 @@ class UserFruitPreferencesUpdate(ApiSchema):
         cls,
         preferences: list[UserFruitPreferenceInput],
     ) -> list[UserFruitPreferenceInput]:
+        """在进入 service 前拒绝重复水果和超出上限的收藏。"""
+
         fruit_ids = [preference.fruit_id for preference in preferences]
         if len(fruit_ids) != len(set(fruit_ids)):
             raise ValueError("Each fruit may appear only once")

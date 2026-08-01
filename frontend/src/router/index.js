@@ -1,8 +1,11 @@
+// 生产环境使用 hash history，适配 GitHub Pages 没有服务端 SPA fallback；
+// 本地开发保留 web history，便于调试普通路径。
 import { createRouter, createWebHashHistory, createWebHistory } from 'vue-router'
 
 import { isAuthenticated } from '../auth/session.js'
 
 const routes = [
+  // requiresAuth 由全局守卫检查 Supabase session；业务资源仍由 FastAPI 再授权。
   {
     path: '/',
     name: 'today',
@@ -54,6 +57,7 @@ const router = createRouter({
 })
 
 router.beforeEach(async (to) => {
+  // 路由守卫只判断“是否有会话”，资料是否存在由页面调用 /api/me 判断。
   const authenticated = await isAuthenticated()
   if (to.meta.requiresAuth && !authenticated) {
     return {

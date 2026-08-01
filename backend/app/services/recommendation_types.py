@@ -1,3 +1,10 @@
+"""推荐核心使用的纯 Python 数据合同。
+
+这些 frozen/slots dataclass 是 ORM 与算法之间的边界：它们不携带 Session，
+便于用固定输入测试季节、过滤、评分、组合和理由生成。新增字段前应先
+确认 mapper、算法和测试是否都需要它。
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -9,6 +16,8 @@ from app.schemas.recommendation import RecommendationReason
 
 @dataclass(frozen=True, slots=True)
 class NutritionProfile:
+    """水果营养特征；None 表示缺失而不是零。"""
+
     energy: float | None = None
     vitamin_c: float | None = None
     fiber: float | None = None
@@ -19,6 +28,8 @@ class NutritionProfile:
 
 @dataclass(frozen=True, slots=True)
 class SeasonWindow:
+    """一条地区和月份季节/供应窗口，支持跨年月份。"""
+
     region: str
     start_month: int
     end_month: int
@@ -30,6 +41,8 @@ class SeasonWindow:
 
 @dataclass(frozen=True, slots=True)
 class FruitPreference:
+    """用户对单个水果的显式态度、禁止和熟悉度信号。"""
+
     preference_score: float | None = None
     is_forbidden: bool = False
     has_tried: bool | None = None
@@ -38,6 +51,8 @@ class FruitPreference:
 
 @dataclass(frozen=True, slots=True)
 class HistoryEvent:
+    """历史展示/食用聚合事件，用于时间衰减去重。"""
+
     fruit_id: int
     occurred_on: date
     times_shown: int = 1
@@ -46,6 +61,8 @@ class HistoryEvent:
 
 @dataclass(frozen=True, slots=True)
 class FeedbackEvent:
+    """带时间的用户反馈，用于反馈调整衰减。"""
+
     fruit_id: int
     feedback_type: str
     occurred_at: datetime
@@ -53,6 +70,8 @@ class FeedbackEvent:
 
 @dataclass(frozen=True, slots=True)
 class RecommendationFruit:
+    """算法需要的水果快照，脱离 SQLAlchemy ORM 后仍可独立评分。"""
+
     id: int
     name: str
     sweet_score: float
@@ -85,6 +104,8 @@ class RecommendationFruit:
 
 @dataclass(frozen=True, slots=True)
 class RecommendationUser:
+    """算法需要的用户画像；不包含 auth UUID 或数据库主键。"""
+
     region: str
     sweet_preference: float | None
     sour_preference: float | None
@@ -101,6 +122,8 @@ class RecommendationUser:
 
 @dataclass(frozen=True, slots=True)
 class RecommendationContext:
+    """一次推荐计算的日期、历史、反馈、刷新排除和随机种子。"""
+
     month: int
     today: date | None = None
     recent_fruit_ids: tuple[int, ...] = ()
@@ -118,6 +141,8 @@ class RecommendationContext:
 
 @dataclass(frozen=True, slots=True)
 class SeasonEvaluation:
+    """季节匹配结果，包含可用性与供应状态。"""
+
     score: float
     has_relevant_data: bool
     is_in_season: bool
@@ -128,6 +153,8 @@ class SeasonEvaluation:
 
 @dataclass(frozen=True, slots=True)
 class ScoreBreakdown:
+    """单水果评分的可解释子分数，供公式和理由生成共同使用。"""
+
     explicit_preference: float
     taste_match: float
     availability_and_season: float
@@ -145,6 +172,8 @@ class ScoreBreakdown:
 
 @dataclass(frozen=True, slots=True)
 class ScoredFruit:
+    """水果及其单项分数和季节评估。"""
+
     fruit: RecommendationFruit
     base_score: float
     scores: ScoreBreakdown
@@ -153,6 +182,8 @@ class ScoredFruit:
 
 @dataclass(frozen=True, slots=True)
 class PairSelection:
+    """完整组合枚举后选出的两种水果及互补分。"""
+
     first: ScoredFruit
     second: ScoredFruit
     second_score: float
@@ -165,6 +196,8 @@ class PairSelection:
 
 @dataclass(frozen=True, slots=True)
 class RecommendationItemResult:
+    """可持久化/返回 API 的单项推荐结果。"""
+
     fruit: RecommendationFruit
     score: float
     rank: int
@@ -178,6 +211,8 @@ class RecommendationItemResult:
 
 @dataclass(frozen=True, slots=True)
 class RecommendationResult:
+    """一次推荐必须恰好包含两个不同 rank 的水果。"""
+
     items: tuple[RecommendationItemResult, RecommendationItemResult]
     total_score: float
 

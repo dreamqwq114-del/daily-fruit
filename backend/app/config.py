@@ -1,3 +1,10 @@
+"""集中读取并校验后端运行时、迁移、测试和 Supabase Auth 配置。
+
+配置使用 Pydantic Settings 从 ``backend/.env`` 和进程环境读取。三种
+数据库 URL 按用途隔离：runtime 给 FastAPI，migration 给 Alembic，test
+只允许指向可丢弃的本地 ``daily_fruit_test`` 数据库。
+"""
+
 from functools import lru_cache
 from pathlib import Path
 from typing import Literal
@@ -15,6 +22,8 @@ DatabasePurpose = Literal["runtime", "migration", "test"]
 
 
 def _is_supabase_host(host: str) -> bool:
+    """判断主机是否属于 Supabase，供测试库和 SSL 规则复用。"""
+
     return any(
         host == domain or host.endswith(f".{domain}")
         for domain in ("supabase.co", "supabase.com")
@@ -27,6 +36,8 @@ def _validate_database_url(
     variable_name: str,
     purpose: DatabasePurpose,
 ) -> None:
+    """检查 psycopg 驱动、数据库名、测试隔离和 Supabase SSL 约束。"""
+
     try:
         parsed = urlsplit(value)
         host = (parsed.hostname or "").lower()
@@ -66,6 +77,8 @@ def _validate_database_url(
 
 
 class Settings(BaseSettings):
+    """应用的类型化配置；字段 alias 对应 ``.env.example`` 的变量名。"""
+
     database_url: str | None = Field(
         default=None,
         alias="DATABASE_URL",
@@ -140,6 +153,8 @@ class Settings(BaseSettings):
     )
     @classmethod
     def normalize_optional_database_url(cls, value: object) -> object:
+        """把空字符串当作未配置，避免空 URL 绕过可选数据库逻辑。"""
+
         if isinstance(value, str) and not value.strip():
             return None
         return value
@@ -147,6 +162,8 @@ class Settings(BaseSettings):
     @field_validator("app_timezone")
     @classmethod
     def validate_app_timezone(cls, value: str) -> str:
+        """确保日期计算使用真实 IANA 时区，而不是拼写错误的字符串。"""
+
         try:
             ZoneInfo(value)
         except (ZoneInfoNotFoundError, ValueError) as error:
@@ -155,6 +172,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_environment_and_database_urls(self) -> "Settings":
+        """执行 production/debug、数据库 URL 和 Supabase URL 的组合校验。"""
+
         if self.app_env == "production" and self.debug:
             raise ValueError("DEBUG must be false when APP_ENV=production")
 
@@ -213,6 +232,8 @@ class Settings(BaseSettings):
         return f"{self.supabase_jwt_issuer}/.well-known/jwks.json"
 
     def database_url_for(self, purpose: DatabasePurpose) -> str | None:
+        """按明确用途返回连接串；不允许调用方隐式复用测试或迁移连接。"""
+
         if purpose == "runtime":
             return self.database_url
         if purpose == "migration":
@@ -224,4 +245,6 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
+    """缓存配置对象，使整个进程使用同一份已校验设置。"""
+
     return Settings()

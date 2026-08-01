@@ -1,3 +1,5 @@
+"""把 ORM 对象映射为无数据库依赖的推荐输入类型。"""
+
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
@@ -17,6 +19,8 @@ from app.services.recommendation_types import (
 
 
 def user_to_recommendation_input(user: User) -> RecommendationUser:
+    """提取推荐实际读取的用户字段；购买条件字段在此明确未接入。"""
+
     preferences = {
         item.fruit_id: FruitPreference(
             preference_score=(
@@ -53,6 +57,8 @@ def user_to_recommendation_input(user: User) -> RecommendationUser:
 
 
 def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
+    """复制水果、营养和季节快照，处理旧行缺失值并避免 N+1 查询。"""
+
     nutrition = (
         None
         if fruit.nutrition is None
@@ -166,6 +172,8 @@ def build_recommendation_context(
     allow_supporting: bool = False,
     random_seed: int | None = None,
 ) -> RecommendationContext:
+    """把 Repository 查询结果规范化为一次纯算法计算的上下文。"""
+
     return RecommendationContext(
         month=month,
         today=today,

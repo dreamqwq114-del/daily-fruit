@@ -1,3 +1,5 @@
+"""把推荐 ORM 图映射成不暴露 SQLAlchemy 对象的 API 响应。"""
+
 from app.models import Recommendation
 from app.schemas.fruit import FruitDetail
 from app.schemas.recommendation import (
@@ -11,6 +13,8 @@ from app.schemas.recommendation import (
 def recommendation_to_detail(
     recommendation: Recommendation,
 ) -> RecommendationDetail:
+    """稳定排序 items/feedback，并验证 JSONB reasons 的 Pydantic 结构。"""
+
     items = []
     for item in sorted(recommendation.items, key=lambda value: value.rank):
         feedback = [

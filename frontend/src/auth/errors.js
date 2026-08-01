@@ -1,3 +1,5 @@
+// Supabase Auth 的英文 code/message 映射为可直接展示的中文；未知错误
+// 不回显原始服务端文本，避免泄漏内部细节或把英文堆栈展示给用户。
 const AUTH_ERROR_MESSAGES = {
   email_exists: '该邮箱已注册，请直接登录。',
   user_already_exists: '该邮箱已注册，请直接登录。',
@@ -10,6 +12,7 @@ const AUTH_ERROR_MESSAGES = {
 }
 
 export function getAuthErrorMessage(error) {
+  // 优先使用稳定 code，再对少量已知英文 message 做兼容匹配。
   if (AUTH_ERROR_MESSAGES[error?.code]) return AUTH_ERROR_MESSAGES[error.code]
 
   const message = String(error?.message || '').toLowerCase()

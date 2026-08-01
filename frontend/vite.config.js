@@ -1,3 +1,5 @@
+// Vite 同时服务本地/Sites 与 GitHub Pages：Pages 构建使用仓库子路径和
+// 公开运行时变量，其他环境加载 Sites/Cloudflare 插件。数据库密钥从不参与前端构建。
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import {
@@ -10,6 +12,7 @@ import {
 import { sites } from './build/sites-vite-plugin.js'
 
 export default defineConfig(async ({ mode }) => {
+  // DEPLOY_TARGET 是部署边界，不把 GitHub Pages 的 /daily-fruit/ 写死在组件里。
   const isGitHubPages = process.env.DEPLOY_TARGET === GITHUB_PAGES_TARGET
   const base = isGitHubPages
     ? resolvePagesBase(process.env.GITHUB_REPOSITORY)

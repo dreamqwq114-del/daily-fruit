@@ -1,3 +1,12 @@
+"""纯 Python 水果推荐算法。
+
+输入是 recommendation_types 中的不可变数据对象，输出是两种水果及
+可解释理由；本模块不访问数据库、网络或 FastAPI。流程为：硬过滤 →
+营养归一化 → 单水果评分 → 枚举合法水果对 → 在近优组合中按 seed 选择。
+购买条件字段 ``market_access_level`` 和 ``accepts_online_purchase`` 没有
+进入 RecommendationUser，因此当前只保存、不参与排序。
+"""
+
 from __future__ import annotations
 
 import math
@@ -30,6 +39,7 @@ from app.services.recommendation_types import (
 
 
 MISSING_SEASON_SCORE = 0.35
+# energy 用于完整营养归一化和数据置信度；组合互补只使用下方五个特征。
 NUTRITION_FEATURES = (
     "energy",
     "vitamin_c",
@@ -99,6 +109,8 @@ class NoRecommendationCandidatesError(RecommendationError):
 
 
 def clamp_score(value: float) -> float:
+    """将分数限制在 [0, 1]，同时拒绝 NaN/无穷值。"""
+
     numeric = float(value)
     if not math.isfinite(numeric):
         raise InvalidRecommendationInputError("分数必须是有限数值")
@@ -106,6 +118,8 @@ def clamp_score(value: float) -> float:
 
 
 def month_is_in_range(month: int, start_month: int, end_month: int) -> bool:
+    """判断普通或跨年月份窗口是否包含当前月份。"""
+
     for value in (month, start_month, end_month):
         if not 1 <= value <= 12:
             raise InvalidRecommendationInputError("月份必须在 1 到 12 之间")
@@ -137,6 +151,8 @@ def evaluate_season(
     month: int,
     city: str = "",
 ) -> SeasonEvaluation:
+    """按城市/地区/全国优先级选择季节窗口；缺失数据只降分。"""
+
     if not region.strip():
         raise InvalidRecommendationInputError("地区不能为空")
     if not 1 <= month <= 12:
@@ -217,7 +233,11 @@ def _quantile(values: list[float], probability: float) -> float:
 def normalize_nutrition_profiles(
     fruits: Iterable[RecommendationFruit],
 ) -> dict[int, NutritionProfile]:
-    """Normalize against the complete supplied active library, not candidates."""
+    """在完整 active 水果库上做 P05/P95 归一化，而不是只看候选集。
+
+    ``default_portion_grams`` 会参与比例换算；演示 CSV 是无物理单位分数，
+    所以该换算是当前已知的语义技术债，而非真实克/毫克计算。
+    """
     fruit_list = list(fruits)
     fruit_ids = [fruit.id for fruit in fruit_list]
     if any(fruit_id <= 0 for fruit_id in fruit_ids):
@@ -275,6 +295,8 @@ def filter_eligible_fruits(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> list[RecommendationFruit]:
+    """执行 inactive、禁止、明确不愿尝试、明确不喜欢和不可供应过滤。"""
+
     fruit_list = list(fruits)
     _validate_inputs(fruit_list, user, context)
     eligible: list[RecommendationFruit] = []
@@ -313,6 +335,8 @@ def score_candidates(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> list[ScoredFruit]:
+    """先过滤，再把每个候选映射为可解释的 ScoreBreakdown。"""
+
     fruit_list = list(fruits)
     eligible = filter_eligible_fruits(fruit_list, user, context)
     if len(eligible) < 2:
@@ -335,6 +359,8 @@ def score_candidates(
 
 
 def calculate_base_score(scores: ScoreBreakdown) -> float:
+    """应用集中定义的单水果权重，并叠加有界反馈调整。"""
+
     if not math.isclose(sum(BASE_SCORE_WEIGHTS.values()), 1.0):
         raise RuntimeError("推荐基础权重之和必须为 1")
     total = sum(
@@ -359,7 +385,7 @@ def nutrition_complement_score(
     first: NutritionProfile,
     second: NutritionProfile,
 ) -> float:
-    """Backward-compatible name for the V2 nutrition pair score."""
+    """计算两种水果的营养覆盖、多样性和缺失数据置信度。"""
     pairs = [
         (getattr(first, feature, None), getattr(second, feature, None))
         for feature in NUTRITION_PAIR_FEATURES
@@ -443,6 +469,8 @@ def select_recommendation_pair(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> PairSelection:
+    """枚举所有合法组合，按组合公式排序并稳定选择近优组合。"""
+
     fruit_list = list(fruits)
     scored = score_candidates(fruit_list, user, context)
     normalized = normalize_nutrition_profiles(
@@ -506,6 +534,8 @@ def recommend_fruits(
     user: RecommendationUser,
     context: RecommendationContext,
 ) -> RecommendationResult:
+    """生成恰好两个水果，并从相同评分贡献构造推荐理由。"""
+
     selection = select_recommendation_pair(fruits, user, context)
     first_reasons = _build_reasons(selection.first, user, selection)
     second_reasons = _build_reasons(selection.second, user, selection)

@@ -1,3 +1,10 @@
+"""Alembic 环境配置。
+
+迁移必须显式指定 ``ALEMBIC_DATABASE_PURPOSE``，只允许 ``migration`` 或
+``test``，从而避免误把运行时或 Supabase 正式连接当作测试目标。外部
+``auth`` 表只作为 FK 参照，不参与业务 schema 自动生成。
+"""
+
 from logging.config import fileConfig
 import os
 from typing import Any, Literal
@@ -21,6 +28,8 @@ target_metadata = Base.metadata
 
 
 def get_alembic_purpose() -> AlembicPurpose:
+    """读取并限制迁移用途，缺失时主动停止。"""
+
     purpose = os.getenv("ALEMBIC_DATABASE_PURPOSE", "").strip().lower()
     if purpose not in {"migration", "test"}:
         raise RuntimeError(
@@ -34,6 +43,8 @@ def get_alembic_url(
     purpose: AlembicPurpose,
     settings: Settings,
 ) -> str:
+    """按用途选择 MIGRATION_DATABASE_URL 或 TEST_DATABASE_URL。"""
+
     database_url = settings.database_url_for(purpose)
     if database_url is None:
         variable_name = (
@@ -50,6 +61,8 @@ def include_name(
     type_: str,
     parent_names: dict[str, str | None],
 ) -> bool:
+    """只比较 public schema，并排除 Alembic 自身版本表。"""
+
     del parent_names
     if type_ == "schema":
         return name in {None, "public"}
@@ -61,6 +74,8 @@ def include_name(
 def normalized_foreign_key_signature(
     constraint: ForeignKeyConstraint,
 ) -> tuple[object, ...]:
+    """统一 schema 名称后比较 FK，避免 public 默认值造成假漂移。"""
+
     def normalize_target(target: str) -> tuple[str, ...]:
         parts = tuple(target.split("."))
         if len(parts) == 2:
@@ -90,6 +105,8 @@ def include_object(
     reflected: bool,
     compare_to: object | None,
 ) -> bool:
+    """忽略标记为 external 的 ORM 表，并使用标准化 FK 比较。"""
+
     del name, reflected
     if getattr(object_, "info", {}).get("external") is True:
         return False
@@ -105,6 +122,8 @@ def include_object(
 
 
 def context_options() -> dict[str, Any]:
+    """集中设置 schema、类型、默认值和命名比较策略。"""
+
     return {
         "target_metadata": target_metadata,
         "include_schemas": True,
@@ -117,6 +136,8 @@ def context_options() -> dict[str, Any]:
 
 
 def run_migrations_offline() -> None:
+    """生成离线 SQL；仍要求显式迁移用途和 URL。"""
+
     purpose = get_alembic_purpose()
     database_url = get_alembic_url(purpose, get_settings())
     context.configure(
@@ -131,6 +152,8 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    """使用对应用途 engine 连接并在结束时释放连接池。"""
+
     purpose = get_alembic_purpose()
     settings = get_settings()
     get_alembic_url(purpose, settings)
@@ -148,6 +171,8 @@ def run_migrations_online() -> None:
 
 
 def configure_online_context(connection: Connection) -> None:
+    """把现有连接绑定给 Alembic context。"""
+
     context.configure(
         connection=connection,
         **context_options(),

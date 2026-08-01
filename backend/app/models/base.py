@@ -1,3 +1,5 @@
+"""SQLAlchemy metadata 基类和统一时间戳字段。"""
+
 from datetime import datetime
 
 from sqlalchemy import DateTime, MetaData, func
@@ -13,6 +15,8 @@ NAMING_CONVENTION = {
 
 
 class Base(DeclarativeBase):
+    """所有业务表共享 public schema 和命名约定。"""
+
     metadata = MetaData(
         schema="public",
         naming_convention=NAMING_CONVENTION,
@@ -20,6 +24,8 @@ class Base(DeclarativeBase):
 
 
 class CreatedAtMixin:
+    """只记录创建时间的历史表字段。"""
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
@@ -28,6 +34,8 @@ class CreatedAtMixin:
 
 
 class TimestampMixin(CreatedAtMixin):
+    """同时记录 created_at/updated_at 的资料表字段。"""
+
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
