@@ -285,7 +285,13 @@ p {
 }
 
 .field-grid--basic {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 20px;
+}
+
+.form-field--wide,
+.choice-field--wide {
+  grid-column: 1 / -1;
 }
 
 .form-field {
@@ -319,6 +325,26 @@ p {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 24px 30px;
+}
+
+.choice-field,
+.horizon-field {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.choice-field__label {
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-weight: 780;
+}
+
+.choice-field__help {
+  margin-top: -2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
 }
 
 .range-field {
@@ -1408,6 +1434,7 @@ p {
   }
 
   .field-grid--two,
+  .field-grid--basic,
   .preference-sliders,
   .choice-card-grid--three,
   .fruit-selection-summary,

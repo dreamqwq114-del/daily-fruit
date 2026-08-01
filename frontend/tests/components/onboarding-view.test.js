@@ -78,6 +78,31 @@ describe('OnboardingView', () => {
     expect(wrapper.text()).not.toContain('当前账号已经创建用户资料')
   })
 
+  it('submits moved discovery and horizon controls with their numeric values', async () => {
+    userApi.replaceFruitPreferences.mockResolvedValueOnce([])
+
+    const wrapper = mount(OnboardingView, {
+      global: {
+        stubs: { RouterLink: { template: '<a><slot /></a>' } },
+      },
+    })
+    await flushPromises()
+
+    await wrapper.find('.choice-field--wide').findAll('button')[2].trigger('click')
+    await wrapper.find('.horizon-field').findAll('button')[0].trigger('click')
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(userApi.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        discovery_level: 2,
+        consumption_horizon_days: 2,
+      }),
+    )
+    expect(userApi.replaceFruitPreferences).toHaveBeenCalledWith([])
+    expect(routerApi.replace).toHaveBeenCalledWith('/')
+  })
+
   it('keeps existing-profile mode when preference loading fails', async () => {
     userApi.getUser.mockResolvedValueOnce({
       id: 7,
