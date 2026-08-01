@@ -76,24 +76,14 @@ const preferenceFields = [
           </option>
         </select>
       </label>
-      <div class="choice-field choice-field--wide">
-        <span class="choice-field__label">尝鲜偏好</span>
-        <div class="choice-card-grid choice-card-grid--three" role="radiogroup" aria-label="尝鲜偏好">
-          <button
-            v-for="option in discoveryOptions"
-            :key="option.value"
-            class="choice-card"
-            :class="{ 'is-selected': model.discovery_level === option.value }"
-            type="button"
-            role="radio"
-            :aria-checked="model.discovery_level === option.value"
-            @click="model.discovery_level = option.value"
-          >
-            <strong>{{ option.title }}</strong>
-            <small>{{ option.description }}</small>
-          </button>
-        </div>
-      </div>
+      <label class="form-field form-field--wide">
+        <span>尝鲜偏好</span>
+        <select v-model.number="model.discovery_level" name="discovery_level" required>
+          <option v-for="option in discoveryOptions" :key="option.value" :value="option.value">
+            {{ option.title }}
+          </option>
+        </select>
+      </label>
     </div>
   </fieldset>
 
@@ -119,19 +109,16 @@ const preferenceFields = [
       <div class="horizon-field">
         <span class="choice-field__label">食用时间</span>
         <span class="choice-field__help">通常多久吃完购买的水果</span>
-        <div
-          class="choice-card-grid choice-card-grid--three"
-          role="radiogroup"
-          aria-label="通常多久吃完购买的水果"
-        >
+        <div class="horizon-segmented" role="radiogroup" aria-label="通常多久吃完购买的水果">
           <button
             v-for="option in horizonOptions"
             :key="option.value"
-            class="choice-card"
+            class="horizon-segment"
             :class="{ 'is-selected': model.consumption_horizon_days === option.value }"
             type="button"
             role="radio"
             :aria-checked="model.consumption_horizon_days === option.value"
+            :data-horizon-days="option.value"
             @click="model.consumption_horizon_days = option.value"
           >
             <strong>{{ option.title }}</strong>

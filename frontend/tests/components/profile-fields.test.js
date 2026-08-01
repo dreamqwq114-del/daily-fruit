@@ -21,8 +21,9 @@ describe('ProfileFields', () => {
       '你的基本信息',
       '口感与食用偏好',
     ])
-    expect(wrapper.find('.choice-field--wide').text()).toContain('尝鲜偏好')
-    expect(wrapper.find('.choice-field--wide').element.closest('fieldset').querySelector('legend').textContent)
+    expect(wrapper.find('select[name="discovery_level"]').exists()).toBe(true)
+    expect(wrapper.find('[role="radiogroup"][aria-label="尝鲜偏好"]').exists()).toBe(false)
+    expect(wrapper.find('select[name="discovery_level"]').element.closest('fieldset').querySelector('legend').textContent)
       .toBe('你的基本信息')
     expect(wrapper.find('.horizon-field').element.closest('fieldset').querySelector('legend').textContent)
       .toBe('口感与食用偏好')
@@ -36,9 +37,12 @@ describe('ProfileFields', () => {
 
     expect(wrapper.findAll('select[name="price_level"] option').map((option) => option.element.value))
       .toEqual(['1', '2', '3'])
-    expect(wrapper.find('.choice-field--wide').findAll('button').map((button) => button.attributes('aria-checked')))
-      .toEqual(['false', 'true', 'false'])
-    expect(wrapper.find('.horizon-field').findAll('button').map((button) => button.attributes('aria-checked')))
+    expect(wrapper.findAll('select[name="discovery_level"] option').map((option) => option.element.value))
+      .toEqual(['0', '1', '2'])
+    expect(wrapper.find('select[name="discovery_level"]').element.value).toBe('1')
+    expect(wrapper.find('.horizon-segmented').findAll('button').map((button) => button.attributes('data-horizon-days')))
+      .toEqual(['2', '4', '7'])
+    expect(wrapper.find('.horizon-segmented').findAll('button').map((button) => button.attributes('aria-checked')))
       .toEqual(['false', 'true', 'false'])
   })
 
@@ -48,12 +52,12 @@ describe('ProfileFields', () => {
       props: { modelValue: model },
     })
 
-    await wrapper.find('.choice-field--wide').findAll('button')[2].trigger('click')
-    await wrapper.find('.horizon-field').findAll('button')[0].trigger('click')
+    await wrapper.find('select[name="discovery_level"]').setValue('2')
+    await wrapper.find('.horizon-segmented').findAll('button')[0].trigger('click')
 
     expect(model.discovery_level).toBe(2)
     expect(model.consumption_horizon_days).toBe(2)
-    expect(wrapper.findAll('[name="discovery_level"]')).toHaveLength(0)
+    expect(wrapper.findAll('[name="discovery_level"]')).toHaveLength(1)
     expect(wrapper.findAll('[name="consumption_horizon_days"]')).toHaveLength(0)
 
     const names = wrapper.findAll('[name]').map((element) => element.attributes('name'))

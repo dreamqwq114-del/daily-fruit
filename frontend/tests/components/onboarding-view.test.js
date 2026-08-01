@@ -88,8 +88,8 @@ describe('OnboardingView', () => {
     })
     await flushPromises()
 
-    await wrapper.find('.choice-field--wide').findAll('button')[2].trigger('click')
-    await wrapper.find('.horizon-field').findAll('button')[0].trigger('click')
+    await wrapper.find('select[name="discovery_level"]').setValue('2')
+    await wrapper.find('.horizon-segmented').findAll('button')[0].trigger('click')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
