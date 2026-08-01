@@ -9,7 +9,39 @@ const props = defineProps({
 })
 
 const preferenceSelection = defineModel({ type: Object, required: true })
+const pickerOpen = ref(false)
+const activeGroup = ref('favoriteIds')
 const searchTerm = ref('')
+const pickerMessage = ref('')
+const draftSelection = ref(null)
+
+const groups = [
+  {
+    key: 'favoriteIds',
+    title: '特别喜欢',
+    description: '会优先考虑这些水果',
+    empty: '还没有标记，可以跳过。',
+    chipClass: 'fruit-selection-group--favorite',
+  },
+  {
+    key: 'dislikeIds',
+    title: '不喜欢',
+    description: '会明显降低推荐分数',
+    empty: '没有特别不喜欢的水果。',
+    chipClass: 'fruit-selection-group--dislike',
+  },
+  {
+    key: 'forbiddenIds',
+    title: '绝对不吃',
+    description: '会完全排除，不会推荐',
+    empty: '没有绝对不能接受的水果。',
+    chipClass: 'fruit-selection-group--forbidden',
+  },
+]
+
+const activeGroupInfo = computed(() =>
+  groups.find((group) => group.key === activeGroup.value) ?? groups[0],
+)
 
 const filteredFruits = computed(() => {
   const keyword = searchTerm.value.trim().toLowerCase()
@@ -19,208 +51,170 @@ const filteredFruits = computed(() => {
   )
 })
 
-const favoriteFruits = computed(() =>
-  props.fruits.filter((fruit) => preferenceSelection.value.favoriteIds.includes(fruit.id)),
-)
-
-const forbiddenFruits = computed(() =>
-  props.fruits.filter((fruit) => preferenceSelection.value.forbiddenIds.includes(fruit.id)),
-)
-
-function isSelected(group, fruitId) {
-  return preferenceSelection.value[group].includes(fruitId)
+function ids(selection, key) {
+  return selection?.[key] ?? []
 }
 
-function toggleSelection(group, fruitId) {
-  const otherGroup = group === 'favoriteIds' ? 'forbiddenIds' : 'favoriteIds'
-  const currentIds = new Set(preferenceSelection.value[group])
-  const otherIds = new Set(preferenceSelection.value[otherGroup])
+function fruitsFor(group) {
+  const selected = new Set(ids(preferenceSelection.value, group.key))
+  return props.fruits.filter((fruit) => selected.has(fruit.id))
+}
 
-  if (currentIds.has(fruitId)) {
-    currentIds.delete(fruitId)
-  } else {
-    currentIds.add(fruitId)
-    otherIds.delete(fruitId)
+function openPicker(groupKey) {
+  activeGroup.value = groupKey
+  searchTerm.value = ''
+  pickerMessage.value = ''
+  draftSelection.value = {
+    favoriteIds: [...ids(preferenceSelection.value, 'favoriteIds')],
+    dislikeIds: [...ids(preferenceSelection.value, 'dislikeIds')],
+    forbiddenIds: [...ids(preferenceSelection.value, 'forbiddenIds')],
+  }
+  pickerOpen.value = true
+}
+
+function closePicker() {
+  pickerOpen.value = false
+  draftSelection.value = null
+  pickerMessage.value = ''
+}
+
+function confirmPicker() {
+  preferenceSelection.value = {
+    favoriteIds: [...draftSelection.value.favoriteIds].sort((a, b) => a - b),
+    dislikeIds: [...draftSelection.value.dislikeIds].sort((a, b) => a - b),
+    forbiddenIds: [...draftSelection.value.forbiddenIds].sort((a, b) => a - b),
+  }
+  closePicker()
+}
+
+function confirmConflict(fruit, nextGroup, previousGroups) {
+  const previous = previousGroups.map((group) => group.title).join('、')
+  if (typeof window === 'undefined' || typeof window.confirm !== 'function') return true
+  return window.confirm(`${fruit.name}已标记为“${previous}”。切换为“${nextGroup.title}”会清除原状态，是否继续？`)
+}
+
+function toggleDraft(fruit) {
+  const groupKey = activeGroup.value
+  const targetIds = new Set(ids(draftSelection.value, groupKey))
+  if (targetIds.has(fruit.id)) {
+    targetIds.delete(fruit.id)
+    draftSelection.value = { ...draftSelection.value, [groupKey]: [...targetIds] }
+    pickerMessage.value = ''
+    return
   }
 
+  if (groupKey === 'favoriteIds' && targetIds.size >= 5) {
+    pickerMessage.value = '特别喜欢最多选择 5 种水果。可以先移除一个再添加。'
+    return
+  }
+
+  const previousGroups = groups.filter(
+    (group) => group.key !== groupKey && ids(draftSelection.value, group.key).includes(fruit.id),
+  )
+  if (previousGroups.length && !confirmConflict(fruit, activeGroupInfo.value, previousGroups)) return
+
+  const next = { ...draftSelection.value }
+  for (const group of groups) {
+    next[group.key] = (group.key === groupKey
+      ? [...ids(next, group.key), fruit.id]
+      : ids(next, group.key).filter((id) => id !== fruit.id))
+  }
+  draftSelection.value = next
+  pickerMessage.value = ''
+}
+
+function isDraftSelected(fruitId) {
+  return ids(draftSelection.value, activeGroup.value).includes(fruitId)
+}
+
+function removeCommitted(groupKey, fruitId) {
   preferenceSelection.value = {
     ...preferenceSelection.value,
-    [group]: [...currentIds].sort((left, right) => left - right),
-    [otherGroup]: [...otherIds].sort((left, right) => left - right),
+    [groupKey]: ids(preferenceSelection.value, groupKey).filter((id) => id !== fruitId),
   }
-}
-
-function clearSelection(group) {
-  preferenceSelection.value = {
-    ...preferenceSelection.value,
-    [group]: [],
-  }
-}
-
-function isBooleanSelected(group, fruitId) {
-  return preferenceSelection.value[group]?.includes(fruitId) ?? false
-}
-
-function toggleBoolean(trueGroup, falseGroup, fruitId, value) {
-  const trueIds = new Set(preferenceSelection.value[trueGroup] ?? [])
-  const falseIds = new Set(preferenceSelection.value[falseGroup] ?? [])
-  const target = value ? trueIds : falseIds
-  const other = value ? falseIds : trueIds
-  if (target.has(fruitId)) target.delete(fruitId)
-  else {
-    target.add(fruitId)
-    other.delete(fruitId)
-  }
-  const nextSelection = {
-    ...preferenceSelection.value,
-    [trueGroup]: [...trueIds].sort((left, right) => left - right),
-    [falseGroup]: [...falseIds].sort((left, right) => left - right),
-  }
-  if (trueGroup === 'triedIds' && value === false) {
-    nextSelection.favoriteIds = nextSelection.favoriteIds.filter(
-      (id) => id !== fruitId,
-    )
-  }
-  preferenceSelection.value = nextSelection
 }
 </script>
 
 <template>
   <fieldset class="form-section fruit-preference-section">
-    <legend>你有特别喜欢或不能接受的水果吗？</legend>
+    <legend>水果偏好</legend>
     <p class="section-help">
-      只标记你的极端偏好。其余水果会由系统根据季节、价格、口感和营养互补自动选择。
+      只标记明确的强偏好。没有选择的水果表示你还没有提供明确意见，系统会从水果库中自动筛选。
     </p>
 
     <div class="fruit-selection-summary">
-      <section class="fruit-selection-group fruit-selection-group--favorite" aria-labelledby="favorite-fruits-title">
+      <section
+        v-for="group in groups"
+        :key="group.key"
+        class="fruit-selection-group"
+        :class="group.chipClass"
+      >
         <div class="fruit-selection-heading">
-          <h2 id="favorite-fruits-title">特别喜欢 <span>{{ favoriteFruits.length }}</span></h2>
-          <button
-            v-if="favoriteFruits.length"
-            class="text-button"
-            type="button"
-            @click="clearSelection('favoriteIds')"
-          >
-            清空
+          <div>
+            <h2>{{ group.title }} <span>{{ fruitsFor(group).length }}</span></h2>
+            <small>{{ group.description }}</small>
+          </div>
+          <button class="button button--small" type="button" @click="openPicker(group.key)">
+            + 添加水果
           </button>
         </div>
-        <div v-if="favoriteFruits.length" class="fruit-selection-chips">
+        <div v-if="fruitsFor(group).length" class="fruit-selection-chips">
           <button
-            v-for="fruit in favoriteFruits"
-            :key="`favorite-${fruit.id}`"
+            v-for="fruit in fruitsFor(group)"
+            :key="`${group.key}-${fruit.id}`"
             class="fruit-selection-chip"
             type="button"
-            :aria-label="`取消特别喜欢${fruit.name}`"
-            @click="toggleSelection('favoriteIds', fruit.id)"
+            :aria-label="`取消${group.title}${fruit.name}`"
+            @click="removeCommitted(group.key, fruit.id)"
           >
-            {{ fruit.name }}
-            <span aria-hidden="true">×</span>
+            {{ fruit.name }} <span aria-hidden="true">×</span>
           </button>
         </div>
-        <p v-else class="fruit-selection-empty">还没有标记，下方点击“特别喜欢”即可。</p>
-      </section>
-
-      <section class="fruit-selection-group fruit-selection-group--forbidden" aria-labelledby="forbidden-fruits-title">
-        <div class="fruit-selection-heading">
-          <h2 id="forbidden-fruits-title">特别不能接受 <span>{{ forbiddenFruits.length }}</span></h2>
-          <button
-            v-if="forbiddenFruits.length"
-            class="text-button"
-            type="button"
-            @click="clearSelection('forbiddenIds')"
-          >
-            清空
-          </button>
-        </div>
-        <div v-if="forbiddenFruits.length" class="fruit-selection-chips">
-          <button
-            v-for="fruit in forbiddenFruits"
-            :key="`forbidden-${fruit.id}`"
-            class="fruit-selection-chip"
-            type="button"
-            :aria-label="`取消特别不能接受${fruit.name}`"
-            @click="toggleSelection('forbiddenIds', fruit.id)"
-          >
-            {{ fruit.name }}
-            <span aria-hidden="true">×</span>
-          </button>
-        </div>
-        <p v-else class="fruit-selection-empty">没有特别禁忌。为了保证有足够候选，建议不要一次排除太多水果。</p>
+        <p v-else class="fruit-selection-empty">{{ group.empty }}</p>
       </section>
     </div>
 
-    <label class="fruit-search-field">
-      <span>在水果库中搜索</span>
-      <input v-model="searchTerm" type="search" placeholder="例如：苹果、甜、脆" />
-    </label>
+    <p class="section-help fruit-preference-note">特别喜欢最多 5 种；“不喜欢”和“绝对不吃”会分开保存。</p>
 
-    <div class="fruit-choice-grid" aria-live="polite">
-      <article v-for="fruit in filteredFruits" :key="fruit.id" class="fruit-choice-card">
-        <span class="fruit-initial" aria-hidden="true">{{ fruit.name.slice(0, 1) }}</span>
-        <span class="fruit-preference-name">
-          <strong>{{ fruit.name }}</strong>
-          <small>{{ fruit.taste }}</small>
-        </span>
-        <div class="fruit-choice-actions">
+    <div v-if="pickerOpen" class="fruit-picker-backdrop" @click.self="closePicker">
+      <section class="fruit-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="fruit-picker-title">
+        <header class="fruit-picker-header">
+          <div>
+            <p class="eyebrow">从 24 种水果中选择</p>
+            <h2 id="fruit-picker-title">{{ activeGroupInfo.title }}</h2>
+            <p>{{ activeGroupInfo.description }}</p>
+          </div>
+          <button class="icon-button" type="button" aria-label="关闭选择器" @click="closePicker">×</button>
+        </header>
+
+        <label class="fruit-search-field">
+          <span>搜索水果</span>
+          <input v-model="searchTerm" type="search" placeholder="例如：苹果、甜、脆" autofocus />
+        </label>
+
+        <p v-if="pickerMessage" class="inline-message" role="alert">{{ pickerMessage }}</p>
+        <div class="fruit-picker-grid" aria-live="polite">
           <button
-            class="fruit-choice-button fruit-choice-button--favorite"
-            :class="{ 'is-selected': isSelected('favoriteIds', fruit.id) }"
+            v-for="fruit in filteredFruits"
+            :key="fruit.id"
+            class="fruit-picker-option"
+            :class="{ 'is-selected': isDraftSelected(fruit.id) }"
             type="button"
-            :aria-pressed="isSelected('favoriteIds', fruit.id)"
-            @click="toggleSelection('favoriteIds', fruit.id)"
+            :aria-pressed="isDraftSelected(fruit.id)"
+            @click="toggleDraft(fruit)"
           >
-            特别喜欢
-          </button>
-          <button
-            class="fruit-choice-button fruit-choice-button--forbidden"
-            :class="{ 'is-selected': isSelected('forbiddenIds', fruit.id) }"
-            type="button"
-            :aria-pressed="isSelected('forbiddenIds', fruit.id)"
-            @click="toggleSelection('forbiddenIds', fruit.id)"
-          >
-            不能接受
-          </button>
-          <button
-            class="fruit-choice-button"
-            :class="{ 'is-selected': isBooleanSelected('triedIds', fruit.id) }"
-            type="button"
-            :aria-pressed="isBooleanSelected('triedIds', fruit.id)"
-            @click="toggleBoolean('triedIds', 'notTriedIds', fruit.id, true)"
-          >
-            吃过
-          </button>
-          <button
-            class="fruit-choice-button"
-            :class="{ 'is-selected': isBooleanSelected('notTriedIds', fruit.id) }"
-            type="button"
-            :aria-pressed="isBooleanSelected('notTriedIds', fruit.id)"
-            @click="toggleBoolean('triedIds', 'notTriedIds', fruit.id, false)"
-          >
-            没吃过
-          </button>
-          <button
-            class="fruit-choice-button"
-            :class="{ 'is-selected': isBooleanSelected('willingToTryIds', fruit.id) }"
-            type="button"
-            :aria-pressed="isBooleanSelected('willingToTryIds', fruit.id)"
-            @click="toggleBoolean('willingToTryIds', 'notWillingToTryIds', fruit.id, true)"
-          >
-            愿意尝试
-          </button>
-          <button
-            class="fruit-choice-button"
-            :class="{ 'is-selected': isBooleanSelected('notWillingToTryIds', fruit.id) }"
-            type="button"
-            :aria-pressed="isBooleanSelected('notWillingToTryIds', fruit.id)"
-            @click="toggleBoolean('willingToTryIds', 'notWillingToTryIds', fruit.id, false)"
-          >
-            暂不想尝试
+            <span class="fruit-initial" aria-hidden="true">{{ fruit.name.slice(0, 1) }}</span>
+            <span><strong>{{ fruit.name }}</strong><small>{{ fruit.taste }}</small></span>
+            <span class="fruit-picker-option-state">{{ isDraftSelected(fruit.id) ? '已选择' : '选择' }}</span>
           </button>
         </div>
-      </article>
-    </div>
+        <p v-if="!filteredFruits.length" class="fruit-selection-empty">没找到匹配的水果，可以换个关键词。</p>
 
-    <p v-if="!filteredFruits.length" class="fruit-selection-empty">没找到匹配的水果，可以清空搜索后重试。</p>
+        <footer class="fruit-picker-actions">
+          <button class="button button--ghost" type="button" @click="closePicker">取消</button>
+          <button class="button button--primary" type="button" @click="confirmPicker">确认选择</button>
+        </footer>
+      </section>
+    </div>
   </fieldset>
 </template>

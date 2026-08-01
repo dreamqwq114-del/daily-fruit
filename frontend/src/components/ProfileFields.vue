@@ -1,7 +1,35 @@
 <script setup>
 const model = defineModel({ type: Object, required: true })
 
-const regions = ['全国', '华东', '华南', '华北', '华中', '西南', '西北', '东北']
+const regions = [
+  { value: '华东', label: '华东' },
+  { value: '华南', label: '华南' },
+  { value: '华北', label: '华北' },
+  { value: '华中', label: '华中' },
+  { value: '西南', label: '西南' },
+  { value: '西北', label: '西北' },
+  { value: '东北', label: '东北' },
+  { value: 'UNKNOWN', label: '暂不确定' },
+]
+
+const priceOptions = [
+  { value: 1, title: '节省优先', description: '更在意日常价格' },
+  { value: 2, title: '适中均衡', description: '价格和选择都平衡' },
+  { value: 3, title: '品质优先', description: '可以接受更高价格' },
+]
+
+const discoveryOptions = [
+  { value: 0, title: '偏保守', description: '优先推荐常见水果' },
+  { value: 1, title: '偶尔尝鲜', description: '可以偶尔加入一种新水果' },
+  { value: 2, title: '喜欢尝鲜', description: '更愿意发现没吃过的水果' },
+]
+
+const horizonOptions = [
+  { value: 2, title: '1～2 天', description: '买了通常很快吃完' },
+  { value: 4, title: '3～5 天', description: '日常适中' },
+  { value: 7, title: '一周左右', description: '希望选择相对耐放的水果' },
+]
+
 const preferenceFields = [
   { key: 'sweet_preference', label: '偏甜', low: '清淡', high: '喜欢甜味' },
   { key: 'sour_preference', label: '偏酸', low: '不太酸', high: '喜欢酸味' },
@@ -10,7 +38,7 @@ const preferenceFields = [
   {
     key: 'convenience_preference',
     label: '食用便利',
-    low: '可以处理',
+    low: '不介意处理',
     high: '越方便越好',
   },
 ]
@@ -19,7 +47,7 @@ const preferenceFields = [
 <template>
   <fieldset class="form-section">
     <legend>你的基本信息</legend>
-    <div class="field-grid field-grid--two">
+    <div class="field-grid field-grid--basic">
       <label class="form-field">
         <span>怎么称呼你</span>
         <input
@@ -32,52 +60,34 @@ const preferenceFields = [
           required
         />
       </label>
-      <label class="form-field">
-        <span>所在城市</span>
-        <input
-          v-model.trim="model.city"
-          name="city"
-          type="text"
-          maxlength="100"
-          autocomplete="address-level2"
-          placeholder="例如：苏州"
-          required
-        />
-      </label>
-      <label class="form-field">
-        <span>所在地区</span>
-        <select v-model="model.region" name="region" required>
-          <option v-for="region in regions" :key="region" :value="region">
-            {{ region }}
-          </option>
-        </select>
-      </label>
-      <label class="form-field">
-        <span>价格范围</span>
-        <select v-model.number="model.price_level" name="price_level" required>
-          <option :value="1">日常实惠</option>
-          <option :value="2">适中均衡</option>
-          <option :value="3">可以接受较高价格</option>
-        </select>
-      </label>
-      <label class="form-field">
-        <span>尝鲜程度</span>
-        <select v-model.number="model.discovery_level" name="discovery_level" required>
-          <option :value="0">只推荐吃过的</option>
-          <option :value="1">偶尔尝试新水果</option>
-          <option :value="2">愿意探索更多</option>
-        </select>
-      </label>
+      <div class="field-grid field-grid--two">
+        <label class="form-field">
+          <span>所在地区</span>
+          <select v-model="model.region" name="region" required>
+            <option v-for="region in regions" :key="region.value" :value="region.value">
+              {{ region.label }}
+            </option>
+          </select>
+        </label>
+        <label class="form-field">
+          <span>价格偏好</span>
+          <select v-model.number="model.price_level" name="price_level" required>
+            <option v-for="option in priceOptions" :key="option.value" :value="option.value">
+              {{ option.title }}
+            </option>
+          </select>
+        </label>
+      </div>
     </div>
   </fieldset>
 
   <fieldset class="form-section">
-    <legend>口感偏好</legend>
+    <legend>口感与食用偏好</legend>
     <div class="preference-sliders">
       <label v-for="field in preferenceFields" :key="field.key" class="range-field">
         <span class="range-heading">
           <strong>{{ field.label }}</strong>
-          <output>{{ Math.round(model[field.key] * 100) }}%</output>
+          <output>{{ Math.round(Number(model[field.key]) * 100) }}%</output>
         </span>
         <input
           v-model.number="model[field.key]"
@@ -89,6 +99,43 @@ const preferenceFields = [
         />
         <span class="range-hints"><small>{{ field.low }}</small><small>{{ field.high }}</small></span>
       </label>
+    </div>
+  </fieldset>
+
+  <fieldset class="form-section">
+    <legend>通常多久吃完购买的水果？</legend>
+    <p class="section-help">这是你的消费周期，不代表水果实际保存天数，也暂时不会参与推荐排序。</p>
+    <div class="choice-card-grid choice-card-grid--three" role="group" aria-label="水果消费周期">
+      <button
+        v-for="option in horizonOptions"
+        :key="option.value"
+        class="choice-card"
+        :class="{ 'is-selected': model.consumption_horizon_days === option.value }"
+        type="button"
+        :aria-pressed="model.consumption_horizon_days === option.value"
+        @click="model.consumption_horizon_days = option.value"
+      >
+        <strong>{{ option.title }}</strong>
+        <small>{{ option.description }}</small>
+      </button>
+    </div>
+  </fieldset>
+
+  <fieldset class="form-section">
+    <legend>尝鲜偏好</legend>
+    <div class="choice-card-grid choice-card-grid--three" role="group" aria-label="尝鲜偏好">
+      <button
+        v-for="option in discoveryOptions"
+        :key="option.value"
+        class="choice-card"
+        :class="{ 'is-selected': model.discovery_level === option.value }"
+        type="button"
+        :aria-pressed="model.discovery_level === option.value"
+        @click="model.discovery_level = option.value"
+      >
+        <strong>{{ option.title }}</strong>
+        <small>{{ option.description }}</small>
+      </button>
     </div>
   </fieldset>
 </template>

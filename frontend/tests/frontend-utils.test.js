@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 
 import {
+  createDefaultProfile,
   preferencesToSelection,
+  profileFromUser,
   selectionToPreferences,
 } from '../src/utils/fruit-preferences.js'
 globalThis.window = {
@@ -24,7 +26,7 @@ afterEach(() => {
   delete globalThis.fetch
 })
 
-test('fruit preference mapping uses favorite and forbidden selections', () => {
+test('fruit preference mapping uses favorite, dislike and forbidden selections', () => {
   const selection = preferencesToSelection([
     { fruit_id: 1, preference_score: 2, is_forbidden: false },
     { fruit_id: 2, preference_score: -1, is_forbidden: false },
@@ -33,60 +35,38 @@ test('fruit preference mapping uses favorite and forbidden selections', () => {
 
   assert.deepEqual(selection, {
     favoriteIds: [1],
+    dislikeIds: [2],
     forbiddenIds: [3],
-    triedIds: [],
-    notTriedIds: [],
-    willingToTryIds: [],
-    notWillingToTryIds: [],
-    legacyPreferences: [
-      { fruit_id: 2, preference_score: -1, is_forbidden: false },
-    ],
   })
 
   assert.deepEqual(
     selectionToPreferences(selection),
     [
-      { fruit_id: 1, preference_score: 2, is_forbidden: false, has_tried: null, willing_to_try: null },
-      { fruit_id: 2, preference_score: -1, is_forbidden: false, has_tried: null, willing_to_try: null },
-      { fruit_id: 3, preference_score: null, is_forbidden: true, has_tried: null, willing_to_try: null },
+      { fruit_id: 1, preference_score: 2, is_forbidden: false },
+      { fruit_id: 2, preference_score: -1, is_forbidden: false },
+      { fruit_id: 3, preference_score: null, is_forbidden: true },
     ],
   )
 })
 
-test('new selections override a legacy preference without dropping other legacy data', () => {
+test('unselected fruits are not submitted as neutral preferences', () => {
   assert.deepEqual(
     selectionToPreferences({
       favoriteIds: [2],
+      dislikeIds: [],
       forbiddenIds: [],
-      legacyPreferences: [
-        { fruit_id: 1, preference_score: -1, is_forbidden: false },
-        { fruit_id: 2, preference_score: 1, is_forbidden: false },
-      ],
-      triedIds: [],
-      notTriedIds: [],
-      willingToTryIds: [],
-      notWillingToTryIds: [],
     }),
-    [
-      { fruit_id: 1, preference_score: -1, is_forbidden: false, has_tried: null, willing_to_try: null },
-      { fruit_id: 2, preference_score: 2, is_forbidden: false, has_tried: null, willing_to_try: null },
-    ],
+    [{ fruit_id: 2, preference_score: 2, is_forbidden: false }],
   )
 })
 
-test('familiarity answers round-trip without changing favorite or forbidden groups', () => {
-  const selection = preferencesToSelection([
-    { fruit_id: 4, preference_score: null, is_forbidden: false, has_tried: true, willing_to_try: true },
-    { fruit_id: 5, preference_score: null, is_forbidden: false, has_tried: false, willing_to_try: false },
-  ])
-  assert.deepEqual(selection.triedIds, [4])
-  assert.deepEqual(selection.notTriedIds, [5])
-  assert.deepEqual(selection.willingToTryIds, [4])
-  assert.deepEqual(selection.notWillingToTryIds, [5])
-  assert.deepEqual(selectionToPreferences(selection), [
-    { fruit_id: 4, preference_score: null, is_forbidden: false, has_tried: true, willing_to_try: true },
-    { fruit_id: 5, preference_score: null, is_forbidden: false, has_tried: false, willing_to_try: false },
-  ])
+test('profile defaults omit city and use the new region and horizon defaults', () => {
+  const profile = profileFromUser({ city: '苏州', region: '全国' })
+  assert.equal(profile.city, undefined)
+  assert.equal(profile.region, 'UNKNOWN')
+  assert.equal(profile.discovery_level, 1)
+  assert.equal(profile.consumption_horizon_days, 4)
+  assert.equal(createDefaultProfile().price_level, 2)
 })
 
 test('apiRequest returns json for successful responses', async () => {

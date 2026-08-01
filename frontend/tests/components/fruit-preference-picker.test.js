@@ -1,93 +1,87 @@
 import { mount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 import FruitPreferencePicker from '../../src/components/FruitPreferencePicker.vue'
 
 const fruits = [
   { id: 1, name: '苹果', taste: '清脆甜' },
   { id: 2, name: '香蕉', taste: '香甜软' },
+  { id: 3, name: '柠檬', taste: '明显酸味' },
 ]
 
-function mountPicker() {
+function selection(overrides = {}) {
+  return {
+    favoriteIds: [],
+    dislikeIds: [],
+    forbiddenIds: [],
+    ...overrides,
+  }
+}
+
+function mountPicker(modelValue = selection(), fruitList = fruits) {
   return mount(FruitPreferencePicker, {
-    props: {
-      fruits,
-      modelValue: {
-        favoriteIds: [],
-        forbiddenIds: [],
-        legacyPreferences: [],
-      },
-    },
+    props: { fruits: fruitList, modelValue },
   })
 }
 
 describe('FruitPreferencePicker', () => {
-  it('uses explicit favorite and forbidden buttons instead of per-fruit selects', async () => {
+  it('does not render the old per-fruit select grid before opening the picker', () => {
     const wrapper = mountPicker()
     expect(wrapper.findAll('select')).toHaveLength(0)
+    expect(wrapper.find('.fruit-picker-dialog').exists()).toBe(false)
     expect(wrapper.text()).toContain('特别喜欢')
-    expect(wrapper.text()).toContain('特别不能接受')
+    expect(wrapper.text()).toContain('不喜欢')
+    expect(wrapper.text()).toContain('绝对不吃')
   })
 
-  it('keeps a fruit in only one selection group', async () => {
+  it('opens a searchable picker and confirms a favorite', async () => {
     const wrapper = mountPicker()
-    const favoriteButtons = wrapper.findAll('.fruit-choice-button--favorite')
-    const forbiddenButtons = wrapper.findAll('.fruit-choice-button--forbidden')
+    await wrapper.findAll('.button--small')[0].trigger('click')
+    expect(wrapper.find('.fruit-picker-dialog').exists()).toBe(true)
 
-    await favoriteButtons[0].trigger('click')
-    const favoriteEvent = wrapper.emitted('update:modelValue')
-    const favoriteSelection = favoriteEvent[favoriteEvent.length - 1][0]
-    expect(favoriteSelection.favoriteIds).toEqual([1])
-    await wrapper.setProps({ modelValue: favoriteSelection })
+    await wrapper.find('.fruit-picker-option').trigger('click')
+    expect(wrapper.find('.fruit-picker-option').classes()).toContain('is-selected')
+    await wrapper.find('.fruit-picker-actions .button--primary').trigger('click')
 
-    await forbiddenButtons[0].trigger('click')
-    const events = wrapper.emitted('update:modelValue')
-    const latest = events[events.length - 1][0]
-    expect(latest.favoriteIds).toEqual([])
-    expect(latest.forbiddenIds).toEqual([1])
-  })
-
-  it('filters the fruit library by name and taste', async () => {
-    const wrapper = mountPicker()
-    await wrapper.find('input[type="search"]').setValue('软')
-    expect(wrapper.findAll('.fruit-choice-card')).toHaveLength(1)
-    expect(wrapper.text()).toContain('香蕉')
-    expect(wrapper.text()).not.toContain('苹果')
-  })
-
-  it('captures familiarity and willingness separately from hard exclusions', async () => {
-    const wrapper = mountPicker()
-    const buttons = wrapper.findAll('.fruit-choice-button')
-    const eatenButton = buttons.find((button) => button.text() === '吃过')
-    const unwillingButton = buttons.find((button) => button.text() === '暂不想尝试')
-    await eatenButton.trigger('click')
-    await unwillingButton.trigger('click')
     const latest = wrapper.emitted('update:modelValue').at(-1)[0]
-    expect(latest.triedIds).toEqual([1])
-    expect(latest.notWillingToTryIds).toEqual([1])
+    expect(latest.favoriteIds).toEqual([1])
+    expect(latest.dislikeIds).toEqual([])
     expect(latest.forbiddenIds).toEqual([])
   })
 
-  it('removes favorite when a fruit is marked as not tried', async () => {
-    const wrapper = mount(FruitPreferencePicker, {
-      props: {
-        fruits,
-        modelValue: {
-          favoriteIds: [1],
-          forbiddenIds: [],
-          triedIds: [],
-          notTriedIds: [],
-          willingToTryIds: [],
-          notWillingToTryIds: [],
-          legacyPreferences: [],
-        },
-      },
-    })
-    const buttons = wrapper.findAll('.fruit-choice-button')
-    const notTriedButton = buttons.find((button) => button.text() === '没吃过')
-    await notTriedButton.trigger('click')
+  it('supports search and cancel without changing the committed selection', async () => {
+    const wrapper = mountPicker()
+    await wrapper.findAll('.button--small')[0].trigger('click')
+    await wrapper.find('input[type="search"]').setValue('软')
+    expect(wrapper.findAll('.fruit-picker-option')).toHaveLength(1)
+    expect(wrapper.text()).toContain('香蕉')
+    expect(wrapper.text()).not.toContain('苹果')
+
+    await wrapper.find('.fruit-picker-option').trigger('click')
+    await wrapper.find('.fruit-picker-actions .button--ghost').trigger('click')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+  })
+
+  it('keeps one status per fruit and asks before switching groups', async () => {
+    const confirmSpy = vi.fn(() => true)
+    window.confirm = confirmSpy
+    const wrapper = mountPicker(selection({ favoriteIds: [1] }))
+    await wrapper.findAll('.button--small')[2].trigger('click')
+    await wrapper.find('.fruit-picker-option').trigger('click')
+    await wrapper.find('.fruit-picker-actions .button--primary').trigger('click')
+
     const latest = wrapper.emitted('update:modelValue').at(-1)[0]
+    expect(confirmSpy).toHaveBeenCalled()
     expect(latest.favoriteIds).toEqual([])
-    expect(latest.notTriedIds).toEqual([1])
+    expect(latest.forbiddenIds).toEqual([1])
+    delete window.confirm
+  })
+
+  it('enforces the five-fruit favorite limit in the picker', async () => {
+    const sixFruits = [...fruits, { id: 4, name: '梨', taste: '清甜' }, { id: 5, name: '桃', taste: '柔软甜' }, { id: 6, name: '葡萄', taste: '甜多汁' }]
+    const wrapper = mountPicker(selection({ favoriteIds: [1, 2, 3, 4, 5] }), sixFruits)
+    await wrapper.findAll('.button--small')[0].trigger('click')
+    await wrapper.findAll('.fruit-picker-option')[5].trigger('click')
+    expect(wrapper.text()).toContain('特别喜欢最多选择 5 种')
   })
 })
