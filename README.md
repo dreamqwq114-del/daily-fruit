@@ -12,7 +12,7 @@
 - 环境变量读取与可选数据库连通性检查；
 - 阶段一架构、ER、API 与实施计划；
 - SQLAlchemy Model、Pydantic Schema 和五版 Alembic migration；
-- 目标 Supabase 已迁移到 `public.alembic_version=0005`，并完成推荐 V2 数据字段升级；
+- 目标 Supabase 已迁移到 `public.alembic_version=0006`，并完成推荐 V2 数据字段升级；
 - 八张业务表已启用 RLS，并对浏览器角色保持 deny-by-default；
 - 目标 Supabase 已幂等写入 24 种水果、24 条营养和 48 条季节演示数据；
 - 纯 Python 推荐算法已实现过滤、六项加权评分、历史和反馈调整、营养互补、
@@ -190,7 +190,7 @@ cd backend
 - `/docs` 和 `/openapi.json` 在 production 返回 404；
 - `DATABASE_URL` 只保存在 FastAPI Cloud Secret 和本机被 Git 忽略的
   `backend/.env` 中；
-- Supabase 已迁移到 `0005`，并在幂等 seed 后保持 24/24/48 演示数据不变；
+- Supabase 已迁移到 `0006`，并在幂等 seed 后保持 24/24/48 演示数据不变；
 - 线上 E2E 已验证登录、建档、两卡、刷新幂等、反馈、换组和历史数据，临时账号及
   行为数据随后已清理。
 
@@ -263,8 +263,9 @@ Supabase Auth Site URL 和回调 allow list 已配置为 GitHub Pages 项目地�
 
 The V2 recommender keeps fruit identity, availability, familiarity, and data
 quality as explicit columns. `data/fruits_seed.json` is the source for the
-24 demonstration fruits; Alembic migration `0005` adds the corresponding
-database fields. `discovery_level`, `has_tried`, and `willing_to_try` are
+24 demonstration fruits; Alembic migrations `0005` and `0006` add the
+corresponding database fields. `discovery_level`, `has_tried`,
+`willing_to_try`, and `consumption_horizon_days` are
 optional familiarity signals. A null signal means that the user has not
 provided an answer and is not treated as a hard preference.
 
@@ -286,7 +287,21 @@ confidence. Recommendation reasons store the actual weighted contribution.
 
 The repaired implementation and seven-profile acceptance run are recorded in
 `docs/recommendation-v2-comparison.md`. The remote Daily Fruit project is at
-Alembic version `0005`; the V2 seed was executed twice with counts remaining
+Alembic version `0006`; the V2 seed was executed twice with counts remaining
 24 fruits, 24 nutrition rows and 48 season rows. The seed updates only the
 fruit, nutrition and season demonstration records and does not touch users or
 recommendation history.
+
+## Preferences settings data contract
+
+The current settings page does not collect city; the legacy `users.city` value
+is retained on partial updates and new API-created users use `UNKNOWN`. Region
+selection uses the seven supported areas plus an internal unknown value. The
+consumption horizon accepts only 2, 4, or 7 days and is stored for future
+features; it is not part of recommendation ranking yet.
+
+Fruit selections are explicit favorite, dislike, or forbidden states. Favorites
+are limited to five. Unselected fruits clear only the managed score/forbidden
+fields while preserving familiarity (`has_tried`, `willing_to_try`) and the
+preference row itself. See
+[`docs/preferences-ui-v1-audit.md`](docs/preferences-ui-v1-audit.md).
