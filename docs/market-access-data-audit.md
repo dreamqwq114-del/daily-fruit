@@ -58,5 +58,60 @@ columns and the owned check constraint.
 - `backend/alembic/versions/0007_user_market_access.py`
 - focused frontend/backend tests and migration metadata tests
 
-No migration or remote database write has been performed at the time of this
-baseline document.
+## Implementation verification
+
+The implementation added the two fields in migration `0007`. The target
+Supabase project was re-read after the migration: both columns exist on
+`public.users` with the expected types, defaults, and market-access check.
+All 14 existing users have `market_access_level = 2` and
+`accepts_online_purchase = false`; no existing row has a null value for either
+field. `public.alembic_version` is now `0007`, and the Supabase migration
+history contains `add_user_market_access_fields`.
+
+The remote migration was applied as additive DDL only. No user profile values,
+fruit data, recommendation history, RLS, policies, or recommendation code were
+changed. The Supabase security advisor still reports the project's existing
+informational RLS-without-policy notices and the existing Auth leaked-password
+warning; the performance notices are existing unused-index INFO findings and
+are unrelated to these columns.
+
+Local verification completed:
+
+- Backend: 184 passed, 29 skipped (database integration tests are skipped when
+  the isolated `daily_fruit_test` URL is not configured).
+- Frontend: 23 unit tests and 29 component tests passed; `npm ci` and
+  `npm run build` passed.
+- GitHub Pages run `30687904936` succeeded for commit `1073ba4`; the public
+  site returned HTTP 200 and its deployed preference chunk contains both new
+  field bindings.
+
+## Independent read-only audit
+
+The independent subagent review returned **PASS** and did not modify files.
+
+- The ORM, schemas, API service, and migration agree on the two fields and
+  their defaults (`2` and `false`).
+- `UserUpdate` remains field-level (`exclude_unset=True`); omitted purchase
+  fields and `city` are retained.
+- Migration `0007` is additive and its downgrade owns only the two columns and
+  the market-access check constraint. It does not write data or touch other
+  schemas.
+- The frontend has one select for `market_access_level` (1/2/3) and one boolean
+  checkbox for `accepts_online_purchase`; there are no duplicate field names.
+- The recommendation service, fruit data, and existing algorithm inputs were
+  not changed. The responsive grid has a mobile single-column fallback with no
+  identified fixed-width overflow risk.
+- Targeted backend and frontend tests passed. The independent reviewer noted
+  that its targeted frontend command was narrower than the full suite; the
+  main verification above is the authoritative full-suite result.
+- No tracked `.env` or real secret was found. Example credentials in tests are
+  placeholders only.
+
+Authenticated live-browser screenshots at 375/768/1440px were not completed
+because no authenticated browser session was available. Static production
+checks were completed instead: GitHub Pages returned HTTP 200, and the
+deployed preference chunk contains both field bindings.
+
+The implementation is ready for the next stage. These fields remain collected
+for future availability features and are intentionally not used by the current
+recommendation ranking, filtering, reasons, or feedback logic.
