@@ -30,7 +30,7 @@ def api_engine() -> Engine:
         version = connection.execute(
             text("SELECT version_num FROM public.alembic_version")
         ).scalar_one()
-    assert version == "0005"
+    assert version == "0006"
     seed_database(engine, load_seed_dataset())
     try:
         yield engine

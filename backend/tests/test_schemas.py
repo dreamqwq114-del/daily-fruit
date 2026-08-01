@@ -123,6 +123,19 @@ def test_user_update_requires_non_null_changes() -> None:
     assert update.model_dump(exclude_unset=True) == {"city": "上海"}
 
 
+def test_user_create_allows_omitted_city_and_validates_horizon() -> None:
+    data = valid_user_data()
+    data.pop("city")
+    data["consumption_horizon_days"] = 7
+    created = UserCreate.model_validate(data)
+    assert created.city == "UNKNOWN"
+    assert created.consumption_horizon_days == 7
+
+    invalid = {**data, "consumption_horizon_days": 3}
+    with pytest.raises(ValidationError):
+        UserCreate.model_validate(invalid)
+
+
 def test_fruit_scores_and_price_are_validated() -> None:
     fruit = FruitBase.model_validate(valid_fruit_data())
     assert fruit.name == "苹果"
@@ -193,6 +206,29 @@ def test_fruit_preference_rejects_untried_favorite_combination() -> None:
                 "fruit_id": 1,
                 "preference_score": 2,
                 "has_tried": False,
+            }
+        )
+
+
+def test_fruit_preference_rejects_favorite_forbidden_conflict() -> None:
+    with pytest.raises(ValidationError, match="both"):
+        UserFruitPreferenceInput.model_validate(
+            {
+                "fruit_id": 1,
+                "preference_score": 2,
+                "is_forbidden": True,
+            }
+        )
+
+
+def test_preference_batch_rejects_more_than_five_favorites() -> None:
+    with pytest.raises(ValidationError, match="five"):
+        UserFruitPreferencesUpdate.model_validate(
+            {
+                "preferences": [
+                    {"fruit_id": fruit_id, "preference_score": 2}
+                    for fruit_id in range(1, 7)
+                ]
             }
         )
 

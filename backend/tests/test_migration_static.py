@@ -44,7 +44,7 @@ V2_COLUMNS = {
         "novelty_level", "data_quality", "data_source_note",
     },
     "fruit_seasons": {"region_level", "availability_score", "supply_status"},
-    "users": {"discovery_level"},
+    "users": {"discovery_level", "consumption_horizon_days"},
     "user_fruit_preferences": {"has_tried", "willing_to_try"},
     "recommendation_items": {"individual_score", "pair_score", "nutrition_pair_score"},
 }
@@ -65,6 +65,7 @@ V2_CONSTRAINTS = {
     "ck_fruit_seasons_availability_score_range",
     "ck_fruit_seasons_supply_status_values",
     "ck_users_discovery_level_range",
+    "ck_users_consumption_horizon_days_values",
     "ck_recommendation_items_individual_score_range",
     "ck_recommendation_items_pair_score_range",
     "ck_recommendation_items_nutrition_pair_score_range",

@@ -73,6 +73,10 @@ class User(TimestampMixin, Base):
             "discovery_level BETWEEN 0 AND 2",
             name="ck_users_discovery_level_range",
         ),
+        CheckConstraint(
+            "consumption_horizon_days IN (2, 4, 7)",
+            name="ck_users_consumption_horizon_days_values",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -115,6 +119,12 @@ class User(TimestampMixin, Base):
         nullable=False,
         default=1,
         server_default=text("1"),
+    )
+    consumption_horizon_days: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+        default=4,
+        server_default=text("4"),
     )
 
     fruit_preferences: Mapped[list[UserFruitPreference]] = relationship(

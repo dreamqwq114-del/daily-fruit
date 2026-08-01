@@ -55,8 +55,25 @@ def list_preferences(
 def replace_preferences(
     session: Session,
     user_id: int,
-    preferences: Iterable[tuple[int, object, bool, bool | None, bool | None]],
+    preferences: Iterable[
+        tuple[
+            int,
+            object,
+            bool,
+            bool | None,
+            bool | None,
+            bool,
+            bool,
+        ]
+    ],
 ) -> list[UserFruitPreference]:
+    """Merge managed preference fields without erasing familiarity data.
+
+    The settings UI owns ``preference_score`` and ``is_forbidden``.  The
+    optional familiarity fields are only changed when an older API client
+    explicitly sends them.  Rows are retained so history and future signals
+    are not lost when a user clears a setting.
+    """
     existing = {
         item.fruit_id: item
         for item in list_preferences(session, user_id)
@@ -69,6 +86,8 @@ def replace_preferences(
         is_forbidden,
         has_tried,
         willing_to_try,
+        has_tried_provided,
+        willing_to_try_provided,
     ) in preferences:
         submitted_ids.add(fruit_id)
         item = existing.get(fruit_id)
@@ -78,20 +97,30 @@ def replace_preferences(
                 fruit_id=fruit_id,
                 preference_score=preference_score,
                 is_forbidden=is_forbidden,
-                has_tried=has_tried,
-                willing_to_try=willing_to_try,
+                has_tried=(
+                    True
+                    if preference_score == 2 and not has_tried_provided
+                    else has_tried
+                ),
+                willing_to_try=(
+                    willing_to_try if willing_to_try_provided else None
+                ),
             )
             session.add(item)
         else:
             item.preference_score = preference_score
             item.is_forbidden = is_forbidden
-            item.has_tried = has_tried
-            item.willing_to_try = willing_to_try
+            if has_tried_provided and preference_score != 2:
+                item.has_tried = has_tried
+            if willing_to_try_provided:
+                item.willing_to_try = willing_to_try
             item.updated_at = now
 
     for fruit_id, item in existing.items():
         if fruit_id not in submitted_ids:
-            session.delete(item)
+            item.preference_score = None
+            item.is_forbidden = False
+            item.updated_at = now
 
     session.flush()
     return list_preferences(session, user_id)

@@ -23,7 +23,7 @@ from app.models import Fruit, FruitNutrition, FruitSeason
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
-EXPECTED_ALEMBIC_VERSION = "0005"
+EXPECTED_ALEMBIC_VERSION = "0006"
 
 
 class FruitSeed(BaseModel):

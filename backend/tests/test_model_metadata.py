@@ -165,7 +165,10 @@ def test_user_and_fruit_score_types_and_checks() -> None:
         4,
         3,
     )
-    assert len(check_sql(users)) == 7
+    assert users.c.consumption_horizon_days.server_default is not None
+    assert users.c.consumption_horizon_days.nullable is False
+    assert "ck_users_consumption_horizon_days_values" in check_sql(users)
+    assert len(check_sql(users)) == 8
 
     fruits = table("fruits")
     assert_numeric(
