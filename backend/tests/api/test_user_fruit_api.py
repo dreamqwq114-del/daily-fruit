@@ -29,11 +29,38 @@ def test_create_get_and_update_user(client: TestClient) -> None:
     fetched = client.get("/api/me")
     assert fetched.status_code == 200
     assert fetched.json() == created
+    assert created["market_access_level"] == 2
+    assert created["accepts_online_purchase"] is False
 
-    updated = client.put("/api/me", json={"price_level": 3})
+    updated = client.put(
+        "/api/me",
+        json={
+            "price_level": 3,
+            "market_access_level": 1,
+            "accepts_online_purchase": True,
+        },
+    )
     assert updated.status_code == 200
     assert updated.json()["city"] == created["city"]
     assert updated.json()["price_level"] == 3
+    assert updated.json()["market_access_level"] == 1
+    assert updated.json()["accepts_online_purchase"] is True
+
+    partial = client.put("/api/me", json={"price_level": 2})
+    assert partial.status_code == 200
+    assert partial.json()["market_access_level"] == 1
+    assert partial.json()["accepts_online_purchase"] is True
+
+
+def test_purchase_condition_rejects_invalid_values(client: TestClient) -> None:
+    create_user(client)
+
+    assert client.put("/api/me", json={"market_access_level": 0}).status_code == 422
+    assert client.put("/api/me", json={"market_access_level": 4}).status_code == 422
+    assert client.put(
+        "/api/me",
+        json={"accepts_online_purchase": "true"},
+    ).status_code == 422
 
 
 def test_create_without_city_uses_unknown_default(client: TestClient) -> None:

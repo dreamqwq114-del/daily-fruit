@@ -77,6 +77,10 @@ class User(TimestampMixin, Base):
             "consumption_horizon_days IN (2, 4, 7)",
             name="ck_users_consumption_horizon_days_values",
         ),
+        CheckConstraint(
+            "market_access_level BETWEEN 1 AND 3",
+            name="ck_users_market_access_level_range",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -125,6 +129,18 @@ class User(TimestampMixin, Base):
         nullable=False,
         default=4,
         server_default=text("4"),
+    )
+    market_access_level: Mapped[int] = mapped_column(
+        SmallInteger,
+        nullable=False,
+        default=2,
+        server_default=text("2"),
+    )
+    accepts_online_purchase: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
     )
 
     fruit_preferences: Mapped[list[UserFruitPreference]] = relationship(

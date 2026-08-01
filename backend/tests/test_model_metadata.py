@@ -167,8 +167,13 @@ def test_user_and_fruit_score_types_and_checks() -> None:
     )
     assert users.c.consumption_horizon_days.server_default is not None
     assert users.c.consumption_horizon_days.nullable is False
+    assert users.c.market_access_level.server_default is not None
+    assert users.c.market_access_level.nullable is False
+    assert users.c.accepts_online_purchase.server_default is not None
+    assert users.c.accepts_online_purchase.nullable is False
     assert "ck_users_consumption_horizon_days_values" in check_sql(users)
-    assert len(check_sql(users)) == 8
+    assert "ck_users_market_access_level_range" in check_sql(users)
+    assert len(check_sql(users)) == 9
 
     fruits = table("fruits")
     assert_numeric(

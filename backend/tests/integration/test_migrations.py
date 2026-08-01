@@ -180,7 +180,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     with engine.connect() as connection:
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
-        ).scalar_one() == "0006"
+        ).scalar_one() == "0007"
         users_columns = {
             item["name"]
             for item in inspect(connection).get_columns(

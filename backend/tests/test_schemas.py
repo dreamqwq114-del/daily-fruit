@@ -136,6 +136,30 @@ def test_user_create_allows_omitted_city_and_validates_horizon() -> None:
         UserCreate.model_validate(invalid)
 
 
+def test_user_purchase_condition_defaults_and_validation() -> None:
+    created = UserCreate.model_validate(valid_user_data())
+    assert created.market_access_level == 2
+    assert created.accepts_online_purchase is False
+
+    updated = UserUpdate.model_validate(
+        {
+            "market_access_level": 1,
+            "accepts_online_purchase": True,
+        }
+    )
+    assert updated.model_dump(exclude_unset=True) == {
+        "market_access_level": 1,
+        "accepts_online_purchase": True,
+    }
+
+    for invalid_level in (0, 4, "2"):
+        with pytest.raises(ValidationError):
+            UserUpdate.model_validate({"market_access_level": invalid_level})
+
+    with pytest.raises(ValidationError):
+        UserUpdate.model_validate({"accepts_online_purchase": "true"})
+
+
 def test_fruit_scores_and_price_are_validated() -> None:
     fruit = FruitBase.model_validate(valid_fruit_data())
     assert fruit.name == "苹果"

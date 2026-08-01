@@ -1,7 +1,7 @@
 from decimal import Decimal
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, StrictBool, StrictInt, field_validator, model_validator
 
 from app.schemas.common import (
     ApiSchema,
@@ -18,6 +18,7 @@ LocationName = Annotated[str, Field(min_length=1, max_length=100)]
 PriceLevel = Annotated[int, Field(ge=1, le=3)]
 DiscoveryLevel = Annotated[int, Field(ge=0, le=2)]
 ConsumptionHorizonDays = Literal[2, 4, 7]
+MarketAccessLevel = Annotated[StrictInt, Field(ge=1, le=3)]
 
 
 class UserBase(ApiSchema):
@@ -31,6 +32,8 @@ class UserBase(ApiSchema):
     convenience_preference: NormalizedScore
     discovery_level: DiscoveryLevel = 1
     consumption_horizon_days: ConsumptionHorizonDays = 4
+    market_access_level: MarketAccessLevel = 2
+    accepts_online_purchase: StrictBool = False
 
 
 class UserCreate(UserBase):
@@ -51,6 +54,8 @@ class UserUpdate(ApiSchema):
     convenience_preference: NormalizedScore | None = None
     discovery_level: DiscoveryLevel | None = None
     consumption_horizon_days: ConsumptionHorizonDays | None = None
+    market_access_level: MarketAccessLevel | None = None
+    accepts_online_purchase: StrictBool | None = None
 
     @model_validator(mode="after")
     def require_non_null_update(self) -> "UserUpdate":
