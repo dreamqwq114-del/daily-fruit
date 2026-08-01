@@ -14,6 +14,7 @@ Auditor: independent read-only subagent (`/root/preferences_audit`)
 - `backend/app/services/user_service.py`
 - `backend/alembic/versions/0006_user_consumption_horizon.py`
 - backend and frontend tests, current Git status, and commit range
+- Supabase read-only table, migration, security-advisor, and performance-advisor results
 
 ## Requirement results
 
@@ -39,18 +40,32 @@ The confirmed target is Daily Fruit project ref `frzbbpocyzlqxljsrsiw`.
 Migration 0006 added `users.consumption_horizon_days SMALLINT NOT NULL DEFAULT 4`
 and the `(2, 4, 7)` check. Existing counts remained 12 users and 57
 preference rows; all existing horizons are 4. RLS and existing policies were
-not changed.
+not changed. The public schema still contains the nine expected business and
+migration tables; no new table or data rewrite was made. Security advisors
+reported the existing deny-by-default `RLS enabled without policies` posture
+and the project's pre-existing disabled leaked-password protection. Performance
+advisors reported three pre-existing unused indexes; none was removed in this
+feature.
 
 ## Test evidence
 
 - Backend: `180 passed, 28 skipped` (skips are isolated-database tests because
   `TEST_DATABASE_URL` is not configured in this workspace).
-- Frontend: 23 unit tests and 25 component tests passed.
+- Frontend: 23 unit tests and 27 component tests passed.
 - `npm run build` passed.
-- GitHub Actions run `30684180630` passed both build and deploy jobs.
+- GitHub Actions runs `30684180630` and `30684304591` passed both build and
+  deploy jobs; the latter is the current frontend commit.
 
 ## Remaining verification boundary
 
-The implementation is ready for the final responsive browser check at 375,
-768, and 1440 CSS pixels. No production user or preference data should be
-changed solely for this visual check.
+The public site returned HTTP 200 and its latest deployed JavaScript/CSS
+assets contain the new picker, horizon, and preference labels. The available
+browser automation session retained a stale page and timed out while loading a
+fresh deployment, so a live DOM/screenshot check at 375, 768, and 1440 CSS
+pixels could not be completed in this environment. This is a verification
+boundary, not a build or deployment failure; no production user or preference
+data was changed solely for visual checking.
+
+Legacy region values outside the seven displayed areas plus `UNKNOWN` are not
+bulk-migrated. They are displayed as the stable unknown option by the current
+frontend mapper and may be normalized only when the user saves the profile.
