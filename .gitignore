@@ -1,11 +1,11 @@
-# Backend secrets and local Python state
+# 后端秘密和本地 Python 状态：真实 DATABASE_URL 只能放在 backend/.env。
 backend/.env
 backend/.venv/
 backend/__pycache__/
 backend/.pytest_cache/
 backend/**/*.py[cod]
 
-# Frontend dependencies and build output
+# 前端依赖和构建产物；只有 .env.example 可以进入 Git。
 frontend/node_modules/
 frontend/dist/
 frontend/.wrangler/
@@ -13,7 +13,7 @@ frontend/.env
 frontend/.env.*
 !frontend/.env.example
 
-# Editors and operating-system files
+# 编辑器与操作系统生成文件。
 .idea/
 .vscode/
 .DS_Store

@@ -1,4 +1,6 @@
 <script setup>
+// 今日页读取当前 active 推荐；刷新和反馈都是受保护的 FastAPI 写请求。
+// 页面只负责 loading/error/empty/重复点击状态，不在前端计算推荐分数。
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -39,6 +41,7 @@ const formattedDate = computed(() => {
 })
 
 async function handleUserNotFound(error) {
+  // Auth 有效但业务资料不存在时，要求用户先完成建档。
   if (error instanceof ApiError && error.status === 404) {
     await router.replace('/onboarding')
     return true
@@ -47,6 +50,7 @@ async function handleUserNotFound(error) {
 }
 
 async function loadToday() {
+  // 先读取用户展示城市/地区，再读取今日推荐；推荐为空时进入 empty 状态。
   loading.value = true
   errorMessage.value = ''
   actionMessage.value = ''
@@ -66,6 +70,7 @@ async function loadToday() {
 }
 
 async function refreshToday() {
+  // 后端负责把旧 active 标为 replaced 并生成新 refresh_number。
   if (refreshing.value) return
 
   refreshing.value = true
@@ -86,6 +91,7 @@ async function refreshToday() {
 }
 
 async function sendFeedback(item, feedbackType) {
+  // 按 recommendation_item_id 提交反馈；每个 item 同时只允许一个请求。
   if (feedbackPending.value[item.id]) return
 
   feedbackPending.value = {

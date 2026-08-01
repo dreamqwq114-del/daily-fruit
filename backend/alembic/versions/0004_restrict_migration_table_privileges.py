@@ -18,6 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """撤销浏览器角色读取 public.alembic_version 的权限。"""
     op.execute(
         sa.text(
             """
@@ -42,5 +43,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # A downgrade must never restore browser access to migration metadata.
+    # 回滚不能恢复浏览器访问迁移元数据，这是安全边界而不是可逆业务数据。
     pass

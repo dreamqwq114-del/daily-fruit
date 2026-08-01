@@ -1,4 +1,6 @@
 <script setup>
+// 资料表单只维护父组件传入的 profile 对象；这里不复制 discovery_level、
+// consumption_horizon_days 等字段，保证保存和回显使用同一份状态。
 import { computed } from 'vue'
 
 const model = defineModel({ type: Object, required: true })
@@ -39,6 +41,7 @@ const horizonOptions = [
 ]
 
 const horizonIndex = computed({
+  // UI 用 0/1/2 的滑块索引，setter 立即转换回 API 约定的 2/4/7 天。
   get() {
     const index = horizonOptions.findIndex(
       (option) => option.value === Number(model.value.consumption_horizon_days),
@@ -73,6 +76,7 @@ const preferenceFields = [
 </script>
 
 <template>
+  <!-- 基本信息同时承载尝鲜和购买条件；购买条件当前只保存，不参与推荐排序。 -->
   <fieldset class="form-section">
     <legend>你的基本信息</legend>
     <div class="field-grid field-grid--basic">
@@ -139,6 +143,7 @@ const preferenceFields = [
   </fieldset>
 
   <fieldset class="form-section">
+    <!-- 口感滑块参与推荐；食用时间只保存消费周期，当前不参与排序。 -->
     <legend>口感与食用偏好</legend>
     <p class="section-help">食用时间表示你的消费周期，不代表水果实际保鲜时间，暂不参与推荐排序。</p>
     <div class="preference-sliders">

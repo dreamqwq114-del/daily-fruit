@@ -1,3 +1,9 @@
+"""当前登录用户的资料和水果偏好 HTTP 路由。
+
+路径统一使用 ``/api/me``，用户身份来自 ``CurrentUser``/``CurrentPrincipal``
+依赖，而不是请求体或查询参数中的 user_id，因此浏览器不能选择别人的资料。
+"""
+
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
@@ -16,6 +22,7 @@ from app.services import user_service
 
 
 router = APIRouter(prefix="/api/me", tags=["users"])
+# Session 依赖只负责连接生命周期；业务提交和回滚由 service 控制。
 DatabaseSession = Annotated[Session, Depends(get_database_session)]
 
 
@@ -25,6 +32,8 @@ def create_current_user(
     principal: CurrentPrincipal,
     session: DatabaseSession,
 ) -> UserRead:
+    """为当前已认证 Auth 用户创建一次性业务资料。"""
+
     return user_service.create_user_for_principal(
         session,
         payload,
@@ -34,6 +43,8 @@ def create_current_user(
 
 @router.get("", response_model=UserRead)
 def get_current_user_profile(current_user: CurrentUser) -> UserRead:
+    """返回当前 JWT 对应的资料，不接受外部 user_id。"""
+
     return UserRead.model_validate(current_user)
 
 
@@ -43,6 +54,8 @@ def update_current_user(
     current_user: CurrentUser,
     session: DatabaseSession,
 ) -> UserRead:
+    """部分更新当前用户的资料字段。"""
+
     return user_service.update_user(session, current_user.id, payload)
 
 
@@ -54,6 +67,8 @@ def get_current_user_fruit_preferences(
     current_user: CurrentUser,
     session: DatabaseSession,
 ) -> list[UserFruitPreferenceRead]:
+    """读取当前用户的水果偏好。"""
+
     return user_service.get_fruit_preferences(session, current_user.id)
 
 
@@ -66,6 +81,8 @@ def replace_current_user_fruit_preferences(
     current_user: CurrentUser,
     session: DatabaseSession,
 ) -> list[UserFruitPreferenceRead]:
+    """合并当前用户提交的喜欢、不喜欢和禁止水果。"""
+
     return user_service.replace_fruit_preferences(
         session,
         current_user.id,

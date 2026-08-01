@@ -1,3 +1,5 @@
+// 前端 profile 的默认值和 API 数字枚举集中在这里，避免建档页与偏好页
+// 各自维护一份状态。未选择的水果不会被序列化成 preference_score=0。
 const REGION_VALUES = new Set([
   '华东',
   '华南',
@@ -10,6 +12,7 @@ const REGION_VALUES = new Set([
 ])
 
 export function createDefaultFruitPreferenceSelection() {
+  // 三类 ID 是展示状态；真正的数字 payload 在 selectionToPreferences 中生成。
   return {
     favoriteIds: [],
     dislikeIds: [],
@@ -22,6 +25,7 @@ function sortedIds(values) {
 }
 
 export function preferencesToSelection(preferences) {
+  // 后端偏好行 → 页面三个集合；forbidden 优先于喜欢/不喜欢。
   const selection = createDefaultFruitPreferenceSelection()
 
   for (const preference of preferences ?? []) {
@@ -44,6 +48,7 @@ export function preferencesToSelection(preferences) {
 }
 
 export function selectionToPreferences(selection) {
+  // 页面集合 → PUT /api/me/fruit-preferences 的最小 payload。
   const preferences = new Map()
 
   for (const fruitId of selection.favoriteIds ?? []) {
@@ -79,6 +84,7 @@ export function selectionToPreferences(selection) {
 }
 
 export function createDefaultProfile() {
+  // 与 UserBase 默认值保持一致：discovery=1、horizon=4、market=2。
   return {
     username: '',
     region: 'UNKNOWN',
@@ -96,6 +102,7 @@ export function createDefaultProfile() {
 }
 
 export function profileFromUser(user) {
+  // 把后端回显合并到默认 profile，兼容旧用户缺少新字段的情况。
   const profile = createDefaultProfile()
 
   for (const key of Object.keys(profile)) {

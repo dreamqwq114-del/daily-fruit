@@ -18,6 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """增加用户消费周期枚举 2/4/7 天，当前仅保存。"""
     op.add_column(
         "users",
         sa.Column(
@@ -37,6 +38,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """删除消费周期约束和列，不触碰其他用户资料。"""
     op.drop_constraint(
         "ck_users_consumption_horizon_days_values",
         "users",

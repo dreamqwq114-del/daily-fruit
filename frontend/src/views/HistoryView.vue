@@ -1,4 +1,5 @@
 <script setup>
+// 历史页只展示后端已经保存的推荐、理由和反馈，不重新运行推荐算法。
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -27,6 +28,7 @@ const feedbackLabels = {
 }
 
 function formatDate(value) {
+  // 后端日期按应用时区的日期返回，固定到中午避免浏览器时区跨日。
   return new Intl.DateTimeFormat('zh-CN', {
     year: 'numeric',
     month: 'long',
@@ -39,6 +41,7 @@ function sortedItems(items) {
 }
 
 async function loadHistory() {
+  // 先确认当前资料存在，再加载带水果与反馈的历史详情。
   loading.value = true
   errorMessage.value = ''
   try {

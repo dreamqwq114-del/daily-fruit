@@ -1,3 +1,10 @@
+"""用户 ORM 查询与偏好持久化。
+
+Repository 只操作 SQLAlchemy Session，不处理 HTTP、JWT 或推荐评分。偏好
+更新采用 merge：页面管理的 score/forbidden 可以清空，但 has_tried 和
+willing_to_try 只有在请求显式提供时才覆盖。
+"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -16,6 +23,8 @@ def get_user(
     *,
     include_preferences: bool = False,
 ) -> User | None:
+    """按 public.users 主键查询，可选预加载偏好避免 N+1。"""
+
     statement = select(User).where(User.id == user_id)
     if include_preferences:
         statement = statement.options(selectinload(User.fruit_preferences))
@@ -28,6 +37,8 @@ def get_user_by_auth_user_id(
     *,
     include_preferences: bool = False,
 ) -> User | None:
+    """按 Supabase Auth UUID 查询业务用户绑定关系。"""
+
     statement = select(User).where(User.auth_user_id == auth_user_id)
     if include_preferences:
         statement = statement.options(selectinload(User.fruit_preferences))
@@ -35,6 +46,8 @@ def get_user_by_auth_user_id(
 
 
 def add_user(session: Session, user: User) -> User:
+    """加入 Session 并 flush，令调用方立即获得数据库生成的 ID。"""
+
     session.add(user)
     session.flush()
     return user
@@ -44,6 +57,8 @@ def list_preferences(
     session: Session,
     user_id: int,
 ) -> list[UserFruitPreference]:
+    """按 fruit_id 稳定读取一个用户的偏好行。"""
+
     statement = (
         select(UserFruitPreference)
         .where(UserFruitPreference.user_id == user_id)
@@ -67,12 +82,11 @@ def replace_preferences(
         ]
     ],
 ) -> list[UserFruitPreference]:
-    """Merge managed preference fields without erasing familiarity data.
+    """合并页面管理字段，同时保留熟悉度数据。
 
-    The settings UI owns ``preference_score`` and ``is_forbidden``.  The
-    optional familiarity fields are only changed when an older API client
-    explicitly sends them.  Rows are retained so history and future signals
-    are not lost when a user clears a setting.
+    设置页面负责 ``preference_score`` 和 ``is_forbidden``；熟悉度字段只有
+    旧客户端明确提交时才修改。保留空偏好行可以避免用户清空设置后丢失
+    将来算法可能使用的熟悉度信号。
     """
     existing = {
         item.fruit_id: item

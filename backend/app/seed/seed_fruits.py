@@ -1,3 +1,10 @@
+"""校验并幂等生成水果、营养和季节演示数据。
+
+``--dry-run`` 和 ``--emit-sql`` 不连接数据库；真正写入只允许本地、可
+丢弃的 ``daily_fruit_test``，并要求显式环境变量。生产 Supabase 写入不
+在这个脚本中开放，避免把 seed 误当成无条件部署命令。
+"""
+
 from __future__ import annotations
 
 import argparse
@@ -23,10 +30,14 @@ from app.models import Fruit, FruitNutrition, FruitSeason
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
+# 写入前的 schema 保护；该值必须与当前可写目标数据库的 alembic_version
+# 同步，否则脚本应拒绝写入而不是猜测数据库状态。
 EXPECTED_ALEMBIC_VERSION = "0006"
 
 
 class FruitSeed(BaseModel):
+    """fruits_seed.json 中一条水果身份和推荐演示属性。"""
+
     model_config = ConfigDict(extra="forbid")
 
     code: str = Field(min_length=1, max_length=60)
@@ -62,6 +73,8 @@ class FruitSeed(BaseModel):
 
 
 class NutritionSeed(BaseModel):
+    """nutrition_demo.csv 中一条无物理单位的归一化演示分数。"""
+
     model_config = ConfigDict(extra="forbid")
 
     fruit_name: str = Field(min_length=1, max_length=100)
@@ -74,6 +87,8 @@ class NutritionSeed(BaseModel):
 
 
 class SeasonSeed(BaseModel):
+    """seasons_demo.csv 中一条地区/月度季节窗口。"""
+
     model_config = ConfigDict(extra="forbid")
 
     fruit_name: str = Field(min_length=1, max_length=100)
@@ -104,16 +119,22 @@ class SeedSummary:
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
+    """以 UTF-8 读取 CSV，统一去掉 BOM 并返回字典行。"""
+
     with path.open(encoding="utf-8", newline="") as source:
         return list(csv.DictReader(source))
 
 
 def require_unique(values: Sequence[object], label: str) -> None:
+    """拒绝重复主键/名称，防止 seed 生成不可预测 upsert。"""
+
     if len(values) != len(set(values)):
         raise ValueError(f"Duplicate {label} in seed files")
 
 
 def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
+    """加载并跨文件校验 24 水果、营养和季节引用关系。"""
+
     fruit_payload = json.loads(
         (data_root / "fruits_seed.json").read_text(encoding="utf-8")
     )
@@ -356,6 +377,8 @@ def seed_database(
     *,
     before_seasons: Callable[[], None] | None = None,
 ) -> SeedSummary:
+    """在单个事务中执行水果、营养、季节 upsert；失败由调用方回滚。"""
+
     with engine.begin() as connection:
         version = connection.execute(
             text("SELECT version_num FROM public.alembic_version")
@@ -386,6 +409,8 @@ def compile_statement(statement: object) -> str:
 
 
 def render_seed_sql(dataset: SeedDataset) -> str:
+    """生成可审阅的 PostgreSQL upsert SQL，不建立连接。"""
+
     statements = (
         build_fruit_statement(dataset),
         build_nutrition_statement(dataset),
@@ -395,6 +420,8 @@ def render_seed_sql(dataset: SeedDataset) -> str:
 
 
 def create_checked_test_engine() -> Engine:
+    """只创建精确匹配 localhost/daily_fruit_test 的测试 engine。"""
+
     if os.getenv("DAILY_FRUIT_ALLOW_TEST_DATABASE_WRITE") != "yes":
         raise RuntimeError(
             "DAILY_FRUIT_ALLOW_TEST_DATABASE_WRITE=yes is required"
@@ -416,6 +443,8 @@ def create_checked_test_engine() -> Engine:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """定义 dry-run、emit-sql 和受保护本地写入模式。"""
+
     parser = argparse.ArgumentParser(description="Seed daily-fruit demo data")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
@@ -432,6 +461,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(arguments: Sequence[str] | None = None) -> int:
+    """执行数据校验和选定 seed 模式，并返回 shell exit code。"""
+
     options = build_parser().parse_args(arguments)
     dataset = load_seed_dataset()
     summary = SeedSummary(

@@ -1,4 +1,7 @@
 <script setup>
+// 建档页负责首次资料创建，也兼容已存在用户的编辑和 next 跳转。
+// ProfileFields 与 FruitPreferencePicker 共享父级响应式状态，保存时分别
+// 调用 /api/me 和 /api/me/fruit-preferences，避免重复提交字段。
 import { onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -35,6 +38,7 @@ const saveMessage = ref('')
 const existingUser = ref(false)
 
 async function loadPage() {
+  // 先加载水果目录，再尝试读取已有资料；404 代表首次建档而非页面错误。
   loading.value = true
   errorMessage.value = ''
 
@@ -62,6 +66,7 @@ async function loadPage() {
 }
 
 async function saveOnboarding() {
+  // submitting 是前端幂等保护，避免快速点击创建两条用户资料或重复偏好。
   if (submitting.value) return
 
   submitting.value = true
@@ -85,6 +90,7 @@ async function saveOnboarding() {
     existingUser.value = true
 
     try {
+      // 用户资料成功后再保存偏好；偏好失败会保留资料成功提示，便于重试。
       await replaceFruitPreferences(selectionToPreferences(preferenceSelection.value))
     } catch (error) {
       saveMessage.value = '基本信息已保存，但水果偏好暂未保存。请再次点击保存重试。'
@@ -124,6 +130,7 @@ onMounted(loadPage)
     <ErrorState v-else-if="errorMessage && !fruits.length" :message="errorMessage" @retry="loadPage" />
 
     <form v-else class="profile-form" @submit.prevent="saveOnboarding">
+      <!-- 子组件只负责输入控件，保存流程留在本页面统一编排。 -->
       <ProfileFields v-model="profile" />
       <FruitPreferencePicker v-model="preferenceSelection" :fruits="fruits" />
 

@@ -1,3 +1,10 @@
+"""水果目录、营养和地区季节窗口 ORM。
+
+Fruit 是推荐候选的身份数据；nutrition 和 seasons 通过外键关系加载。
+``is_active`` 用于停用而不是删除历史水果，避免 recommendation_items 变成
+孤立记录。
+"""
+
 from __future__ import annotations
 
 from decimal import Decimal
@@ -29,6 +36,8 @@ if TYPE_CHECKING:
 
 
 class Fruit(TimestampMixin, Base):
+    """水果身份、口感、价格、便利性与推荐角色。"""
+
     __tablename__ = "fruits"
     __table_args__ = (
         UniqueConstraint("name", name="uq_fruits_name"),
@@ -250,6 +259,8 @@ class Fruit(TimestampMixin, Base):
 
 
 class FruitNutrition(TimestampMixin, Base):
+    """每种水果唯一的营养演示行；当前源数据是无单位归一化分数。"""
+
     __tablename__ = "fruit_nutritions"
     __table_args__ = (
         UniqueConstraint("fruit_id", name="uq_fruit_nutritions_fruit_id"),
@@ -303,6 +314,8 @@ class FruitNutrition(TimestampMixin, Base):
 
 
 class FruitSeason(CreatedAtMixin, Base):
+    """水果的地区/月度季节和供应窗口，支持跨年月份。"""
+
     __tablename__ = "fruit_seasons"
     __table_args__ = (
         UniqueConstraint(

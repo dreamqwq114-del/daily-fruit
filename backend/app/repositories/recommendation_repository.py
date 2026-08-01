@@ -1,3 +1,10 @@
+"""推荐历史、反馈和并发控制查询。
+
+Repository 通过 selectinload/joinedload 一次加载推荐详情，Application
+Service 只负责业务流程。用户锁使用 PostgreSQL advisory transaction lock，
+确保同一用户同一天不会并发生成两个 active 推荐。
+"""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -15,6 +22,7 @@ from app.services.recommendation_types import FeedbackEvent, HistoryEvent
 
 
 RECOMMENDATION_DETAIL_OPTIONS = (
+    # items → fruit/nutrition/seasons/feedback 全部批量预加载，避免 N+1。
     selectinload(Recommendation.items)
     .selectinload(RecommendationItem.fruit)
     .selectinload(Fruit.nutrition),
@@ -28,6 +36,7 @@ RECOMMENDATION_DETAIL_OPTIONS = (
 
 
 def acquire_user_lock(session: Session, user_id: int) -> None:
+    """在当前事务内锁住一个用户的推荐生成流程。"""
     session.execute(select(func.pg_advisory_xact_lock(user_id)))
 
 
@@ -38,6 +47,7 @@ def get_active_recommendation(
     *,
     for_update: bool = False,
 ) -> Recommendation | None:
+    """读取当天 active 记录；刷新时可附带行锁。"""
     statement = (
         select(Recommendation)
         .where(
@@ -56,6 +66,7 @@ def get_recommendation(
     session: Session,
     recommendation_id: int,
 ) -> Recommendation | None:
+    """按 ID 读取完整推荐详情。"""
     statement = (
         select(Recommendation)
         .where(Recommendation.id == recommendation_id)
@@ -70,6 +81,7 @@ def list_history(
     *,
     limit: int,
 ) -> list[Recommendation]:
+    """按日期、刷新序号和 ID 倒序读取用户历史。"""
     statement = (
         select(Recommendation)
         .where(Recommendation.user_id == user_id)
@@ -89,6 +101,7 @@ def next_refresh_number(
     user_id: int,
     recommendation_date: date,
 ) -> int:
+    """计算当天下一刷新序号，调用方需在用户锁内使用。"""
     statement = select(
         func.coalesce(func.max(Recommendation.refresh_number), -1) + 1
     ).where(
@@ -106,6 +119,7 @@ def recent_fruit_ids(
     until: date | None = None,
     limit: int = 30,
 ) -> tuple[int, ...]:
+    """提取近期出现过的水果，供历史多样性分使用。"""
     conditions = [
         Recommendation.user_id == user_id,
         Recommendation.recommendation_date >= since,
@@ -135,6 +149,7 @@ def feedback_by_fruit(
     until: datetime | None = None,
     limit: int = 100,
 ) -> dict[int, tuple[str, ...]]:
+    """按水果聚合近期反馈类型，兼容旧算法上下文。"""
     conditions = [
         RecommendationFeedback.user_id == user_id,
         RecommendationFeedback.created_at >= since,
@@ -172,6 +187,7 @@ def history_events(
     until: date | None = None,
     limit: int = 200,
 ) -> tuple[HistoryEvent, ...]:
+    """汇总展示次数与 eaten 次数，供指数历史衰减使用。"""
     conditions = [
         Recommendation.user_id == user_id,
         Recommendation.recommendation_date >= since,
@@ -228,6 +244,7 @@ def feedback_events(
     until: datetime | None = None,
     limit: int = 200,
 ) -> tuple[FeedbackEvent, ...]:
+    """读取带时间的反馈事件，供反馈衰减计算使用。"""
     conditions = [
         Recommendation.user_id == user_id,
         RecommendationFeedback.user_id == user_id,
@@ -265,6 +282,7 @@ def previous_pairs(
     until: date | None = None,
     limit: int = 30,
 ) -> tuple[frozenset[int], ...]:
+    """获取近期水果组合，避免重复 pair。"""
     recommendations = list_history(session, user_id, limit=limit)
     return tuple(
         frozenset(item.fruit_id for item in recommendation.items)
@@ -279,6 +297,7 @@ def add_recommendation(
     session: Session,
     recommendation: Recommendation,
 ) -> Recommendation:
+    """加入并 flush 推荐，不在 Repository 内提交事务。"""
     session.add(recommendation)
     session.flush()
     return recommendation
@@ -288,6 +307,7 @@ def get_item(
     session: Session,
     item_id: int,
 ) -> RecommendationItem | None:
+    """读取反馈目标及其所属推荐，用于归属校验。"""
     statement = (
         select(RecommendationItem)
         .where(RecommendationItem.id == item_id)
@@ -306,6 +326,7 @@ def get_feedback(
     user_id: int,
     feedback_type: str,
 ) -> RecommendationFeedback | None:
+    """查找同一 item/user/type 的已有反馈，实现幂等提交。"""
     statement = select(RecommendationFeedback).where(
         RecommendationFeedback.recommendation_item_id == item_id,
         RecommendationFeedback.user_id == user_id,
@@ -318,6 +339,7 @@ def add_feedback(
     session: Session,
     feedback: RecommendationFeedback,
 ) -> RecommendationFeedback:
+    """加入并 flush 一条反馈，事务由 Application Service 提交。"""
     session.add(feedback)
     session.flush()
     return feedback

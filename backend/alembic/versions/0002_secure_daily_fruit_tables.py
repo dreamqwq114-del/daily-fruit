@@ -31,10 +31,14 @@ DATA_API_ROLES = ("anon", "authenticated")
 
 
 def comma_separated_objects(names: tuple[str, ...]) -> str:
+    """生成带 public schema 和引用标识符的安全对象列表。"""
+
     return ", ".join(f'public."{name}"' for name in names)
 
 
 def revoke_from_optional_role(role: str) -> None:
+    """若角色存在，撤销业务表和 identity sequence 的浏览器权限。"""
+
     tables = comma_separated_objects(BUSINESS_TABLES)
     sequences = comma_separated_objects(IDENTITY_SEQUENCES)
     op.execute(
@@ -88,6 +92,7 @@ def secure_known_rls_helper() -> None:
 
 
 def upgrade() -> None:
+    """启用 RLS 并撤销 anon/authenticated/PUBLIC 的直接业务表权限。"""
     """Deny browser roles and enable RLS without allow policies."""
     for table_name in BUSINESS_TABLES:
         op.execute(
@@ -118,6 +123,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """保持 deny-by-default；回滚不会意外恢复浏览器访问。"""
     """Disable RLS only; never re-grant revoked browser privileges."""
     for table_name in reversed(BUSINESS_TABLES):
         op.execute(

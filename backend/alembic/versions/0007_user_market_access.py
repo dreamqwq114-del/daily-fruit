@@ -18,6 +18,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """增加购买条件和网购意愿字段，当前只进入资料保存链路。"""
     op.add_column(
         "users",
         sa.Column(
@@ -47,6 +48,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """只删除本 migration 新增的购买条件字段和约束。"""
     op.drop_column("users", "accepts_online_purchase", schema="public")
     op.drop_constraint(
         "ck_users_market_access_level_range",

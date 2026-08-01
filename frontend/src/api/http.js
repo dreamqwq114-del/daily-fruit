@@ -1,3 +1,5 @@
+// 所有业务请求经过这里：读取 token、设置 JSON header、超时、解析错误、
+// 处理 401 和阻止生产环境请求访问者自己的 localhost。
 import { clearLocalSession, getAccessToken } from '../auth/session.js'
 
 const DEFAULT_TIMEOUT_MS = 10_000
@@ -21,6 +23,7 @@ const STATUS_MESSAGES = {
 }
 
 export class ApiError extends Error {
+  // 让页面根据 status/code 展示友好信息，而不是暴露后端堆栈。
   constructor(message, { status = 0, code = 'request_failed' } = {}) {
     super(message)
     this.name = 'ApiError'
@@ -34,6 +37,7 @@ export function ensureApiConfigured({
   isDevelopment = IS_DEVELOPMENT,
   isGitHubPages = IS_GITHUB_PAGES,
 } = {}) {
+  // GitHub Pages 没有后端时在 fetch 前失败，避免向错误地址发请求。
   if (isGitHubPages && !apiBaseUrl && !isDevelopment) {
     throw new ApiError('在线服务尚未配置', {
       code: 'api_not_configured',
@@ -42,6 +46,7 @@ export function ensureApiConfigured({
 }
 
 function getResponseMessage(status, payload) {
+  // 只接受少量安全的后端 detail；其他状态统一使用前端文案。
   if (
     payload &&
     typeof payload.detail === 'string' &&
@@ -61,6 +66,7 @@ export async function handleAuthenticationRequired({
   clearSession = clearLocalSession,
   notify = notifyAuthenticationRequired,
 } = {}) {
+  // 清理失效会话后通知路由层回到登录页；清理失败也不能卡住跳转。
   try {
     await clearSession()
   } catch {
@@ -71,6 +77,7 @@ export async function handleAuthenticationRequired({
 }
 
 async function readPayload(response) {
+  // 先读取文本再按 content-type 解析，避免 HTML 错误页被当作 JSON。
   const contentType = response.headers.get('content-type') ?? ''
   const text = await response.text()
 
@@ -107,6 +114,7 @@ export async function apiRequest(
     accessToken: suppliedAccessToken,
   } = {},
 ) {
+  // 业务 API 只使用 Bearer token；credentials=omit 防止浏览器自动带 cookie。
   ensureApiConfigured()
 
   const controller = new AbortController()
