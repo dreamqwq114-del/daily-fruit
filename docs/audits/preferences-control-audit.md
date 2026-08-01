@@ -50,6 +50,11 @@ The authenticated preference route was not available for a complete live DOM
 check in this environment: the local preview has no public authentication
 configuration and redirects to login, while the existing external browser tab
 has a stale session and refreshes time out. No user data was submitted. The
-final deployment check will verify the public HTTP response and deployed asset
-labels; the authenticated 375px/768px/1440px visual check remains a manual
-follow-up if the browser session becomes available.
+public GitHub Pages deployment nevertheless returned HTTP 200, and the latest
+deployed JavaScript chunk contains the new horizon control and preference
+field bindings. The authenticated 375px/768px/1440px visual check remains a
+manual follow-up if the browser session becomes available.
+
+Deployment evidence: GitHub Actions run `30685587770` completed successfully
+for commit `0ff4a4e`; public URL:
+`https://dreamqwq114-del.github.io/daily-fruit/`.
