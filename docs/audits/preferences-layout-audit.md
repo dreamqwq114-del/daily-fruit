@@ -36,6 +36,10 @@ keyboard requirement; no blocking issue was found.
 - Production build: `npm run build` passed after stopping the local preview
   process that had locked `frontend/dist` on Windows (`EPERM` was an environment
   lock, not a compile failure).
+- GitHub Actions run `30685149610` completed the build and Pages deploy for
+  commit `8efbf9e`; the public site returned HTTP 200 and its deployed
+  JavaScript chunk contains the new `尝鲜偏好`、`食用时间` and
+  `口感与食用偏好` labels.
 - The layout uses two CSS grid columns on desktop/tablet, wide rows for name
   and discovery, and one-column grids below 680px. Horizon cards become a
   single column on small screens, avoiding text-driven horizontal overflow.
