@@ -51,10 +51,12 @@ feature.
 
 - Backend: `180 passed, 28 skipped` (skips are isolated-database tests because
   `TEST_DATABASE_URL` is not configured in this workspace).
-- Frontend: 23 unit tests and 27 component tests passed.
+- Frontend: 23 unit tests and 29 component tests passed after the preference
+  layout regression coverage was added.
 - `npm run build` passed.
-- GitHub Actions runs `30684180630` and `30684304591` passed both build and
-  deploy jobs; the latter is the current frontend commit.
+- GitHub Actions runs `30684180630`, `30684304591`, and `30685149610` passed
+  both build and deploy jobs; `30685149610` contains the current frontend
+  layout commit.
 
 ## Remaining verification boundary
 
