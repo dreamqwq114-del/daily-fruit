@@ -300,6 +300,11 @@ selection uses the seven supported areas plus an internal unknown value. The
 consumption horizon accepts only 2, 4, or 7 days and is stored for future
 features; it is not part of recommendation ranking yet.
 
+Purchase conditions are stored separately on `public.users` as
+`market_access_level` (1-3, default 2) and `accepts_online_purchase` (boolean,
+default false). They describe the user's purchasing environment and willingness
+to buy online; the current recommendation algorithm does not read these fields.
+
 Fruit selections are explicit favorite, dislike, or forbidden states. Favorites
 are limited to five. Unselected fruits clear only the managed score/forbidden
 fields while preserving familiarity (`has_tried`, `willing_to_try`) and the

@@ -90,6 +90,8 @@ export function createDefaultProfile() {
     convenience_preference: 0.5,
     discovery_level: 1,
     consumption_horizon_days: 4,
+    market_access_level: 2,
+    accepts_online_purchase: false,
   }
 }
 

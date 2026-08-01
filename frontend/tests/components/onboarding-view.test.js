@@ -89,6 +89,8 @@ describe('OnboardingView', () => {
     await flushPromises()
 
     await wrapper.find('select[name="discovery_level"]').setValue('2')
+    await wrapper.find('select[name="market_access_level"]').setValue('1')
+    await wrapper.find('input[name="accepts_online_purchase"]').setValue(true)
     await wrapper.find('input[name="consumption_horizon_days"]').setValue('0')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
@@ -97,6 +99,8 @@ describe('OnboardingView', () => {
       expect.objectContaining({
         discovery_level: 2,
         consumption_horizon_days: 2,
+        market_access_level: 1,
+        accepts_online_purchase: true,
       }),
     )
     expect(userApi.replaceFruitPreferences).toHaveBeenCalledWith([])

@@ -26,6 +26,12 @@ const discoveryOptions = [
   { value: 2, title: '喜欢尝鲜', description: '更愿意发现没吃过的水果' },
 ]
 
+const marketAccessOptions = [
+  { value: 1, title: '选择较少', description: '主要在小型水果店、乡镇商店或附近小店购买' },
+  { value: 2, title: '一般', description: '附近有菜市场、社区生鲜或普通超市' },
+  { value: 3, title: '选择丰富', description: '附近有大型商超、生鲜平台或较多水果店' },
+]
+
 const horizonOptions = [
   { value: 2, title: '1～2 天', description: '买了很快吃完' },
   { value: 4, title: '3～5 天', description: '日常适中' },
@@ -46,6 +52,11 @@ const horizonIndex = computed({
 })
 
 const selectedHorizon = computed(() => horizonOptions[horizonIndex.value] ?? horizonOptions[1])
+const selectedMarketAccess = computed(() =>
+  marketAccessOptions.find(
+    (option) => option.value === Number(model.value.market_access_level),
+  ) ?? marketAccessOptions[1],
+)
 
 const preferenceFields = [
   { key: 'sweet_preference', label: '偏甜', low: '清淡', high: '喜欢甜味' },
@@ -65,7 +76,7 @@ const preferenceFields = [
   <fieldset class="form-section">
     <legend>你的基本信息</legend>
     <div class="field-grid field-grid--basic">
-      <label class="form-field form-field--wide">
+      <label class="form-field">
         <span>怎么称呼你</span>
         <input
           v-model.trim="model.username"
@@ -93,6 +104,26 @@ const preferenceFields = [
           </option>
         </select>
       </label>
+      <div class="form-field market-access-field">
+        <span>购买条件</span>
+        <select v-model.number="model.market_access_level" name="market_access_level" required>
+          <option v-for="option in marketAccessOptions" :key="option.value" :value="option.value">
+            {{ option.title }}
+          </option>
+        </select>
+        <small>{{ selectedMarketAccess.description }}</small>
+        <label class="checkbox-field">
+          <input
+            v-model="model.accepts_online_purchase"
+            name="accepts_online_purchase"
+            type="checkbox"
+          />
+          <span>
+            <strong>愿意通过网购购买水果</strong>
+            <small>包括电商、生鲜配送或即时零售平台</small>
+          </span>
+        </label>
+      </div>
       <label class="form-field form-field--wide">
         <span>尝鲜偏好</span>
         <select v-model.number="model.discovery_level" name="discovery_level" required>

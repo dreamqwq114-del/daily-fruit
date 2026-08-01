@@ -67,6 +67,8 @@ test('profile defaults omit city and use the new region and horizon defaults', (
   assert.equal(profile.discovery_level, 1)
   assert.equal(profile.consumption_horizon_days, 4)
   assert.equal(createDefaultProfile().price_level, 2)
+  assert.equal(createDefaultProfile().market_access_level, 2)
+  assert.equal(createDefaultProfile().accepts_online_purchase, false)
 })
 
 test('apiRequest returns json for successful responses', async () => {
