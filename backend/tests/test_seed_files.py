@@ -74,6 +74,7 @@ def test_fruit_seed_has_required_unique_records_and_valid_ranges() -> None:
         "name",
         "aliases",
         "category",
+        "display_group",
         "taste",
         *SCORE_FIELDS,
         "average_price_level",
@@ -111,7 +112,8 @@ def test_fruit_seed_has_required_unique_records_and_valid_ranges() -> None:
         assert all(0 <= float(fruit[field]) <= 1 for field in SCORE_FIELDS)
         assert fruit["average_price_level"] in {1, 2, 3}
         assert fruit["consumption_mode"] in {"direct", "peel", "cut", "ingredient"}
-        assert fruit["daily_recommendation_role"] in {"main", "exploration", "supporting"}
+        assert fruit["daily_recommendation_role"] in {"main", "supporting"}
+        assert str(fruit["display_group"]).strip()
         assert fruit["data_quality"] in {"high", "medium", "low"}
         assert 0 <= int(fruit["novelty_level"]) <= 2
         assert float(fruit["default_portion_grams"]) > 0
