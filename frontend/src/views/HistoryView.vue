@@ -103,7 +103,7 @@ onMounted(loadHistory)
             <div class="history-fruit-heading">
               <span class="fruit-initial" aria-hidden="true">{{ item.fruit.name.slice(0, 1) }}</span>
               <div>
-                <small>{{ item.rank === 1 ? '首选' : '搭档' }} · {{ item.fruit.category }}</small>
+                <small>{{ item.rank === 1 ? '首选' : '搭档' }} · {{ item.fruit.display_group || item.fruit.category }}</small>
                 <h3>{{ item.fruit.name }}</h3>
               </div>
             </div>

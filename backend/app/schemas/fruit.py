@@ -15,6 +15,7 @@ from app.schemas.common import (
 
 FruitName = Annotated[str, Field(min_length=1, max_length=100)]
 Category = Annotated[str, Field(min_length=1, max_length=80)]
+DisplayGroup = Annotated[str, Field(min_length=1, max_length=80)]
 TasteLabel = Annotated[str, Field(min_length=1, max_length=120)]
 DefaultPortion = Annotated[str, Field(min_length=1, max_length=80)]
 RegionName = Annotated[str, Field(min_length=1, max_length=100)]
@@ -22,7 +23,7 @@ PriceLevel = Annotated[int, Field(ge=1, le=3)]
 ConsumptionMode = Annotated[str, Field(pattern="^(direct|peel|cut|ingredient)$")]
 DailyRecommendationRole = Annotated[
     str,
-    Field(pattern="^(main|exploration|supporting)$"),
+    Field(pattern="^(main|supporting)$"),
 ]
 DataQuality = Annotated[str, Field(pattern="^(high|medium|low)$")]
 FactType = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{1,39}$")]
@@ -40,6 +41,7 @@ class FruitBase(ApiSchema):
         default_factory=list,
     )
     category: Category
+    display_group: Annotated[str, Field(max_length=80)] = ""
     taste: TasteLabel
     sweet_score: NormalizedScore
     sour_score: NormalizedScore

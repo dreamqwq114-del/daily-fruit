@@ -33,7 +33,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
 # 写入前的 schema 保护；该值必须与当前可写目标数据库的 alembic_version
 # 同步，否则脚本应拒绝写入而不是猜测数据库状态。
-EXPECTED_ALEMBIC_VERSION = "0008"
+EXPECTED_ALEMBIC_VERSION = "0009"
+
+DISPLAY_GROUP_BY_CATEGORY = {
+    "仁果": "苹果梨类",
+    "核果类": "桃樱类",
+    "浆果类": "葡萄与浆果类",
+    "柑橘类": "柑橘类",
+    "瓜果类": "瓜类",
+    "热带水果": "热带与特色水果",
+}
 
 
 class FruitSeed(BaseModel):
@@ -45,6 +54,7 @@ class FruitSeed(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     aliases: list[str] = Field(default_factory=list)
     category: str = Field(min_length=1, max_length=80)
+    display_group: str | None = Field(default=None, min_length=1, max_length=80)
     taste: str = Field(min_length=1, max_length=120)
     sweet_score: Decimal = Field(ge=0, le=1)
     sour_score: Decimal = Field(ge=0, le=1)
@@ -57,7 +67,7 @@ class FruitSeed(BaseModel):
     direct_eating: bool
     consumption_mode: str = Field(pattern="^(direct|peel|cut|ingredient)$")
     daily_recommendation_role: str = Field(
-        pattern="^(main|exploration|supporting)$"
+        pattern="^(main|supporting)$"
     )
     preparation_difficulty: Decimal = Field(ge=0, le=1)
     portability_score: Decimal = Field(ge=0, le=1)
@@ -222,6 +232,18 @@ def fruit_rows(dataset: SeedDataset) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = []
     for item in dataset.fruits:
         row = item.model_dump()
+        row["display_group"] = row["display_group"] or DISPLAY_GROUP_BY_CATEGORY[
+            row["category"]
+        ]
+        # The four component fields are the single calculation source.  The
+        # persisted aggregate remains only for compatibility with old clients.
+        row["convenience_score"] = round(
+            Decimal("0.30") * row["portability_score"]
+            + Decimal("0.25") * (1 - row["preparation_difficulty"])
+            + Decimal("0.25") * (1 - row["messiness_score"])
+            + Decimal("0.20") * (1 - row["storage_difficulty"]),
+            3,
+        )
         if not row["aliases"]:
             row["aliases"] = postgresql.array([], type_=String(100))
         rows.append(row)
@@ -235,6 +257,7 @@ def build_fruit_statement(dataset: SeedDataset) -> object:
         name: getattr(excluded, name)
         for name in (
             "category",
+            "display_group",
             "code",
             "aliases",
             "taste",

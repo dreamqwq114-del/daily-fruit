@@ -11,6 +11,12 @@ from app.models import Base
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
+MIGRATION_0009_PATH = (
+    BACKEND_ROOT
+    / "alembic"
+    / "versions"
+    / "0009_fruit_display_semantics.py"
+)
 MIGRATION_PATH = (
     BACKEND_ROOT
     / "alembic"
@@ -38,6 +44,7 @@ EXPECTED_INDEXES = {
 V2_COLUMNS = {
     "fruits": {
         "code", "aliases", "default_portion_grams", "direct_eating",
+        "display_group",
         "consumption_mode", "daily_recommendation_role",
         "preparation_difficulty", "portability_score", "messiness_score",
         "storage_difficulty", "aroma_intensity", "commonness_score",
@@ -271,3 +278,14 @@ def test_migration_has_no_data_security_or_system_schema_operations() -> None:
         "truncate ",
     ):
         assert forbidden not in lowered
+
+
+def test_migration_0009_has_stable_display_semantics_contract() -> None:
+    source = MIGRATION_0009_PATH.read_text(encoding="utf-8")
+    assert "revision: str = \"0009\"" in source
+    assert "down_revision: str | Sequence[str] | None = \"0008\"" in source
+    assert "display_group" in source
+    assert "'main', 'supporting'" in source
+    assert "'main', 'exploration', 'supporting'" in source
+    assert "code = 'lemon'" in source
+    assert "code IN ('papaya', 'avocado')" in source

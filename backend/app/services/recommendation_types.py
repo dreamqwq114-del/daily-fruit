@@ -123,6 +123,9 @@ class RecommendationFruit:
     convenience_score: float
     average_price_level: int
     category: str = ""
+    # Presentation-only grouping retained for API compatibility; the core
+    # recommendation score must never read it.
+    display_group: str = ""
     taste: str = ""
     code: str = ""
     aliases: tuple[str, ...] = ()

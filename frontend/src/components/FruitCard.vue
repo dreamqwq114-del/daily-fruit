@@ -42,7 +42,7 @@ const rankLabels = {
     <div class="fruit-card__content">
       <header class="fruit-card__heading">
         <div>
-          <p class="eyebrow">{{ item.fruit.category }} · {{ item.fruit.taste }}</p>
+          <p class="eyebrow">{{ item.fruit.display_group || item.fruit.category }} · {{ item.fruit.taste }}</p>
           <h2>{{ item.fruit.name }}</h2>
         </div>
         <span class="score-chip" :aria-label="`推荐匹配度 ${Math.round(item.score * 100)} 分`">

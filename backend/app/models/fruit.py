@@ -103,7 +103,7 @@ class Fruit(TimestampMixin, Base):
             name="ck_fruits_consumption_mode_values",
         ),
         CheckConstraint(
-            "daily_recommendation_role IN ('main', 'exploration', 'supporting')",
+            "daily_recommendation_role IN ('main', 'supporting')",
             name="ck_fruits_daily_role_values",
         ),
         CheckConstraint(
@@ -128,7 +128,15 @@ class Fruit(TimestampMixin, Base):
         default=list,
         server_default=text("ARRAY[]::varchar[]"),
     )
+    # Deprecated compatibility grouping.  Recommendation scoring must not
+    # read this presentation-oriented field.
     category: Mapped[str] = mapped_column(String(80), nullable=False)
+    display_group: Mapped[str] = mapped_column(
+        String(80),
+        nullable=False,
+        default="",
+        server_default=text("''"),
+    )
     taste: Mapped[str] = mapped_column(String(120), nullable=False)
     sweet_score: Mapped[Decimal] = mapped_column(
         Numeric(4, 3),
