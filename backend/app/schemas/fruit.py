@@ -25,6 +25,7 @@ DailyRecommendationRole = Annotated[
     Field(pattern="^(main|exploration|supporting)$"),
 ]
 DataQuality = Annotated[str, Field(pattern="^(high|medium|low)$")]
+FactType = Annotated[str, Field(pattern="^[a-z][a-z0-9_]{1,39}$")]
 RegionLevel = Annotated[str, Field(pattern="^(city|province|area|national)$")]
 SupplyStatus = Annotated[
     str,
@@ -71,6 +72,18 @@ class FruitRead(FruitBase):
     updated_at: AwareDatetime
 
 
+class FruitFactRead(ApiSchema):
+    id: PositiveId
+    fruit_id: PositiveId
+    fact_type: FactType
+    fact_text: Annotated[str, Field(min_length=1)]
+    sort_order: Annotated[int, Field(ge=1)]
+    is_active: bool
+    source_note: Annotated[str, Field(max_length=500)] | None = None
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
+
 class FruitNutritionBase(ApiSchema):
     energy: NutritionValue
     vitamin_c: NutritionValue
@@ -111,6 +124,7 @@ class FruitDetail(FruitRead):
 __all__ = [
     "FruitBase",
     "FruitDetail",
+    "FruitFactRead",
     "FruitNutritionBase",
     "FruitNutritionRead",
     "FruitRead",

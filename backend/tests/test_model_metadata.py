@@ -21,6 +21,7 @@ from app.models import Base
 EXPECTED_TABLES = {
     "public.users",
     "public.fruits",
+    "public.fruit_facts",
     "public.fruit_nutritions",
     "public.fruit_seasons",
     "public.user_fruit_preferences",
@@ -111,7 +112,7 @@ def assert_numeric(
         assert column_type.scale == scale
 
 
-def test_metadata_contains_exactly_eight_public_tables() -> None:
+def test_metadata_contains_exactly_nine_public_tables() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES | EXPECTED_EXTERNAL_TABLES
     assert {target.schema for target in business_tables()} == {"public"}
     assert Base.metadata.tables["auth.users"].info["external"] is True
@@ -231,6 +232,22 @@ def test_nutrition_and_season_constraints_match_design() -> None:
     }
 
 
+def test_fruit_fact_constraints_and_types_match_design() -> None:
+    facts = table("fruit_facts")
+    assert unique_column_sets(facts) == {("fruit_id", "sort_order")}
+    assert facts.c.sort_order.nullable is False
+    assert facts.c.is_active.server_default is not None
+    assert set(check_sql(facts)) == {
+        "ck_fruit_facts_sort_order_positive",
+        "ck_fruit_facts_fact_type_not_blank",
+        "ck_fruit_facts_fact_text_not_blank",
+    }
+    assert {
+        index.name: index_expression_names(index)
+        for index in facts.indexes
+    } == {"ix_fruit_facts_fruit_active": ("fruit_id", "is_active")}
+
+
 def test_preference_recommendation_and_feedback_constraints() -> None:
     preferences = table("user_fruit_preferences")
     assert unique_column_sets(preferences) == {("user_id", "fruit_id")}
@@ -272,6 +289,7 @@ def test_foreign_key_delete_rules_are_explicit() -> None:
     expected = {
         ("fruit_nutritions", "fruit_id"): ("public.fruits.id", "CASCADE"),
         ("fruit_seasons", "fruit_id"): ("public.fruits.id", "CASCADE"),
+        ("fruit_facts", "fruit_id"): ("public.fruits.id", "CASCADE"),
         ("user_fruit_preferences", "user_id"): (
             "public.users.id",
             "CASCADE",

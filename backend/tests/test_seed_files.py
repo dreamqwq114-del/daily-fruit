@@ -8,6 +8,7 @@ DATA_ROOT = PROJECT_ROOT / "data"
 FRUIT_FILE = DATA_ROOT / "fruits_seed.json"
 NUTRITION_FILE = DATA_ROOT / "nutrition_demo.csv"
 SEASON_FILE = DATA_ROOT / "seasons_demo.csv"
+FACT_FILE = DATA_ROOT / "fruit_facts_seed.json"
 REQUIRED_CODES = {
     "apple",
     "banana",
@@ -162,6 +163,24 @@ def test_seasons_have_valid_unique_natural_keys_and_cross_year_rows() -> None:
         assert 1 <= int(row["start_month"]) <= 12
         assert 1 <= int(row["end_month"]) <= 12
         assert 0 <= float(row["season_score"]) <= 1
+
+
+def test_fruit_fact_seed_has_three_rows_per_fruit() -> None:
+    facts = json.loads(FACT_FILE.read_text(encoding="utf-8"))
+    fruit_codes = {str(fruit["code"]) for fruit in load_fruits()}
+    keys = [(row["fruit_code"], row["sort_order"]) for row in facts]
+
+    assert len(facts) == 72
+    assert {row["fruit_code"] for row in facts} == fruit_codes
+    assert len(keys) == len(set(keys))
+    assert all(row["fact_type"] for row in facts)
+    assert all(row["fact_text"].strip() for row in facts)
+    assert all(row["sort_order"] in {1, 2, 3} for row in facts)
+    assert all(row["is_active"] is True for row in facts)
+    assert all(
+        sum(1 for item in facts if item["fruit_code"] == code) == 3
+        for code in fruit_codes
+    )
 
 
 def test_emitted_seed_sql_casts_empty_alias_arrays() -> None:

@@ -56,6 +56,11 @@ const rankLabels = {
 
       <p class="fruit-description">{{ item.fruit.description }}</p>
 
+      <aside v-if="item.daily_fact" class="fruit-fact" aria-label="每日冷知识">
+        <span class="fruit-fact__label">每日冷知识</span>
+        <p>{{ item.daily_fact.fact_text }}</p>
+      </aside>
+
       <div class="portion-row">
         <span aria-hidden="true">一</span>
         <p><small>建议份量</small><strong>{{ item.fruit.default_portion }}</strong></p>

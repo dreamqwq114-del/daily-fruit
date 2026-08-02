@@ -161,7 +161,7 @@ python -m app.seed.seed_fruits --dry-run
 
 执行 migration 前必须显式配置 `ALEMBIC_DATABASE_PURPOSE=migration` 与 `MIGRATION_DATABASE_URL`，并重新确认目标数据库；测试环境则使用 `ALEMBIC_DATABASE_PURPOSE=test` 与 `TEST_DATABASE_URL`。不要在不确定的数据库上执行 upgrade、downgrade 或 seed。
 
-当前 seed 写入器的 schema 版本保护尚未跟上最新 migration head，因此目前只推荐运行 `--dry-run`；在修复并重新验证保护条件前，不应把写入命令作为可用流程。
+当前 seed 写入器要求 schema 版本为 `0008`。默认写入只允许本地可丢弃的 `daily_fruit_test`；向已确认的 Supabase 迁移库写入时，必须显式设置 `MIGRATION_DATABASE_URL`、`DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes` 并传入 `--migration`。连接串只能来自本地环境或部署 Secret。
 
 ### 测试与构建
 
@@ -238,6 +238,14 @@ npm run build
 - 构建：GitHub Pages 工作流执行 `npm ci`、`npm test` 和 `npm run build`。
 
 项目没有声明测试覆盖率百分比。部分数据库集成测试在未提供可丢弃测试库时会跳过。
+
+## 每日冷知识数据
+
+水果冷知识存放在 `data/fruit_facts_seed.json`，由 `public.fruit_facts` 表保存。当前为 24 种水果、每种 3 条、共 72 条演示文案；推荐接口以 `daily_fact` 返回当天稳定选择的一条，不参与过滤、评分或营养互补。
+
+迁移和 seed 必须分开执行。先在后端目录运行 `python -m alembic upgrade head`，再运行 `python -m app.seed.seed_fruits --dry-run` 校验数据。默认 seed 只允许写入可丢弃的本地 `daily_fruit_test` 数据库；向已确认的 Supabase 迁移库写入时，必须在进程环境中显式设置 `MIGRATION_DATABASE_URL` 和 `DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes`，并执行 `python -m app.seed.seed_fruits --migration`。连接串只放在本地环境或部署 Secret，不写入 Git。
+
+文案中的季节、价格、营养和部分冷知识用于软件功能演示；涉及健康、药物、牙齿或过敏的内容需要来源审校，不构成医学或专业营养建议。
 
 ## 当前限制
 

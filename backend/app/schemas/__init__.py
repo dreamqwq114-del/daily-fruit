@@ -1,6 +1,7 @@
 from app.schemas.fruit import (
     FruitBase,
     FruitDetail,
+    FruitFactRead,
     FruitNutritionBase,
     FruitNutritionRead,
     FruitRead,
@@ -36,6 +37,7 @@ __all__ = [
     "FeedbackType",
     "FruitBase",
     "FruitDetail",
+    "FruitFactRead",
     "FruitNutritionBase",
     "FruitNutritionRead",
     "FruitRead",

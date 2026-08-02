@@ -13,7 +13,7 @@ from app.schemas.common import (
     RecommendationScore,
     RefreshNumber,
 )
-from app.schemas.fruit import FruitDetail
+from app.schemas.fruit import FruitDetail, FruitFactRead
 
 
 class RecommendationStatus(StrEnum):
@@ -185,6 +185,7 @@ class RecommendationFeedbackRead(RecommendationFeedbackCreate):
 
 class RecommendationItemDetail(RecommendationItemRead):
     fruit: FruitDetail
+    daily_fact: FruitFactRead | None = None
     feedback: list[RecommendationFeedbackRead] = Field(default_factory=list)
 
 

@@ -1122,6 +1122,31 @@ p {
   line-height: 1.65;
 }
 
+.fruit-fact {
+  margin: 16px 0;
+  padding: 14px 16px;
+  border: 1px solid #d4e2c8;
+  border-radius: 17px;
+  background: #f5f8ed;
+  color: var(--ink);
+}
+
+.fruit-fact__label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--green);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.fruit-fact p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
 .portion-row {
   display: grid;
   grid-template-columns: auto 1fr auto;
