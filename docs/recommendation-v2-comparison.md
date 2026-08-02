@@ -3,12 +3,14 @@
 ## Scope
 
 This report compares the fixed offline profiles used by
-`docs/recommendation-v1-baseline.md` with the V2 implementation in
-`backend/app/services/recommendation_service.py`. It is an engineering
+`docs/recommendation-v1-baseline.md` with the V2 implementation exposed by the
+`recommendation_service.py` Facade and implemented in
+`backend/app/services/recommendation_core/`. It is an engineering
 regression report, not a nutrition or market-price evaluation.
 
 The run uses the 24 fruits in `data/fruits_seed.json`, month 7, region `华东`,
-and `random_seed=20260731`. The V2 run uses the new identity, role, portion,
+and `random_seed=20260731`. The V2 run uses the new identity, role, portion
+metadata,
 convenience, familiarity, availability, and data-quality fields. The legacy
 season CSV is enriched by the seed loader with an explicit region level,
 availability score, and supply status until those CSV columns are authored
@@ -31,9 +33,10 @@ Pair = 0.70 mean(U)
      + 0.05 pair_novelty
 ```
 
-Nutrition is normalized against the complete active library after converting
-each value to the fruit's default portion. Values missing from a profile stay
-missing and reduce pair confidence. The price term is one-sided: a fruit at or
+Nutrition is normalized against the complete active library as 0–1 unitless
+demo indices with P05/P95 bounds; `default_portion_grams` is not used in this
+calculation. Values missing from a profile stay missing and reduce pair
+confidence. The price term is one-sided: a fruit at or
 below the user's budget receives 1, while prices above the budget receive a
 bounded penalty. History and feedback use date-based exponential decay.
 
@@ -97,7 +100,7 @@ being treated as “tried”.
 
 ## Verification
 
-- Backend: `177 passed, 26 skipped` with Python 3.11.
+- Backend: `197 passed, 30 skipped` with the repository's Python 3.11 environment.
 - Frontend: `npm test` passed (23 Node tests, 25 component tests).
 - Frontend production build: `npm run build` passed.
 - Remote Supabase project `Daily Fruit`, ref `frzbbpocyzlqxljsrsiw`, is now at

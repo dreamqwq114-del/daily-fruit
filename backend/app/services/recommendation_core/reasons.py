@@ -1,4 +1,9 @@
-"""基于真实评分贡献生成可解释推荐理由。"""
+"""基于真实评分贡献生成可解释推荐理由。
+
+理由不是另一个评分器：它读取已经计算好的单水果和组合分解，按绝对贡献
+排序并应用既有的正反馈保留与最少理由回退规则，确保展示文本不会脱离
+实际推荐依据。
+"""
 
 from __future__ import annotations
 
@@ -16,6 +21,7 @@ from app.services.recommendation_types import (
 from .common import clamp_score
 from .fruit_evaluation import BASE_SCORE_WEIGHTS
 from .pair_selection import PAIR_SCORE_WEIGHTS
+
 
 def _build_reasons(
     scored: ScoredFruit,

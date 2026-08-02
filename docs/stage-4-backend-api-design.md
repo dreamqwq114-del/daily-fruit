@@ -12,13 +12,15 @@ TestClient 集成测试。Vue 正式页面、Supabase Auth 和远程数据库写
 ```text
 Router -> Application Service -> Repository -> SQLAlchemy Session
                          |
-                         -> pure recommendation_service.py
+                         -> recommendation_service.py Facade
+                              -> recommendation_core (pure algorithm)
 ```
 
 - Router：HTTP 输入、状态码、依赖注入和响应模型；
 - Application Service：业务规则、事务提交/回滚、推荐生成与刷新编排；
 - Repository：SQLAlchemy 查询、锁和持久化；
-- 纯推荐算法：继续只接收内存对象，不持有 Session；
+- 纯推荐算法：由 `recommendation_service.py` Facade 调用
+  `recommendation_core`，只接收内存对象，不持有 Session；
 - Schema：HTTP 请求与响应，不放数据库查询。
 
 ## 3. 数据库连接和事务
