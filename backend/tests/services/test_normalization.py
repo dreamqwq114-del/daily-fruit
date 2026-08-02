@@ -38,7 +38,7 @@ def profile(value: float) -> NutritionProfile:
 
 def test_nutrition_is_normalized_per_feature() -> None:
     normalized = normalize_nutrition_profiles(
-        [make_fruit(1, profile(10)), make_fruit(2, profile(30))]
+        [make_fruit(1, profile(0.10)), make_fruit(2, profile(0.30))]
     )
 
     assert normalized[1] == profile(0.0)
@@ -47,7 +47,7 @@ def test_nutrition_is_normalized_per_feature() -> None:
 
 def test_equal_feature_values_use_neutral_score_without_division_by_zero() -> None:
     normalized = normalize_nutrition_profiles(
-        [make_fruit(1, profile(10)), make_fruit(2, profile(10))]
+        [make_fruit(1, profile(0.10)), make_fruit(2, profile(0.10))]
     )
 
     assert normalized[1] == profile(0.5)
@@ -56,7 +56,7 @@ def test_equal_feature_values_use_neutral_score_without_division_by_zero() -> No
 
 def test_missing_nutrition_remains_missing_instead_of_becoming_neutral() -> None:
     normalized = normalize_nutrition_profiles(
-        [make_fruit(1, profile(10)), make_fruit(2, None)]
+        [make_fruit(1, profile(0.10)), make_fruit(2, None)]
     )
 
     assert normalized[2] == NutritionProfile()
@@ -65,13 +65,16 @@ def test_missing_nutrition_remains_missing_instead_of_becoming_neutral() -> None
 def test_duplicate_fruit_id_is_rejected() -> None:
     with pytest.raises(InvalidRecommendationInputError, match="不能重复"):
         normalize_nutrition_profiles(
-            [make_fruit(1, profile(10)), make_fruit(1, profile(20))]
+            [make_fruit(1, profile(0.10)), make_fruit(1, profile(0.20))]
         )
 
 
-def test_negative_or_non_finite_nutrition_is_rejected() -> None:
-    with pytest.raises(InvalidRecommendationInputError, match="非负有限"):
-        normalize_nutrition_profiles([make_fruit(1, profile(-1))])
+def test_out_of_range_or_non_finite_nutrition_is_rejected() -> None:
+    with pytest.raises(InvalidRecommendationInputError, match="0 到 1"):
+        normalize_nutrition_profiles([make_fruit(1, profile(-0.1))])
 
-    with pytest.raises(InvalidRecommendationInputError, match="非负有限"):
+    with pytest.raises(InvalidRecommendationInputError, match="0 到 1"):
+        normalize_nutrition_profiles([make_fruit(1, profile(1.1))])
+
+    with pytest.raises(InvalidRecommendationInputError, match="0 到 1"):
         normalize_nutrition_profiles([make_fruit(1, profile(float("nan")))])

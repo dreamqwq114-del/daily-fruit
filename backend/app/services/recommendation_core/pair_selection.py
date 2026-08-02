@@ -1,4 +1,9 @@
-"""两种水果的营养互补、合法性和组合选择。"""
+"""两种水果的营养互补、合法性和组合选择。
+
+本模块枚举完整水果对并执行组合级硬约束。跨天冷却按既定顺序逐级放宽，
+但 ``excluded_pair`` 始终是不可放宽的换组约束；最终只返回算法核心选定
+的 ``PairSelection``，不负责持久化或 HTTP 编排。
+"""
 
 from __future__ import annotations
 
@@ -24,8 +29,7 @@ from .common import (
 )
 from .fruit_evaluation import (
     NUTRITION_PAIR_FEATURES,
-    normalize_nutrition_profiles,
-    score_candidates,
+    _score_candidates_with_normalized,
 )
 
 PAIR_SCORE_WEIGHTS = {
@@ -219,9 +223,10 @@ def select_recommendation_pair(
     """
 
     fruit_list = list(fruits)
-    scored = score_candidates(fruit_list, user, context)
-    normalized = normalize_nutrition_profiles(
-        [fruit for fruit in fruit_list if fruit.is_active]
+    scored, normalized = _score_candidates_with_normalized(
+        fruit_list,
+        user,
+        context,
     )
     recently_shown = _recently_shown_fruit_ids(
         context,

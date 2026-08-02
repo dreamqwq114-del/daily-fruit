@@ -1,4 +1,10 @@
-"""水果级候选过滤、营养处理和单水果评分。"""
+"""水果级候选过滤、营养处理和单水果评分。
+
+这里把水果资料转换成可配对的 ``ScoredFruit``：先执行不可违反的候选
+硬过滤，再按季节、偏好、历史、反馈、便利性和价格等软因素计算分数。
+营养字段仍是 0～1 的演示指数；本模块只提供纯函数，不读取数据库或请求
+外部服务。
+"""
 
 from __future__ import annotations
 
@@ -328,14 +334,16 @@ def filter_eligible_fruits(
     return sorted(eligible, key=lambda fruit: fruit.id)
 
 
-def score_candidates(
+def _score_candidates_with_normalized(
     fruits: Iterable[RecommendationFruit],
     user: RecommendationUser,
     context: RecommendationContext,
-) -> list[ScoredFruit]:
+) -> tuple[list[ScoredFruit], dict[int, NutritionProfile]]:
     """先过滤，再把每个候选映射为可解释的 ScoreBreakdown。
 
     营养归一化仍基于全部 active 水果；只有过滤后的水果进入单水果评分。
+    配对选择同时需要这份归一化结果，因此这里一次返回评分列表和营养档案，
+    避免同一推荐流程重复执行完全相同的归一化。
     算法需要至少两个候选，候选不足会抛出领域错误而不是返回重复水果。
     """
 
@@ -357,7 +365,18 @@ def score_candidates(
         )
         for fruit in eligible
     ]
-    return sorted(scored, key=lambda item: (-item.base_score, item.fruit.id))
+    return sorted(scored, key=lambda item: (-item.base_score, item.fruit.id)), normalized
+
+
+def score_candidates(
+    fruits: Iterable[RecommendationFruit],
+    user: RecommendationUser,
+    context: RecommendationContext,
+) -> list[ScoredFruit]:
+    """公开的单水果评分入口；保留原签名并丢弃内部归一化档案。"""
+
+    scored, _ = _score_candidates_with_normalized(fruits, user, context)
+    return scored
 
 
 def calculate_base_score(scores: ScoreBreakdown) -> float:
@@ -689,13 +708,3 @@ def _validate_inputs(
         raise InvalidRecommendationInputError("历史水果 ID 必须为正整数")
     if any(fruit_id <= 0 for fruit_id in context.feedback_by_fruit):
         raise InvalidRecommendationInputError("反馈水果 ID 必须为正整数")
-
-
-def _validate_unit_scores(values: Mapping[str, float | None]) -> None:
-    """验证可选的单位区间分数；``None`` 表示未提供，不代表 0。"""
-    for name, value in values.items():
-        if value is None:
-            continue
-        numeric = float(value)
-        if not math.isfinite(numeric) or not 0 <= numeric <= 1:
-            raise InvalidRecommendationInputError(f"{name} 必须在 0 到 1 之间")

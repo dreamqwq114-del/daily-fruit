@@ -17,6 +17,7 @@ from app.services import (
     select_recommendation_pair,
 )
 from app.services.recommendation_service import _recently_shown_fruit_ids
+from app.services.recommendation_core import fruit_evaluation
 
 
 def make_user(**changes: object) -> RecommendationUser:
@@ -98,6 +99,37 @@ def test_second_fruit_is_not_simply_base_score_runner_up() -> None:
     assert result.first.fruit.id == 1
     assert result.second.fruit.id == 3
     assert result.complement_score > 0.8
+
+
+def test_select_pair_normalizes_nutrition_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fruits = [
+        make_fruit(1, profile(1, 0, 1, 0, 1, 0)),
+        make_fruit(2, profile(0, 1, 0, 1, 0, 1)),
+        make_fruit(3, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+    ]
+    original = fruit_evaluation.normalize_nutrition_profiles
+    calls = 0
+
+    def counting_normalize(fruit_values):
+        nonlocal calls
+        calls += 1
+        return original(fruit_values)
+
+    monkeypatch.setattr(
+        fruit_evaluation,
+        "normalize_nutrition_profiles",
+        counting_normalize,
+    )
+
+    select_recommendation_pair(
+        fruits,
+        make_user(),
+        RecommendationContext(month=7),
+    )
+
+    assert calls == 1
 
 
 def test_selected_pair_always_contains_distinct_fruits() -> None:

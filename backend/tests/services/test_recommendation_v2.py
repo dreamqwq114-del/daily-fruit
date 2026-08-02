@@ -42,12 +42,12 @@ def fruit(
     role: str = "main",
     seasons: tuple[SeasonWindow, ...] = (),
     nutrition: NutritionProfile | None = NutritionProfile(
-        energy=50,
-        vitamin_c=20,
-        fiber=2,
-        potassium=100,
-        folate=10,
-        carotenoids=1,
+        energy=0.50,
+        vitamin_c=0.20,
+        fiber=0.02,
+        potassium=0.80,
+        folate=0.30,
+        carotenoids=0.10,
     ),
     **changes: object,
 ) -> RecommendationFruit:
@@ -94,9 +94,9 @@ def test_unwilling_and_untried_discovery_zero_are_hard_exclusions() -> None:
     assert [item.id for item in eligible] == [3]
 
 
-def test_normalization_uses_portion_and_preserves_missing_values() -> None:
-    first = fruit(1, nutrition=NutritionProfile(energy=10))
-    second = fruit(2, nutrition=NutritionProfile(energy=30), default_portion_grams=200)
+def test_normalization_uses_demo_indices_and_preserves_missing_values() -> None:
+    first = fruit(1, nutrition=NutritionProfile(energy=0.10), default_portion_grams=100)
+    second = fruit(2, nutrition=NutritionProfile(energy=0.30), default_portion_grams=200)
     normalized = normalize_nutrition_profiles([first, second])
     assert normalized[1].energy == 0.0
     assert normalized[2].energy == 1.0
