@@ -107,8 +107,9 @@ class FeedbackEvent:
 class RecommendationFruit:
     """算法需要的水果快照，脱离 SQLAlchemy ORM 后仍可独立评分。
 
-    口感、便利性、价格和探索字段进入单水果评分；营养和 seasons 由后续
-    阶段分别用于归一化、地区月份判断和组合评分。``is_active`` 与
+    口感、便利性、价格和用户偏好进入单水果评分；``novelty_level`` 与
+    展示分组只作为元数据，不直接改变分数。营养和 seasons 由后续阶段分别
+    用于归一化、地区月份判断和组合评分。``is_active`` 与
     ``daily_recommendation_role`` 在候选过滤阶段决定是否允许进入评分，
     因而不能被当作仅供展示的元数据。字段默认值主要服务旧数据兼容，
     mapper 必须谨慎选择中性/保守 fallback，避免缺失数据制造虚假的优势。

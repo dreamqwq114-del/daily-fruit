@@ -22,6 +22,7 @@ Router -> Application Service -> Repository -> SQLAlchemy Session
 - 纯推荐算法：由 `recommendation_service.py` Facade 调用
   `recommendation_core`，只接收内存对象，不持有 Session；
 - Schema：HTTP 请求与响应，不放数据库查询。
+- 水果 `display_group` 只用于目录展示和筛选；兼容字段 `category` 不进入纯推荐核心的评分或配对逻辑。
 
 ## 3. 数据库连接和事务
 
