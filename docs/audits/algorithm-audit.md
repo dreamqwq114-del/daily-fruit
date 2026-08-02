@@ -1,6 +1,7 @@
 # First-round independent audit: recommendation algorithm V2
 
-- Scope: `backend/app/services/recommendation_service.py`, mapper, algorithm tests.
+- Scope: `backend/app/services/recommendation_service.py` Facade,
+  `backend/app/services/recommendation_core/`, mapper, and algorithm tests.
 - Method: read-only review plus focused V2 tests; no Supabase write.
 - Initial focused result: 42 passed.
 
@@ -23,9 +24,9 @@
 ## Positive checks
 
 Filtering covers inactive, forbidden, unwilling, supporting-role and explicitly
-unavailable fruit. Nutrition normalization uses the complete active library,
-portion grams, P05/P95 bounds, and preserves missing values. Pair selection
+unavailable fruit. Nutrition normalization uses the complete active library's
+0–1 unitless demo indices, P05/P95 bounds, and preserves missing values;
+`default_portion_grams` is not used in this calculation. Pair selection
 enumerates legal combinations, applies the 0.70/0.15/0.10/0.05 formula, and
 uses a deterministic near-top random choice when seeded. Reasons carry the
 actual weighted contribution.
-

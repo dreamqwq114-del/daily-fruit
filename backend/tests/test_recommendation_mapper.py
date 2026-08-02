@@ -119,16 +119,24 @@ def test_mapper_preserves_explicit_zero_v2_identity_values() -> None:
 def test_context_mapper_copies_mutable_inputs() -> None:
     feedback = {1: ["liked"]}
     recent = [1, 2]
+    cooldown = [frozenset({3, 4})]
+    previous = [frozenset({5, 6})]
 
     context = build_recommendation_context(
         month=7,
         recent_fruit_ids=recent,
         feedback_by_fruit=feedback,
+        cooldown_pairs=cooldown,
+        previous_pairs=previous,
         random_seed=42,
     )
     feedback[1].append("eaten")
     recent.append(3)
+    cooldown.append(frozenset({7, 8}))
+    previous.append(frozenset({9, 10}))
 
     assert context.recent_fruit_ids == (1, 2)
     assert context.feedback_by_fruit == {1: ("liked",)}
+    assert context.cooldown_pairs == (frozenset({3, 4}),)
+    assert context.previous_pairs == (frozenset({5, 6}),)
     assert context.random_seed == 42

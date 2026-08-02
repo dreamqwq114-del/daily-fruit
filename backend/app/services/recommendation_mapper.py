@@ -1,4 +1,10 @@
-"""把 ORM 对象映射为无数据库依赖的推荐输入类型。"""
+"""把 ORM 对象映射为无数据库依赖的推荐输入类型。
+
+mapper 不是无害的字段复制层，而是 ORM/数据库语义进入纯推荐领域对象
+的边界：缺失值、旧字段和默认值会直接进入过滤与排序。这里不应引入
+Session 查询或新的推荐规则；任何 fallback 都必须是中性/保守的，并在
+数据迁移完成后重新评估是否可以移除。
+"""
 
 from __future__ import annotations
 
@@ -19,7 +25,13 @@ from app.services.recommendation_types import (
 
 
 def user_to_recommendation_input(user: User) -> RecommendationUser:
-    """提取推荐实际读取的用户字段；购买条件字段在此明确未接入。"""
+    """提取推荐实际读取的用户字段；购买条件字段在此明确未接入。
+
+    ``FruitPreference`` 的 ``None``、``False`` 和数值会原样保留，避免把
+    未选择水果写成中性偏好。当前 ``market_access_level``、
+    ``accepts_online_purchase`` 和 ``consumption_horizon_days`` 不属于
+    RecommendationUser，因此保存它们不会改变本版本排序。
+    """
 
     preferences = {
         item.fruit_id: FruitPreference(
@@ -57,8 +69,15 @@ def user_to_recommendation_input(user: User) -> RecommendationUser:
 
 
 def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
-    """复制水果、营养和季节快照，处理旧行缺失值并避免 N+1 查询。"""
+    """复制水果、营养和季节快照，处理旧行缺失值并避免 N+1 查询。
 
+    该函数假设 Repository 已经预加载 nutrition/seasons；它不补查数据库。
+    营养缺失保留为 ``None``，表示未知；供应缺失使用 ``unknown``，不能
+    乐观地当作 ``available``，因为后者会直接影响候选过滤与可得性分。
+    """
+
+    # 缺失营养留在 None，后续 normalization/pair complement 会降低 coverage
+    # confidence，而不是把未知数据伪造成 0 分营养。
     nutrition = (
         None
         if fruit.nutrition is None
@@ -71,6 +90,8 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
             carotenoids=float(fruit.nutrition.carotenoids),
         )
     )
+    # 旧 season 行若没有新字段，使用保守的 national/0.45/unknown fallback。
+    # 这些默认值是迁移兼容方案；数据迁移完整后应评估删除它们的必要性。
     seasons = tuple(
         SeasonWindow(
             region=item.region,
@@ -108,6 +129,8 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
         average_price_level=fruit.average_price_level,
         category=fruit.category,
         taste=fruit.taste,
+        # 100g 只是在旧行缺失份量时的兼容元数据；当前 nutrition_demo 是
+        # 无物理单位分数，份量换算不会因此变成真实营养计算。
         default_portion_grams=float(
             fruit.default_portion_grams
             if fruit.default_portion_grams is not None
@@ -167,12 +190,21 @@ def build_recommendation_context(
     feedback_by_fruit: Mapping[int, Sequence[str]] | None = None,
     history_events: Sequence[HistoryEvent] = (),
     feedback_events: Sequence[FeedbackEvent] = (),
+    cooldown_pairs: Sequence[frozenset[int]] = (),
     previous_pairs: Sequence[frozenset[int]] = (),
     excluded_pair: frozenset[int] | None = None,
     allow_supporting: bool = False,
     random_seed: int | None = None,
 ) -> RecommendationContext:
-    """把 Repository 查询结果规范化为一次纯算法计算的上下文。"""
+    """把 Repository 查询结果规范化为一次纯算法计算的上下文。
+
+    序列被固定成 tuple，映射值也固定成 tuple，保证算法输入不可变且不会
+    被后续 ORM 生命周期影响。``feedback_by_fruit`` 是旧调用者兼容输入；
+    新路径应同时提供带时间的 ``feedback_events``，这样反馈衰减才能使用
+    真实事件时间。``excluded_pair``、``cooldown_pairs`` 和
+    ``previous_pairs`` 的语义不同：前者是刷新硬排除，中者是短期组合冷却，
+    后者只是长期组合新颖度信号。
+    """
 
     return RecommendationContext(
         month=month,
@@ -184,6 +216,7 @@ def build_recommendation_context(
         },
         history_events=tuple(history_events),
         feedback_events=tuple(feedback_events),
+        cooldown_pairs=tuple(cooldown_pairs),
         previous_pairs=tuple(previous_pairs),
         excluded_pair=excluded_pair,
         allow_supporting=allow_supporting,

@@ -6,7 +6,11 @@ from sqlalchemy.orm import Session
 from app.errors import ResourceConflictError
 from app.schemas.recommendation import RecommendationFeedbackCreate
 from app.schemas.user import UserCreate
-from app.services import recommendation_application_service, user_service
+from app.services import (
+    NoRecommendationCandidatesError,
+    recommendation_application_service,
+    user_service,
+)
 
 
 TODAY = date(2026, 7, 31)
@@ -134,3 +138,49 @@ def test_refresh_requires_existing_active_recommendation(
             user.id,
             today=TODAY,
         )
+
+
+def test_failed_refresh_keeps_original_recommendation_active(
+    api_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = create_user(api_session)
+    first = recommendation_application_service.get_today_recommendation(
+        api_session,
+        user.id,
+        today=TODAY,
+    )
+
+    def fail_recommendation(*args: object, **kwargs: object) -> None:
+        raise NoRecommendationCandidatesError(
+            "当前没有其他满足条件的水果组合"
+        )
+
+    monkeypatch.setattr(
+        recommendation_application_service,
+        "recommend_fruits",
+        fail_recommendation,
+    )
+
+    with pytest.raises(ResourceConflictError, match="当前没有其他"):
+        recommendation_application_service.refresh_recommendation(
+            api_session,
+            user.id,
+            today=TODAY,
+        )
+
+    # Service 抛错后由请求 Session 边界回滚；模拟该边界后，旧 active 必须保留。
+    api_session.rollback()
+    current = recommendation_application_service.get_today_recommendation(
+        api_session,
+        user.id,
+        today=TODAY,
+    )
+    history = recommendation_application_service.list_recommendation_history(
+        api_session,
+        user.id,
+    )
+
+    assert current.id == first.id
+    assert current.status == "active"
+    assert len(history) == 1

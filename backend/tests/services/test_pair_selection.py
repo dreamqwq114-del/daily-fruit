@@ -1,8 +1,13 @@
+from datetime import date, timedelta
+
 import pytest
 
 from app.services import (
     FruitPreference,
+    HistoryEvent,
+    NoRecommendationCandidatesError,
     NutritionProfile,
+    PairSelection,
     RecommendationContext,
     RecommendationFruit,
     RecommendationUser,
@@ -11,6 +16,8 @@ from app.services import (
     score_candidates,
     select_recommendation_pair,
 )
+from app.services.recommendation_service import _recently_shown_fruit_ids
+from app.services.recommendation_core import fruit_evaluation
 
 
 def make_user(**changes: object) -> RecommendationUser:
@@ -94,6 +101,37 @@ def test_second_fruit_is_not_simply_base_score_runner_up() -> None:
     assert result.complement_score > 0.8
 
 
+def test_select_pair_normalizes_nutrition_once(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fruits = [
+        make_fruit(1, profile(1, 0, 1, 0, 1, 0)),
+        make_fruit(2, profile(0, 1, 0, 1, 0, 1)),
+        make_fruit(3, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+    ]
+    original = fruit_evaluation.normalize_nutrition_profiles
+    calls = 0
+
+    def counting_normalize(fruit_values):
+        nonlocal calls
+        calls += 1
+        return original(fruit_values)
+
+    monkeypatch.setattr(
+        fruit_evaluation,
+        "normalize_nutrition_profiles",
+        counting_normalize,
+    )
+
+    select_recommendation_pair(
+        fruits,
+        make_user(),
+        RecommendationContext(month=7),
+    )
+
+    assert calls == 1
+
+
 def test_selected_pair_always_contains_distinct_fruits() -> None:
     fruits = [
         make_fruit(1, profile(0, 0, 0, 0, 0, 0)),
@@ -166,3 +204,166 @@ def test_pair_score_uses_v2_pair_formula() -> None:
     )
     assert result.pair_score == pytest.approx(expected)
     assert 0 <= result.pair_score <= 1
+
+
+def _pair_ids(result: PairSelection) -> frozenset[int]:
+    """把算法结果折叠成无序 pair，测试不依赖展示 rank。"""
+
+    return frozenset(
+        {
+            result.first.fruit.id,
+            result.second.fruit.id,
+        }
+    )
+
+
+def test_pair_from_last_three_days_is_avoided_when_alternative_exists() -> None:
+    fruits = [make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)) for index in range(1, 5)]
+    context = RecommendationContext(
+        month=7,
+        today=date(2026, 8, 10),
+        cooldown_pairs=(frozenset({1, 2}),),
+    )
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert _pair_ids(result) != frozenset({1, 2})
+
+
+def test_yesterdays_fruits_are_avoided_when_enough_alternatives_exist() -> None:
+    today = date(2026, 8, 10)
+    fruits = [make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)) for index in range(1, 5)]
+    context = RecommendationContext(
+        month=7,
+        today=today,
+        history_events=(
+            HistoryEvent(1, today - timedelta(days=1)),
+            HistoryEvent(2, today - timedelta(days=1)),
+        ),
+    )
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert _pair_ids(result) == frozenset({3, 4})
+
+
+def test_same_day_history_is_not_cross_day_fruit_cooldown() -> None:
+    today = date(2026, 8, 10)
+    context = RecommendationContext(
+        month=7,
+        today=today,
+        history_events=(
+            HistoryEvent(1, today),
+            HistoryEvent(2, today - timedelta(days=1)),
+            HistoryEvent(3, today - timedelta(days=2)),
+        ),
+    )
+
+    assert _recently_shown_fruit_ids(context, days=1) == frozenset({2})
+
+
+def test_single_fruit_cooldown_relaxes_when_it_blocks_all_pairs() -> None:
+    today = date(2026, 8, 10)
+    fruits = [make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)) for index in range(1, 4)]
+    context = RecommendationContext(
+        month=7,
+        today=today,
+        history_events=tuple(
+            HistoryEvent(index, today - timedelta(days=1))
+            for index in range(1, 4)
+        ),
+    )
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert len(_pair_ids(result)) == 2
+
+
+def test_pair_cooldown_relaxes_when_user_has_too_few_candidates() -> None:
+    fruits = [make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)) for index in range(1, 4)]
+    all_pairs = tuple(
+        frozenset(pair)
+        for pair in ((1, 2), (1, 3), (2, 3))
+    )
+    context = RecommendationContext(month=7, cooldown_pairs=all_pairs)
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert _pair_ids(result) in set(all_pairs)
+
+
+def test_excluded_pair_is_never_restored_during_relaxation() -> None:
+    fruits = [make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)) for index in range(1, 4)]
+    all_pairs = tuple(
+        frozenset(pair)
+        for pair in ((1, 2), (1, 3), (2, 3))
+    )
+    context = RecommendationContext(
+        month=7,
+        cooldown_pairs=all_pairs,
+        excluded_pair=frozenset({1, 2}),
+    )
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert _pair_ids(result) != frozenset({1, 2})
+
+
+def test_refresh_never_returns_excluded_pair() -> None:
+    fruits = [
+        make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5))
+        for index in range(1, 4)
+    ]
+    context = RecommendationContext(
+        month=7,
+        excluded_pair=frozenset({1, 2}),
+    )
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert _pair_ids(result) != frozenset({1, 2})
+
+
+def test_refresh_fails_when_only_excluded_pair_is_legal() -> None:
+    fruits = [
+        make_fruit(1, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+        make_fruit(2, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+    ]
+    context = RecommendationContext(
+        month=7,
+        excluded_pair=frozenset({1, 2}),
+    )
+
+    with pytest.raises(NoRecommendationCandidatesError):
+        select_recommendation_pair(fruits, make_user(), context)
+
+
+def test_old_pair_can_return_after_cooldown_period() -> None:
+    fruits = [
+        make_fruit(1, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+        make_fruit(2, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)),
+    ]
+    context = RecommendationContext(
+        month=7,
+        previous_pairs=(frozenset({1, 2}),),
+        cooldown_pairs=(),
+    )
+
+    result = select_recommendation_pair(fruits, make_user(), context)
+
+    assert _pair_ids(result) == frozenset({1, 2})
+
+
+def test_same_user_date_and_refresh_seed_remain_deterministic() -> None:
+    fruits = [make_fruit(index, profile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5)) for index in range(1, 6)]
+    context = RecommendationContext(
+        month=7,
+        today=date(2026, 8, 10),
+        random_seed=20260810,
+        cooldown_pairs=(frozenset({1, 2}),),
+    )
+
+    first = select_recommendation_pair(fruits, make_user(), context)
+    second = select_recommendation_pair(list(reversed(fruits)), make_user(), context)
+
+    assert _pair_ids(first) == _pair_ids(second)

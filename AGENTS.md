@@ -36,7 +36,8 @@ Daily Fruit 的目标是让推荐结果更可能被用户愿意吃、实际买�
 
 关键服务职责：
 
-- `recommendation_service.py`：纯推荐逻辑；不得持有数据库 `Session`、发查询或访问网络。
+- `recommendation_service.py`：稳定的推荐公开 Facade，负责重导出 API、调用核心并组装结果；不得持有数据库 `Session`、发查询或访问网络。
+- `recommendation_core/`：按水果评估、组合选择、理由和共享工具承载纯推荐逻辑；不得访问数据库、FastAPI 或反向依赖 Facade。
 - `recommendation_application_service.py`：加载上下文、事务、并发控制、刷新和持久化编排。
 - `recommendation_mapper.py`：把 ORM 及查询结果转换为算法类型。
 - `recommendation_types.py`：纯算法输入输出合同。
