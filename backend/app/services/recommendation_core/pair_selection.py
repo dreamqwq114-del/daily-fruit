@@ -99,14 +99,16 @@ def _sensory_category_diversity(
     first: RecommendationFruit,
     second: RecommendationFruit,
 ) -> float:
-    """用类别、食用方式和四个口感维度衡量组合差异。"""
-    category_difference = 1.0 if first.category != second.category else 0.0
-    mode_difference = 1.0 if first.consumption_mode != second.consumption_mode else 0.0
+    """用四个真实口感维度衡量组合的体验差异。
+
+    ``sensory_category_diversity`` 是稳定的 API 字段名；内部不再读取
+    ``category``/``display_group``，避免展示分组改变推荐结果。
+    """
     taste_distance = sum(
         abs(getattr(first, dimension) - getattr(second, dimension))
         for dimension in ("sweet_score", "sour_score", "soft_score", "crisp_score")
     ) / 4
-    return clamp_score(0.4 * category_difference + 0.3 * mode_difference + 0.3 * taste_distance)
+    return clamp_score(taste_distance)
 
 
 def _pair_is_legal(
@@ -179,7 +181,7 @@ def _pair_is_legal(
     # 均衡和尝鲜模式：一组最多包含一个明确没吃过的水果。
     # 不再强制组合必须包含 has_tried=True 的水果，
     # 避免少数已标记为吃过的水果成为每组必须出现的锚点。
-    if user.discovery_level in {1, 2} and explicit_untried_count > 1:
+    if user.discovery_level == 1 and explicit_untried_count > 1:
         return False
 
     # 所有硬性规则均通过，组合可以进入后续评分。

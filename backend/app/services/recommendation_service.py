@@ -7,6 +7,8 @@ recommendation_core 内部模块。门面只负责显式重导出和结果组装
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+
 from app.services.recommendation_core.common import (
     InvalidRecommendationInputError,
     NoRecommendationCandidatesError,
@@ -30,7 +32,6 @@ from app.services.recommendation_core.fruit_evaluation import (
     MIN_FEEDBACK_ADJUSTMENT,
     _derived_convenience,
     _explicit_preference_score,
-    _exploration_adjustment,
     _feedback_adjustment,
     _feedback_events_for,
     _history_freshness,
@@ -43,6 +44,7 @@ from app.services.recommendation_core.fruit_evaluation import (
     calculate_base_score,
     evaluate_season,
     filter_eligible_fruits,
+    is_exploration_recommendation,
     month_is_in_range,
     normalize_nutrition_profiles,
     score_candidates,
@@ -132,6 +134,7 @@ __all__ = [
     "clamp_score",
     "evaluate_season",
     "filter_eligible_fruits",
+    "is_exploration_recommendation",
     "month_is_in_range",
     "normalize_nutrition_profiles",
     "nutrition_complement_score",

@@ -20,6 +20,7 @@ from app.services.recommendation_types import (
 
 from .common import clamp_score
 from .fruit_evaluation import BASE_SCORE_WEIGHTS
+from .fruit_evaluation import is_exploration_recommendation
 from .pair_selection import PAIR_SCORE_WEIGHTS
 
 
@@ -74,9 +75,9 @@ def _build_reasons(
             "这是你明确喜欢的水果",
             ReasonComponent.EXPLICIT_PREFERENCE,
         )
-    elif preference is not None and preference.has_tried is False:
+    elif is_exploration_recommendation(fruit, preference, user):
         add(
-            BASE_SCORE_WEIGHTS["explicit_preference"] * scores.explicit_preference,
+            0.0,
             ReasonCode.EXPLORATION,
             "这是你尚未尝试过的新选择",
             ReasonComponent.FAMILIARITY,
