@@ -10,6 +10,7 @@ FRUIT_DETAIL_OPTIONS = (
     # selectinload 将关系批量读取，避免推荐计算中逐水果 N+1 查询。
     selectinload(Fruit.nutrition),
     selectinload(Fruit.seasons),
+    selectinload(Fruit.facts),
 )
 
 

@@ -1,8 +1,9 @@
 """校验并幂等生成水果、营养和季节演示数据。
 
-``--dry-run`` 和 ``--emit-sql`` 不连接数据库；真正写入只允许本地、可
-丢弃的 ``daily_fruit_test``，并要求显式环境变量。生产 Supabase 写入不
-在这个脚本中开放，避免把 seed 误当成无条件部署命令。
+``--dry-run`` 和 ``--emit-sql`` 不连接数据库；默认写入只允许本地、可
+丢弃的 ``daily_fruit_test``。生产 Supabase 写入必须同时显式传入
+``--migration`` 和 ``DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes``，避免把 seed
+误当成无条件部署命令。
 """
 
 from __future__ import annotations
@@ -23,16 +24,16 @@ from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.config import Settings
+from app.config import Settings, _is_supabase_host
 from app.database import create_database_engine
-from app.models import Fruit, FruitNutrition, FruitSeason
+from app.models import Fruit, FruitFact, FruitNutrition, FruitSeason
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
 # 写入前的 schema 保护；该值必须与当前可写目标数据库的 alembic_version
 # 同步，否则脚本应拒绝写入而不是猜测数据库状态。
-EXPECTED_ALEMBIC_VERSION = "0006"
+EXPECTED_ALEMBIC_VERSION = "0008"
 
 
 class FruitSeed(BaseModel):
@@ -104,11 +105,25 @@ class SeasonSeed(BaseModel):
     )
 
 
+class FruitFactSeed(BaseModel):
+    """fruit_facts_seed.json 涓殑涓€鏉℃按鏋滃喎鐭ヨ瘑銆?"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fruit_code: str = Field(min_length=1, max_length=60)
+    fact_type: str = Field(pattern="^[a-z][a-z0-9_]{1,39}$")
+    fact_text: str = Field(min_length=1, max_length=2000)
+    sort_order: int = Field(ge=1, le=20)
+    is_active: bool = True
+    source_note: str | None = Field(default=None, max_length=500)
+
+
 @dataclass(frozen=True)
 class SeedDataset:
     fruits: tuple[FruitSeed, ...]
     nutritions: tuple[NutritionSeed, ...]
     seasons: tuple[SeasonSeed, ...]
+    facts: tuple[FruitFactSeed, ...]
 
 
 @dataclass(frozen=True)
@@ -116,6 +131,7 @@ class SeedSummary:
     fruits: int
     nutritions: int
     seasons: int
+    facts: int
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -155,8 +171,13 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
         row.setdefault("supply_status", "available")
         season_rows.append(SeasonSeed.model_validate(row))
     seasons = tuple(season_rows)
+    fact_payload = json.loads(
+        (data_root / "fruit_facts_seed.json").read_text(encoding="utf-8")
+    )
+    facts = tuple(FruitFactSeed.model_validate(item) for item in fact_payload)
 
     fruit_names = [item.name for item in fruits]
+    fruit_codes = [item.code for item in fruits]
     nutrition_names = [item.fruit_name for item in nutritions]
     season_keys = [
         (
@@ -167,20 +188,33 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
         )
         for item in seasons
     ]
+    fact_keys = [(item.fruit_code, item.sort_order) for item in facts]
     require_unique(fruit_names, "fruit name")
+    require_unique(fruit_codes, "fruit code")
     require_unique(nutrition_names, "nutrition fruit name")
     require_unique(season_keys, "season natural key")
+    require_unique(fact_keys, "fruit fact natural key")
 
     expected_names = set(fruit_names)
     if set(nutrition_names) != expected_names:
         raise ValueError("Nutrition rows must match fruit names exactly")
     if {item.fruit_name for item in seasons} != expected_names:
         raise ValueError("Every fruit must have season rows")
+    expected_codes = set(fruit_codes)
+    if {item.fruit_code for item in facts} != expected_codes:
+        raise ValueError("Every fruit must have fact rows")
+    fact_counts = {
+        code: sum(1 for item in facts if item.fruit_code == code)
+        for code in expected_codes
+    }
+    if set(fact_counts.values()) != {3}:
+        raise ValueError("Every fruit must have exactly three fact rows")
 
     return SeedDataset(
         fruits=fruits,
         nutritions=nutritions,
         seasons=seasons,
+        facts=facts,
     )
 
 
@@ -233,6 +267,64 @@ def build_fruit_statement(dataset: SeedDataset) -> object:
     return statement.on_conflict_do_update(
         index_elements=[Fruit.name],
         set_=update_columns,
+    )
+
+
+def fact_values_table(dataset: SeedDataset) -> object:
+    seed_values = values(
+        column("fruit_code", String(60)),
+        column("fact_type", String(40)),
+        column("fact_text", FruitFact.fact_text.type),
+        column("sort_order", FruitFact.sort_order.type),
+        column("is_active", FruitFact.is_active.type),
+        column("source_note", FruitFact.source_note.type),
+        name="seed_fruit_fact",
+    )
+    return seed_values.data(
+        [
+            (
+                item.fruit_code,
+                item.fact_type,
+                item.fact_text,
+                item.sort_order,
+                item.is_active,
+                item.source_note,
+            )
+            for item in dataset.facts
+        ]
+    )
+
+
+def build_fact_statement(dataset: SeedDataset) -> object:
+    seed_values = fact_values_table(dataset)
+    selected = select(
+        Fruit.id,
+        seed_values.c.fact_type,
+        seed_values.c.fact_text,
+        seed_values.c.sort_order,
+        seed_values.c.is_active,
+        seed_values.c.source_note,
+    ).join(seed_values, Fruit.code == seed_values.c.fruit_code)
+    statement = insert(FruitFact).from_select(
+        (
+            "fruit_id",
+            "fact_type",
+            "fact_text",
+            "sort_order",
+            "is_active",
+            "source_note",
+        ),
+        selected,
+    )
+    return statement.on_conflict_do_update(
+        index_elements=[FruitFact.fruit_id, FruitFact.sort_order],
+        set_={
+            "fact_type": statement.excluded.fact_type,
+            "fact_text": statement.excluded.fact_text,
+            "is_active": statement.excluded.is_active,
+            "source_note": statement.excluded.source_note,
+            "updated_at": func.now(),
+        },
     )
 
 
@@ -387,6 +479,7 @@ def seed_database(
             raise RuntimeError("Database schema is not at the expected version")
 
         connection.execute(build_fruit_statement(dataset))
+        connection.execute(build_fact_statement(dataset))
         connection.execute(build_nutrition_statement(dataset))
         if before_seasons is not None:
             before_seasons()
@@ -396,6 +489,7 @@ def seed_database(
         fruits=len(dataset.fruits),
         nutritions=len(dataset.nutritions),
         seasons=len(dataset.seasons),
+        facts=len(dataset.facts),
     )
 
 
@@ -413,6 +507,7 @@ def render_seed_sql(dataset: SeedDataset) -> str:
 
     statements = (
         build_fruit_statement(dataset),
+        build_fact_statement(dataset),
         build_nutrition_statement(dataset),
         build_season_statement(dataset),
     )
@@ -442,6 +537,28 @@ def create_checked_test_engine() -> Engine:
     return engine
 
 
+def create_checked_migration_engine() -> Engine:
+    """创建仅用于明确授权的 Supabase migration seed engine。"""
+
+    if os.getenv("DAILY_FRUIT_ALLOW_MIGRATION_SEED") != "yes":
+        raise RuntimeError(
+            "DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes is required"
+        )
+    settings = Settings()
+    database_url = settings.migration_database_url
+    if database_url is None:
+        raise RuntimeError("MIGRATION_DATABASE_URL is not configured")
+    parsed = urlsplit(database_url)
+    if not _is_supabase_host(parsed.hostname or ""):
+        raise RuntimeError(
+            "Migration seed requires a confirmed Supabase migration database"
+        )
+    engine = create_database_engine("migration", settings=settings)
+    if engine is None:
+        raise RuntimeError("MIGRATION_DATABASE_URL is not configured")
+    return engine
+
+
 def build_parser() -> argparse.ArgumentParser:
     """定义 dry-run、emit-sql 和受保护本地写入模式。"""
 
@@ -457,6 +574,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="print PostgreSQL upsert SQL without a database connection",
     )
+    mode.add_argument(
+        "--migration",
+        action="store_true",
+        help="write the confirmed Supabase migration database with explicit approval",
+    )
     return parser
 
 
@@ -469,12 +591,14 @@ def main(arguments: Sequence[str] | None = None) -> int:
         fruits=len(dataset.fruits),
         nutritions=len(dataset.nutritions),
         seasons=len(dataset.seasons),
+        facts=len(dataset.facts),
     )
 
     if options.dry_run:
         print(
             "Dry run validated: "
             f"fruits={summary.fruits}, "
+            f"facts={summary.facts}, "
             f"nutritions={summary.nutritions}, seasons={summary.seasons}"
         )
         return 0
@@ -484,7 +608,11 @@ def main(arguments: Sequence[str] | None = None) -> int:
 
     engine: Engine | None = None
     try:
-        engine = create_checked_test_engine()
+        engine = (
+            create_checked_migration_engine()
+            if options.migration
+            else create_checked_test_engine()
+        )
         summary = seed_database(engine, dataset)
     except (SQLAlchemyError, RuntimeError, ValueError):
         print("Seed failed; transaction rolled back.")
@@ -496,6 +624,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
     print(
         "Seed completed: "
         f"fruits={summary.fruits}, "
+        f"facts={summary.facts}, "
         f"nutritions={summary.nutritions}, seasons={summary.seasons}"
     )
     return 0

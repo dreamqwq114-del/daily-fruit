@@ -32,6 +32,9 @@ RECOMMENDATION_DETAIL_OPTIONS = (
     selectinload(Recommendation.items)
     .selectinload(RecommendationItem.fruit)
     .selectinload(Fruit.seasons),
+    selectinload(Recommendation.items)
+    .selectinload(RecommendationItem.fruit)
+    .selectinload(Fruit.facts),
     selectinload(Recommendation.items).selectinload(
         RecommendationItem.feedback
     ),

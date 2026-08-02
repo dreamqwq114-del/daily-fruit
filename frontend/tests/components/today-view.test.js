@@ -21,6 +21,7 @@ import TodayView from '../../src/views/TodayView.vue'
 function makeRecommendation(id = 10, refreshNumber = 0) {
   const fruit = (fruitId, name) => ({
     id: fruitId,
+    code: fruitId === 1 ? 'apple' : 'orange',
     name,
     category: '演示水果',
     taste: '清甜',
@@ -52,6 +53,14 @@ function makeRecommendation(id = 10, refreshNumber = 0) {
         fruit_id: 1,
         score: 0.8,
         rank: 1,
+        daily_fact: {
+          id: 501,
+          fruit_id: 1,
+          fact_type: 'botany',
+          fact_text: '测试冷知识文案',
+          sort_order: 1,
+          is_active: true,
+        },
         fruit: fruit(1, '苹果'),
         reasons: [
           { code: 'in_season', component: 'season_score', message: '当前处于适宜购买月份' },
@@ -112,6 +121,21 @@ describe('TodayView', () => {
     expect(wrapper.text()).toContain('苹果')
     expect(wrapper.text()).toContain('橙子')
     expect(wrapper.text()).toContain('华东')
+  })
+
+  it('renders an optional daily fact after the description', async () => {
+    const wrapper = mountToday()
+    await flushPromises()
+
+    const firstCard = wrapper.findAll('.fruit-card')[0]
+    expect(firstCard.find('.fruit-fact').exists()).toBe(true)
+    expect(firstCard.find('.fruit-fact').text()).toContain('每日冷知识')
+    expect(firstCard.find('.fruit-fact').text()).toContain('测试冷知识文案')
+    expect(
+      firstCard.find('.fruit-description').element.compareDocumentPosition(
+        firstCard.find('.fruit-fact').element,
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
   })
 
   it('prevents duplicate refresh and feedback submissions', async () => {

@@ -243,6 +243,12 @@ class Fruit(TimestampMixin, Base):
         passive_deletes=True,
         single_parent=True,
     )
+    facts: Mapped[list[FruitFact]] = relationship(
+        back_populates="fruit",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="FruitFact.sort_order",
+    )
     seasons: Mapped[list[FruitSeason]] = relationship(
         back_populates="fruit",
         cascade="all, delete-orphan",
@@ -256,6 +262,59 @@ class Fruit(TimestampMixin, Base):
         back_populates="fruit",
         passive_deletes="all",
     )
+
+
+class FruitFact(TimestampMixin, Base):
+    """姘存灉鍐锋煡鏂囨锛氭瘡绉嶆按鏋滃彲淇濆瓨澶氭潯骞舵寜鏃ユ湡杞崲銆?"""
+
+    __tablename__ = "fruit_facts"
+    __table_args__ = (
+        UniqueConstraint(
+            "fruit_id",
+            "sort_order",
+            name="uq_fruit_facts_fruit_sort_order",
+        ),
+        CheckConstraint(
+            "sort_order > 0",
+            name="ck_fruit_facts_sort_order_positive",
+        ),
+        CheckConstraint(
+            "length(btrim(fact_type)) > 0",
+            name="ck_fruit_facts_fact_type_not_blank",
+        ),
+        CheckConstraint(
+            "length(btrim(fact_text)) > 0",
+            name="ck_fruit_facts_fact_text_not_blank",
+        ),
+        Index(
+            "ix_fruit_facts_fruit_active",
+            "fruit_id",
+            "is_active",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(always=False),
+        primary_key=True,
+    )
+    fruit_id: Mapped[int] = mapped_column(
+        BigInteger,
+        ForeignKey("public.fruits.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    fact_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    fact_text: Mapped[str] = mapped_column(Text, nullable=False)
+    sort_order: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default=true(),
+    )
+    source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    fruit: Mapped[Fruit] = relationship(back_populates="facts")
 
 
 class FruitNutrition(TimestampMixin, Base):

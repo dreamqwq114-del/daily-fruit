@@ -58,6 +58,7 @@ def test_today_refresh_feedback_and_history_flow(client: TestClient) -> None:
     assert {item["rank"] for item in first["items"]} == {1, 2}
     assert all(2 <= len(item["reasons"]) <= 4 for item in first["items"])
     assert all(item["fruit"]["nutrition"] for item in first["items"])
+    assert all(item["daily_fact"]["fact_text"] for item in first["items"])
 
     repeated = client.get("/api/recommendations/today")
     assert repeated.status_code == 200

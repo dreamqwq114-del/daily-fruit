@@ -1,0 +1,97 @@
+[
+  {"fruit_code":"apple","fact_type":"botany","fact_text":"苹果、梨、桃和草莓都属于蔷薇科，和玫瑰是远亲。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"apple","fact_type":"ripening","fact_text":"苹果会释放乙烯，因此和猕猴桃、牛油果放在一起，可以帮助它们更快成熟。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"apple","fact_type":"health_note","fact_text":"“一天一苹果，医生远离我”是一句健康俗语，不代表只吃苹果就能预防疾病。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"banana","fact_type":"botany","fact_text":"香蕉在植物学上属于浆果，香蕉“树”则是一种大型草本植物。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"banana","fact_type":"ripening","fact_text":"香蕉成熟时，果肉中的部分淀粉会转化为糖，因此会越来越甜、越来越软。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"banana","fact_type":"food","fact_text":"香蕉皮出现少量褐色斑点通常代表成熟度提高，并不等于果肉已经腐坏。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"orange","fact_type":"botany","fact_text":"甜橙主要来源于柑橘祖先和柚子祖先的杂交。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"orange","fact_type":"structure","fact_text":"橙子内部一粒粒多汁的果肉，实际上是装满汁液的汁囊。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"orange","fact_type":"variety","fact_text":"脐橙底部的“肚脐”是一枚发育不完全的次生小果实，不是虫眼或畸形伤口。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"mandarin","fact_type":"botany","fact_text":"柑橘不是缩小版的甜橙，反而是甜橙的重要祖先之一。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"mandarin","fact_type":"structure","fact_text":"柑橘容易剥皮，是因为果皮内侧与果肉之间连接得比较疏松。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"mandarin","fact_type":"ripening","fact_text":"柑橘采摘后可以变软、颜色也可能变化，但糖分通常不会明显增加。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"grape","fact_type":"botany","fact_text":"葡萄是真正的浆果，而名字里带“莓”的草莓反而不是。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"grape","fact_type":"appearance","fact_text":"葡萄表面的白霜通常是天然果粉，能减少水分流失，并不等同于农药残留。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"grape","fact_type":"ripening","fact_text":"葡萄采摘后不会继续明显变甜，因此买到的酸葡萄很难靠放置变甜。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"kiwifruit","fact_type":"botany","fact_text":"猕猴桃原产于中国，在海外推广早期曾被称为“中国醋栗”。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"kiwifruit","fact_type":"ripening","fact_text":"猕猴桃会受到乙烯影响，与苹果或香蕉一起放入纸袋，可以加快软化。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"kiwifruit","fact_type":"food","fact_text":"猕猴桃果肉中的细小黑籽可以直接食用，不需要专门去除。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"strawberry","fact_type":"botany","fact_text":"草莓红色的部分主要是膨大的花托，并不是真正意义上的果实。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"strawberry","fact_type":"structure","fact_text":"草莓表面的每一个“小籽”，其实都是一枚独立的小果实。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"strawberry","fact_type":"storage","fact_text":"草莓最好在食用前再清洗，过早沾水容易加快软化和霉变。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"blueberry","fact_type":"botany","fact_text":"蓝莓在植物学上确实属于真正的浆果。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"blueberry","fact_type":"appearance","fact_text":"蓝莓表面的灰白色果粉是一层天然蜡质，可以帮助果实减少失水。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"blueberry","fact_type":"color","fact_text":"蓝莓的蓝紫色主要来自果皮中的花青素，果肉本身通常颜色较浅。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"watermelon","fact_type":"botany","fact_text":"西瓜属于葫芦科，它的果实类型叫“瓠果”，可以理解为外皮坚硬的特殊浆果。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"watermelon","fact_type":"breeding","fact_text":"常见无籽西瓜通常是三倍体，所谓“无籽”实际上是种子没有正常发育成熟。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"watermelon","fact_type":"food","fact_text":"西瓜含水量超过九成，但不能完全代替日常饮水。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"hami_melon","fact_type":"classification","fact_text":"哈密瓜不是单一品种，而是新疆多种甜瓜品种和类型的统称。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"hami_melon","fact_type":"texture","fact_text":"不同哈密瓜的果肉可能是脆的、软的，颜色也可能呈绿色、白色或橙色。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"hami_melon","fact_type":"storage","fact_text":"哈密瓜切开后容易失水和吸收冰箱异味，应密封冷藏并尽快食用。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"peach","fact_type":"botany","fact_text":"桃属于核果，坚硬的桃核是包裹种子的内果皮，而不是种子本身。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"peach","fact_type":"variety","fact_text":"桃可以分为离核桃和黏核桃，区别在于成熟后果肉是否容易与果核分离。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"peach","fact_type":"ripening","fact_text":"桃采摘后可以继续变软、香味增强，但过早采摘的桃不一定能获得完整甜味。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"pear","fact_type":"botany","fact_text":"梨与苹果同属蔷薇科仁果类，内部结构也十分相似。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pear","fact_type":"texture","fact_text":"梨肉中细小的颗粒感来自“石细胞”，并不代表混入了沙子。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pear","fact_type":"ripening","fact_text":"许多欧洲梨需要采摘后再软熟，而亚洲梨通常适合在树上成熟后食用。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"mango","fact_type":"botany","fact_text":"芒果、腰果和开心果都属于漆树科，确实是植物学上的亲戚。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"mango","fact_type":"structure","fact_text":"芒果和桃一样属于核果，中央的硬核内部才是真正的种子。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"mango","fact_type":"health_note","fact_text":"少数人接触芒果果皮或果梗汁液后可能出现皮肤发痒、红肿，不一定是果肉本身引起的。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"pineapple","fact_type":"botany","fact_text":"一个菠萝由许多小花形成的果实融合而成，因此属于聚花果。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pineapple","fact_type":"food","fact_text":"新鲜菠萝中的菠萝蛋白酶会分解蛋白质，这也是部分人吃完后舌头刺痛的原因之一。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pineapple","fact_type":"processing","fact_text":"加热和罐藏会使大部分菠萝蛋白酶失去活性，因此熟菠萝通常没有那么明显的刺口感。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"dragon_fruit","fact_type":"botany","fact_text":"火龙果其实是攀援型仙人掌结出的果实，并不是长在普通果树上。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"dragon_fruit","fact_type":"flowering","fact_text":"火龙果的花通常在夜间开放，花朵很大，但开放时间比较短。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"dragon_fruit","fact_type":"food","fact_text":"火龙果果肉中的黑色小籽可以直接食用，也是其膳食纤维来源的一部分。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"lychee","fact_type":"botany","fact_text":"荔枝、龙眼和红毛丹都属于无患子科，是关系较近的水果。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"lychee","fact_type":"structure","fact_text":"荔枝白色半透明的可食部分叫假种皮，真正的果实结构包围着内部种子。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"lychee","fact_type":"ripening","fact_text":"荔枝采摘后不会继续明显变甜，因此需要在树上达到合适成熟度再采收。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"longan","fact_type":"botany","fact_text":"龙眼与荔枝是近亲，二者都属于无患子科。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"longan","fact_type":"structure","fact_text":"龙眼透明果肉包围着深色种子，因此英文中常被称为“dragon eye”。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"longan","fact_type":"processing","fact_text":"龙眼晒干或烘干后，水分减少、糖分和香气相对集中，便成为常见的桂圆干。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"cherry","fact_type":"botany","fact_text":"樱桃、桃、李和杏都属于李属，果实类型均为核果。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"cherry","fact_type":"ripening","fact_text":"樱桃采摘后不会继续明显变甜，因此采收时的成熟度非常重要。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"cherry","fact_type":"health_note","fact_text":"完整吞下一枚樱桃核通常问题不大，但不应敲碎后大量咀嚼其中的种仁。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"pomegranate","fact_type":"botany","fact_text":"石榴属于一种果皮坚韧的特殊浆果，内部由多个分隔空间组成。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pomegranate","fact_type":"structure","fact_text":"红色多汁的部分叫假种皮，每一颗假种皮内部都包裹着一枚种子。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pomegranate","fact_type":"food","fact_text":"石榴籽可以连同外面的汁囊一起食用，也可以只吸取汁液后吐出硬籽。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"pomelo","fact_type":"botany","fact_text":"柚子是现代许多柑橘品种的重要祖先，甜橙和西柚的形成都与它有关。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pomelo","fact_type":"structure","fact_text":"柚子果皮中的白色部分叫中果皮，通常比橙子和柑橘厚得多。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"pomelo","fact_type":"medication_note","fact_text":"部分柚子品种可能影响某些药物的代谢，但并不是“所有柚子不能和所有药一起吃”；服药者应查看药品说明或询问医生、药师。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"papaya","fact_type":"botany","fact_text":"木瓜植株看起来像树，实际上是一种大型草本植物。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"papaya","fact_type":"food","fact_text":"未成熟木瓜含有较多乳白色汁液，其中的木瓜蛋白酶可以分解蛋白质。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"papaya","fact_type":"cooking","fact_text":"青木瓜常用于做菜或嫩肉，成熟木瓜则更软、更甜，适合作为水果直接食用。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"durian","fact_type":"botany","fact_text":"榴莲属于锦葵科，与可可、棉花、秋葵和木槿都能算作远亲。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"durian","fact_type":"growth","fact_text":"榴莲的花和果实可以直接生长在粗壮树枝甚至主干附近，这种现象叫老茎生花或老茎结果。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"durian","fact_type":"aroma","fact_text":"榴莲复杂的气味来自多种挥发性化合物，其中包括含硫化合物、酯类和醇类。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"lemon","fact_type":"botany","fact_text":"柠檬并不是最原始的柑橘种类，而是不同古老柑橘祖先杂交形成的后代。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"lemon","fact_type":"peel","fact_text":"柠檬皮表面的小点是油腺，挤压时喷出的液体主要含有芳香精油。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"lemon","fact_type":"health_note","fact_text":"长时间含柠檬片或频繁小口饮用高浓度柠檬水，可能增加牙釉质酸蚀风险。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+
+  {"fruit_code":"avocado","fact_type":"botany","fact_text":"牛油果属于樟科，与肉桂、樟树和月桂是远亲；果实类型则属于单籽浆果。","sort_order":1,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"avocado","fact_type":"ripening","fact_text":"牛油果通常在树上保持坚硬，采摘后才会逐渐软熟。","sort_order":2,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"},
+  {"fruit_code":"avocado","fact_type":"food","fact_text":"切开的牛油果变褐主要是酶促氧化造成的，加入柠檬汁并隔绝空气可以减慢变色。","sort_order":3,"is_active":true,"source_note":"用户提供的演示文案，待来源审校。"}
+]

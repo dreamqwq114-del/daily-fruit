@@ -17,6 +17,7 @@ BACKEND_ROOT = Path(__file__).resolve().parents[2]
 EXPECTED_TABLES = {
     "users",
     "fruits",
+    "fruit_facts",
     "fruit_nutritions",
     "fruit_seasons",
     "user_fruit_preferences",
@@ -25,6 +26,7 @@ EXPECTED_TABLES = {
     "recommendation_feedback",
 }
 EXPECTED_INDEXES = {
+    "fruit_facts": {"ix_fruit_facts_fruit_active"},
     "fruit_seasons": {"ix_fruit_seasons_region_fruit_id"},
     "recommendations": {
         "ix_recommendations_user_history",
@@ -180,7 +182,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     with engine.connect() as connection:
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
-        ).scalar_one() == "0007"
+        ).scalar_one() == "0008"
         users_columns = {
             item["name"]
             for item in inspect(connection).get_columns(
@@ -221,6 +223,7 @@ def test_actual_indexes_and_foreign_key_delete_rules(
     assert actual_delete_rules == {
         ("fruit_nutritions", "fruit_id"): "CASCADE",
         ("fruit_seasons", "fruit_id"): "CASCADE",
+        ("fruit_facts", "fruit_id"): "CASCADE",
         ("user_fruit_preferences", "user_id"): "CASCADE",
         ("user_fruit_preferences", "fruit_id"): "RESTRICT",
         ("recommendations", "user_id"): "RESTRICT",

@@ -1,13 +1,14 @@
 """把推荐 ORM 图映射成不暴露 SQLAlchemy 对象的 API 响应。"""
 
 from app.models import Recommendation
-from app.schemas.fruit import FruitDetail
+from app.schemas.fruit import FruitDetail, FruitFactRead
 from app.schemas.recommendation import (
     RecommendationDetail,
     RecommendationFeedbackRead,
     RecommendationItemDetail,
     RecommendationReason,
 )
+from app.services.fruit_fact_service import select_daily_fact
 
 
 def recommendation_to_detail(
@@ -40,6 +41,18 @@ def recommendation_to_detail(
                 nutrition_pair_score=item.nutrition_pair_score,
                 created_at=item.created_at,
                 fruit=FruitDetail.model_validate(item.fruit),
+                daily_fact=(
+                    None
+                    if (
+                        daily_fact := select_daily_fact(
+                            item.fruit.facts,
+                            fruit_code=item.fruit.code,
+                            recommendation_date=recommendation.recommendation_date,
+                        )
+                    )
+                    is None
+                    else FruitFactRead.model_validate(daily_fact)
+                ),
                 feedback=feedback,
             )
         )
