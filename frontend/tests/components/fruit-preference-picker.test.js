@@ -38,6 +38,7 @@ describe('FruitPreferencePicker', () => {
     const wrapper = mountPicker()
     await wrapper.findAll('.button--small')[0].trigger('click')
     expect(wrapper.find('.fruit-picker-dialog').exists()).toBe(true)
+    expect(wrapper.find('.fruit-picker-scroll-area').exists()).toBe(true)
 
     await wrapper.find('.fruit-picker-option').trigger('click')
     expect(wrapper.find('.fruit-picker-option').classes()).toContain('is-selected')
