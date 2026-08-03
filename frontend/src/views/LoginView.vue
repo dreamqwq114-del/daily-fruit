@@ -46,7 +46,7 @@ async function submit() {
     <div class="auth-card">
       <p class="eyebrow">每日水果 · 安全登录</p>
       <h1>{{ mode === 'signin' ? '欢迎回来' : '创建账号' }}</h1>
-      <p>登录信息由 Supabase Auth 管理，水果偏好仍只通过 FastAPI 访问。</p>
+      <p>登录后，你的偏好会被妥善保存，方便我们每天为你推荐水果。</p>
       <p v-if="mode === 'signup'" class="auth-note">
         邮箱仅作为登录账号；注册无需验证码，请确认邮箱填写正确。
       </p>
