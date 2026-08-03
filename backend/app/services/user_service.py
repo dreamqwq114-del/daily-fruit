@@ -22,12 +22,27 @@ from app.schemas.user import (
     UserRead,
     UserUpdate,
 )
+from app.services.texture_preference import (
+    LEGACY_TEXTURE_SYNC_SOURCE,
+    convert_legacy_texture_preference,
+)
 
 
 def create_user(session: Session, payload: UserCreate) -> UserRead:
     """创建未绑定 Auth 的兼容入口；受保护 API 使用 principal 版本。"""
 
-    user = User(**payload.model_dump())
+    values = payload.model_dump()
+    if "texture_preference" in payload.model_fields_set:
+        _apply_explicit_texture(values, values.get("texture_preference"))
+    elif {"soft_preference", "crisp_preference"} & payload.model_fields_set:
+        texture, source = convert_legacy_texture_preference(
+            values.get("soft_preference"), values.get("crisp_preference")
+        )
+        values.update(
+            texture_preference=texture,
+            texture_preference_source=source,
+        )
+    user = User(**values)
     user_repository.add_user(session, user)
     session.commit()
     return UserRead.model_validate(user)
@@ -42,7 +57,15 @@ def create_user_for_principal(
 
     if user_repository.get_user_by_auth_user_id(session, auth_user_id):
         raise ResourceConflictError("当前账号已经创建用户资料")
-    user = User(auth_user_id=auth_user_id, **payload.model_dump())
+    values = payload.model_dump()
+    if "texture_preference" in payload.model_fields_set:
+        _apply_explicit_texture(values, values.get("texture_preference"))
+    elif {"soft_preference", "crisp_preference"} & payload.model_fields_set:
+        texture, source = convert_legacy_texture_preference(
+            values.get("soft_preference"), values.get("crisp_preference")
+        )
+        values.update(texture_preference=texture, texture_preference_source=source)
+    user = User(auth_user_id=auth_user_id, **values)
     try:
         user_repository.add_user(session, user)
         session.commit()
@@ -67,7 +90,33 @@ def update_user(
     """使用 ``exclude_unset`` 做字段级更新，并在成功后提交事务。"""
 
     user = _require_user(session, user_id)
-    for field_name, value in payload.model_dump(exclude_unset=True).items():
+    supplied = payload.model_dump(exclude_unset=True)
+    if "texture_preference" in payload.model_fields_set:
+        texture = supplied["texture_preference"]
+        user.texture_preference = texture
+        user.texture_preference_source = (
+            "explicit_new" if texture is not None else "unset"
+        )
+        user.legacy_texture_sync_source = (
+            LEGACY_TEXTURE_SYNC_SOURCE if texture is not None else None
+        )
+        if texture is None:
+            user.soft_preference = None
+            user.crisp_preference = None
+        else:
+            user.soft_preference = 1 - float(texture)
+            user.crisp_preference = float(texture)
+        supplied.pop("texture_preference", None)
+        supplied.pop("soft_preference", None)
+        supplied.pop("crisp_preference", None)
+    elif {"soft_preference", "crisp_preference"} & payload.model_fields_set:
+        soft = supplied.get("soft_preference", user.soft_preference)
+        crisp = supplied.get("crisp_preference", user.crisp_preference)
+        texture, source = convert_legacy_texture_preference(soft, crisp)
+        user.texture_preference = texture
+        user.texture_preference_source = source
+        user.legacy_texture_sync_source = None
+    for field_name, value in supplied.items():
         setattr(user, field_name, value)
     user.updated_at = datetime.now(UTC)
     session.commit()
@@ -174,6 +223,24 @@ def _require_user(session: Session, user_id: int) -> User:
     if user is None:
         raise ResourceNotFoundError("用户不存在")
     return user
+
+
+def _apply_explicit_texture(values: dict[str, object], texture: object) -> None:
+    """Double-write new texture values for one compatibility release."""
+
+    values["texture_preference"] = texture
+    values["texture_preference_source"] = (
+        "explicit_new" if texture is not None else "unset"
+    )
+    values["legacy_texture_sync_source"] = (
+        LEGACY_TEXTURE_SYNC_SOURCE if texture is not None else None
+    )
+    if texture is None:
+        values["soft_preference"] = None
+        values["crisp_preference"] = None
+    else:
+        values["soft_preference"] = 1 - float(texture)
+        values["crisp_preference"] = float(texture)
 
 
 __all__ = [

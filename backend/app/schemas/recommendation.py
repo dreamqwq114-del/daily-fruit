@@ -43,6 +43,7 @@ class ReasonCode(StrEnum):
     SOUR_MATCH = "sour_match"
     SOFT_MATCH = "soft_match"
     CRISP_MATCH = "crisp_match"
+    TEXTURE_MATCH = "texture_match"
     PRICE_MATCH = "price_match"
     NOT_RECENTLY_RECOMMENDED = "not_recently_recommended"
     CONVENIENT = "convenient"
@@ -119,6 +120,16 @@ class RecommendationSelectionRead(ApiSchema):
     )
 
 
+class RecommendationSnapshotRead(ApiSchema):
+    """持久化时的最终解析值，不随当前水果目录重新计算。"""
+
+    effective_sweet_score: float | None = None
+    effective_sour_score: float | None = None
+    effective_texture_score: float | None = None
+    effective_convenience_score: float | None = None
+    effective_ripe_storage_score: float | None = None
+
+
 class RecommendationItemCreate(ApiSchema):
     fruit_id: PositiveId
     score: RecommendationScore
@@ -134,6 +145,7 @@ class RecommendationItemRead(RecommendationItemCreate):
     id: PositiveId
     recommendation_id: PositiveId
     created_at: AwareDatetime
+    snapshot: RecommendationSnapshotRead | None = None
 
 
 class RecommendationBase(ApiSchema):
@@ -142,6 +154,8 @@ class RecommendationBase(ApiSchema):
     refresh_number: RefreshNumber
     total_score: RecommendationScore
     status: RecommendationStatus = RecommendationStatus.ACTIVE
+    scoring_model_version: str | None = None
+    fruit_profile_version: str | None = None
 
 
 def _validate_recommendation_pair(

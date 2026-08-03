@@ -18,8 +18,8 @@ from pathlib import Path
 from typing import Callable, Sequence
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import Engine, String, column, func, select, text, values
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import Engine, String, cast, column, func, select, text, values
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
@@ -39,7 +39,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
 # 写入前的 schema 保护；该值必须与当前可写目标数据库的 alembic_version
 # 同步，否则脚本应拒绝写入而不是猜测数据库状态。
-EXPECTED_ALEMBIC_VERSION = "0012"
+EXPECTED_ALEMBIC_VERSION = "0013"
 
 DISPLAY_GROUP_BY_CATEGORY = {
     "仁果": "苹果梨类",
@@ -68,7 +68,13 @@ class FruitSeed(BaseModel):
     sour_score: Decimal = Field(ge=0, le=1)
     soft_score: Decimal = Field(ge=0, le=1)
     crisp_score: Decimal = Field(ge=0, le=1)
+    texture_score: Decimal = Field(ge=0, le=1)
     convenience_score: Decimal = Field(ge=0, le=1)
+    ripe_storage_score: Decimal = Field(ge=0, le=1)
+    typical_purchase_stage: str = Field(
+        pattern="^(ready_to_eat|needs_ripening|variable)$"
+    )
+    ripening_note: str | None = Field(default=None, max_length=500)
     average_price_level: int = Field(ge=1, le=3)
     default_portion: str = Field(min_length=1, max_length=80)
     default_portion_grams: Decimal = Field(gt=0)
@@ -89,6 +95,16 @@ class FruitSeed(BaseModel):
     image_url: str | None = None
     description: str = Field(min_length=1)
     is_active: bool = True
+
+    @field_validator("ripe_storage_score")
+    @classmethod
+    def validate_fixed_ripe_storage_score(cls, value: Decimal) -> Decimal:
+        if value not in {
+            Decimal("0.10"), Decimal("0.30"), Decimal("0.50"),
+            Decimal("0.70"), Decimal("0.90"),
+        }:
+            raise ValueError("ripe_storage_score must use a fixed profile value")
+        return value
 
 
 class NutritionSeed(BaseModel):
@@ -148,11 +164,27 @@ class SelectionOptionSeed(BaseModel):
     sour_score: Decimal | None = Field(default=None, ge=0, le=1)
     soft_score: Decimal | None = Field(default=None, ge=0, le=1)
     crisp_score: Decimal | None = Field(default=None, ge=0, le=1)
+    texture_score: Decimal | None = Field(default=None, ge=0, le=1)
+    ripe_storage_score: Decimal | None = Field(default=None, ge=0, le=1)
+    convenience_score: Decimal | None = Field(default=None, ge=0, le=1)
     is_default: bool = False
     is_active: bool = True
     display_order: int = Field(ge=1, le=100)
     data_quality: str = Field(default="low", pattern="^(high|medium|low)$")
     data_source_note: str | None = Field(default=None, max_length=500)
+
+    @field_validator("ripe_storage_score")
+    @classmethod
+    def validate_fixed_ripe_storage_score(
+        cls,
+        value: Decimal | None,
+    ) -> Decimal | None:
+        if value is not None and value not in {
+            Decimal("0.10"), Decimal("0.30"), Decimal("0.50"),
+            Decimal("0.70"), Decimal("0.90"),
+        }:
+            raise ValueError("selection option ripe_storage_score must use a fixed profile value")
+        return value
 
 
 @dataclass(frozen=True)
@@ -193,6 +225,21 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
     fruit_payload = json.loads(
         (data_root / "fruits_seed.json").read_text(encoding="utf-8")
     )
+    profile_payload = {
+        item["code"]: item
+        for item in json.loads(
+            (data_root / "fruit_profile_seed.json").read_text(encoding="utf-8")
+        )
+    }
+    if set(profile_payload) != {item["code"] for item in fruit_payload}:
+        raise ValueError("Fruit profile rows must match fruits exactly")
+    for item in fruit_payload:
+        profile = profile_payload.get(item["code"])
+        if profile is None:
+            raise ValueError(f"Missing fruit profile for {item['code']}")
+        item.update(profile)
+        item["soft_score"] = round(1 - profile["texture_score"], 3)
+        item["crisp_score"] = profile["texture_score"]
     fruits = tuple(FruitSeed.model_validate(item) for item in fruit_payload)
     nutritions = tuple(
         NutritionSeed.model_validate(item)
@@ -261,17 +308,31 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
     if not option_fruit_codes <= expected_codes:
         raise ValueError("Selection options must reference known fruit codes")
     for item in selection_options:
-        if item.fruit_code in EXPLICIT_ONLY_OPTION_FRUITS and any(
+        if item.is_default and any(
             value is not None
             for value in (
                 item.sweet_score,
                 item.sour_score,
                 item.soft_score,
                 item.crisp_score,
+                item.texture_score,
+                item.ripe_storage_score,
+                item.convenience_score,
+            )
+        ):
+            raise ValueError("Default selection options must inherit parent scores")
+        if item.fruit_code in EXPLICIT_ONLY_OPTION_FRUITS and any(
+            value is not None
+            for value in (
+                item.soft_score,
+                item.crisp_score,
+                item.texture_score,
+                item.ripe_storage_score,
             )
         ):
             raise ValueError(
-                "Explicit-only selection options must not override fruit scores"
+                "Explicit-only selection options must not encode seed hardness "
+                "as global texture or storage scores"
             )
     for fruit_code in option_fruit_codes:
         active = [
@@ -300,15 +361,6 @@ def fruit_rows(dataset: SeedDataset) -> list[dict[str, object]]:
         row["display_group"] = row["display_group"] or DISPLAY_GROUP_BY_CATEGORY[
             row["category"]
         ]
-        # The four component fields are the single calculation source.  The
-        # persisted aggregate remains only for compatibility with old clients.
-        row["convenience_score"] = round(
-            Decimal("0.30") * row["portability_score"]
-            + Decimal("0.25") * (1 - row["preparation_difficulty"])
-            + Decimal("0.25") * (1 - row["messiness_score"])
-            + Decimal("0.20") * (1 - row["storage_difficulty"]),
-            3,
-        )
         if not row["aliases"]:
             row["aliases"] = postgresql.array([], type_=String(100))
         rows.append(row)
@@ -330,7 +382,11 @@ def build_fruit_statement(dataset: SeedDataset) -> object:
             "sour_score",
             "soft_score",
             "crisp_score",
+            "texture_score",
             "convenience_score",
+            "ripe_storage_score",
+            "typical_purchase_stage",
+            "ripening_note",
             "average_price_level",
             "default_portion",
             "default_portion_grams",
@@ -562,6 +618,9 @@ def selection_option_values_table(dataset: SeedDataset) -> object:
         column("sour_score", FruitSelectionOption.sour_score.type),
         column("soft_score", FruitSelectionOption.soft_score.type),
         column("crisp_score", FruitSelectionOption.crisp_score.type),
+        column("texture_score", FruitSelectionOption.texture_score.type),
+        column("ripe_storage_score", FruitSelectionOption.ripe_storage_score.type),
+        column("convenience_score", FruitSelectionOption.convenience_score.type),
         column("is_default", FruitSelectionOption.is_default.type),
         column("is_active", FruitSelectionOption.is_active.type),
         column("display_order", FruitSelectionOption.display_order.type),
@@ -579,6 +638,9 @@ def selection_option_values_table(dataset: SeedDataset) -> object:
                 item.sour_score,
                 item.soft_score,
                 item.crisp_score,
+                item.texture_score,
+                item.ripe_storage_score,
+                item.convenience_score,
                 item.is_default,
                 item.is_active,
                 item.display_order,
@@ -596,10 +658,34 @@ def build_selection_option_statement(dataset: SeedDataset) -> object:
         Fruit.id,
         seed_values.c.code,
         seed_values.c.name,
-        seed_values.c.sweet_score,
-        seed_values.c.sour_score,
-        seed_values.c.soft_score,
-        seed_values.c.crisp_score,
+        cast(
+            seed_values.c.sweet_score,
+            FruitSelectionOption.sweet_score.type,
+        ).label("sweet_score"),
+        cast(
+            seed_values.c.sour_score,
+            FruitSelectionOption.sour_score.type,
+        ).label("sour_score"),
+        cast(
+            seed_values.c.soft_score,
+            FruitSelectionOption.soft_score.type,
+        ).label("soft_score"),
+        cast(
+            seed_values.c.crisp_score,
+            FruitSelectionOption.crisp_score.type,
+        ).label("crisp_score"),
+        cast(
+            seed_values.c.texture_score,
+            FruitSelectionOption.texture_score.type,
+        ).label("texture_score"),
+        cast(
+            seed_values.c.ripe_storage_score,
+            FruitSelectionOption.ripe_storage_score.type,
+        ).label("ripe_storage_score"),
+        cast(
+            seed_values.c.convenience_score,
+            FruitSelectionOption.convenience_score.type,
+        ).label("convenience_score"),
         seed_values.c.is_default,
         seed_values.c.is_active,
         seed_values.c.display_order,
@@ -615,6 +701,9 @@ def build_selection_option_statement(dataset: SeedDataset) -> object:
             "sour_score",
             "soft_score",
             "crisp_score",
+            "texture_score",
+            "ripe_storage_score",
+            "convenience_score",
             "is_default",
             "is_active",
             "display_order",
@@ -632,6 +721,9 @@ def build_selection_option_statement(dataset: SeedDataset) -> object:
             "sour_score": excluded.sour_score,
             "soft_score": excluded.soft_score,
             "crisp_score": excluded.crisp_score,
+            "texture_score": excluded.texture_score,
+            "ripe_storage_score": excluded.ripe_storage_score,
+            "convenience_score": excluded.convenience_score,
             "is_default": excluded.is_default,
             "is_active": excluded.is_active,
             "display_order": excluded.display_order,

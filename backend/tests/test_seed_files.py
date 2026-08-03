@@ -186,15 +186,59 @@ def test_fruit_fact_seed_has_three_rows_per_fruit() -> None:
     )
 
 
-def test_selection_option_seed_preserves_pomegranate_score_semantics() -> None:
+def test_selection_option_seed_matches_the_calibrated_override_matrix() -> None:
     rows = json.loads(OPTION_FILE.read_text(encoding="utf-8"))
-    pomegranate = [row for row in rows if row["fruit_code"] == "pomegranate"]
+    score_fields = (
+        "sweet_score",
+        "sour_score",
+        "texture_score",
+        "convenience_score",
+        "ripe_storage_score",
+    )
+    expected = {
+        ("apple", "crisp"): {},
+        ("apple", "powdery"): {
+            "sweet_score": 0.70, "sour_score": 0.15, "texture_score": 0.25,
+        },
+        ("peach", "crisp"): {},
+        ("peach", "soft"): {
+            "sweet_score": 0.80, "sour_score": 0.20, "texture_score": 0.15,
+            "convenience_score": 0.75, "ripe_storage_score": 0.10,
+        },
+        ("grape", "hard_crisp"): {},
+        ("grape", "soft_juicy"): {
+            "sweet_score": 0.70, "sour_score": 0.30, "texture_score": 0.20,
+            "ripe_storage_score": 0.10,
+        },
+        ("kiwifruit", "green"): {},
+        ("kiwifruit", "yellow"): {
+            "sweet_score": 0.60, "sour_score": 0.40, "texture_score": 0.20,
+        },
+        ("kiwifruit", "red"): {
+            "sweet_score": 0.65, "sour_score": 0.30, "texture_score": 0.20,
+            "ripe_storage_score": 0.10,
+        },
+        ("pomegranate", "soft_seed"): {},
+        ("pomegranate", "hard_seed"): {
+            "sweet_score": 0.70, "sour_score": 0.25, "convenience_score": 0.20,
+        },
+        ("dragon_fruit", "red"): {},
+        ("dragon_fruit", "white"): {
+            "sweet_score": 0.50, "sour_score": 0.05, "texture_score": 0.40,
+        },
+    }
 
-    assert {row["code"] for row in pomegranate} == {"soft_seed", "hard_seed"}
+    actual = {
+        (row["fruit_code"], row["code"]): {
+            field: row[field] for field in score_fields if row.get(field) is not None
+        }
+        for row in rows
+    }
+    assert actual == expected
     assert all(
-        row.get(field) is None
-        for row in pomegranate
-        for field in ("sweet_score", "sour_score", "soft_score", "crisp_score")
+        all(row.get(field) is None for field in score_fields)
+        for row in rows
+        if row["is_default"]
     )
 
 

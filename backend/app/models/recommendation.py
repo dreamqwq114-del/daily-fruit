@@ -77,6 +77,8 @@ class Recommendation(CreatedAtMixin, Base):
         nullable=False,
     )
     status: Mapped[str] = mapped_column(String(16), nullable=False)
+    scoring_model_version: Mapped[str] = mapped_column(String(40), nullable=False)
+    fruit_profile_version: Mapped[str] = mapped_column(String(40), nullable=False)
 
     user: Mapped[User] = relationship(back_populates="recommendations")
     items: Mapped[list[RecommendationItem]] = relationship(
@@ -146,6 +148,12 @@ class RecommendationItem(CreatedAtMixin, Base):
             name="ck_recommendation_items_selection_resolution_source",
         ),
         CheckConstraint(
+            "selection_option_id IS NULL OR "
+            "(selection_option_name_snapshot IS NOT NULL AND "
+            "selection_option_code_snapshot IS NOT NULL)",
+            name="ck_recommendation_items_selection_option_snapshot_complete",
+        ),
+        CheckConstraint(
             "effective_sweet_score_snapshot IS NULL OR effective_sweet_score_snapshot BETWEEN 0 AND 1",
             name="ck_recommendation_items_selection_sweet_range",
         ),
@@ -160,6 +168,26 @@ class RecommendationItem(CreatedAtMixin, Base):
         CheckConstraint(
             "effective_crisp_score_snapshot IS NULL OR effective_crisp_score_snapshot BETWEEN 0 AND 1",
             name="ck_recommendation_items_selection_crisp_range",
+        ),
+        CheckConstraint(
+            "effective_texture_score_snapshot IS NULL OR effective_texture_score_snapshot BETWEEN 0 AND 1",
+            name="ck_recommendation_items_selection_texture_range",
+        ),
+        CheckConstraint(
+            "effective_convenience_score_snapshot IS NULL OR effective_convenience_score_snapshot BETWEEN 0 AND 1",
+            name="ck_recommendation_items_selection_convenience_range",
+        ),
+        CheckConstraint(
+            "effective_ripe_storage_score_snapshot IS NULL OR effective_ripe_storage_score_snapshot BETWEEN 0 AND 1",
+            name="ck_recommendation_items_selection_ripe_range",
+        ),
+        CheckConstraint(
+            "jsonb_typeof(fruit_snapshot) = 'object'",
+            name="ck_recommendation_items_fruit_snapshot_object",
+        ),
+        CheckConstraint(
+            "daily_fact_snapshot IS NULL OR jsonb_typeof(daily_fact_snapshot) = 'object'",
+            name="ck_recommendation_items_daily_fact_snapshot_object",
         ),
         Index(
             "ix_recommendation_items_fruit_id",
@@ -210,6 +238,7 @@ class RecommendationItem(CreatedAtMixin, Base):
         BigInteger,
         ForeignKey(
             "public.fruit_selection_options.id",
+            name="fk_recommendation_items_selection_option",
             ondelete="RESTRICT",
         ),
         nullable=True,
@@ -223,6 +252,12 @@ class RecommendationItem(CreatedAtMixin, Base):
     selection_resolution_source: Mapped[str | None] = mapped_column(
         String(40), nullable=True
     )
+    fruit_snapshot: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False
+    )
+    daily_fact_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
     effective_sweet_score_snapshot: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 3), nullable=True
     )
@@ -233,6 +268,15 @@ class RecommendationItem(CreatedAtMixin, Base):
         Numeric(4, 3), nullable=True
     )
     effective_crisp_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
+    effective_texture_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
+    effective_convenience_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
+    effective_ripe_storage_score_snapshot: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 3), nullable=True
     )
 

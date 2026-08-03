@@ -37,6 +37,7 @@ class UserBase(ApiSchema):
     sour_preference: NormalizedScore | None = None
     soft_preference: NormalizedScore | None = None
     crisp_preference: NormalizedScore | None = None
+    texture_preference: NormalizedScore | None = None
     price_level: PriceLevel
     convenience_preference: NormalizedScore
     discovery_level: DiscoveryLevel = 1
@@ -61,6 +62,7 @@ class UserUpdate(ApiSchema):
     sour_preference: NormalizedScore | None = None
     soft_preference: NormalizedScore | None = None
     crisp_preference: NormalizedScore | None = None
+    texture_preference: NormalizedScore | None = None
     price_level: PriceLevel | None = None
     convenience_preference: NormalizedScore | None = None
     discovery_level: DiscoveryLevel | None = None
@@ -74,8 +76,9 @@ class UserUpdate(ApiSchema):
 
         if not self.model_fields_set:
             raise ValueError("At least one user field must be provided")
+        clearable = {"sweet_preference", "sour_preference", "texture_preference"}
         if any(
-            getattr(self, field_name) is None
+            getattr(self, field_name) is None and field_name not in clearable
             for field_name in self.model_fields_set
         ):
             raise ValueError("Updated user fields must not be null")

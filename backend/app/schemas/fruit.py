@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field
 
@@ -32,6 +32,7 @@ SupplyStatus = Annotated[
     str,
     Field(pattern="^(available|unknown|unavailable)$"),
 ]
+TypicalPurchaseStage = Literal["ready_to_eat", "needs_ripening", "variable"]
 
 
 class FruitBase(ApiSchema):
@@ -47,7 +48,13 @@ class FruitBase(ApiSchema):
     sour_score: NormalizedScore
     soft_score: NormalizedScore
     crisp_score: NormalizedScore
+    # Deprecated soft/crisp fields remain accepted for old clients; the new
+    # algorithm reads texture_score when it is present.
+    texture_score: NormalizedScore | None = None
     convenience_score: NormalizedScore
+    ripe_storage_score: NormalizedScore | None = None
+    typical_purchase_stage: TypicalPurchaseStage | None = None
+    ripening_note: Annotated[str, Field(max_length=500)] | None = None
     average_price_level: PriceLevel
     default_portion: DefaultPortion
     default_portion_grams: PortionGrams = 100
@@ -86,6 +93,9 @@ class FruitSelectionOptionRead(ApiSchema):
     sour_score: NormalizedScore | None = None
     soft_score: NormalizedScore | None = None
     crisp_score: NormalizedScore | None = None
+    texture_score: NormalizedScore | None = None
+    ripe_storage_score: NormalizedScore | None = None
+    convenience_score: NormalizedScore | None = None
     is_default: bool
     is_active: bool
     display_order: Annotated[int, Field(ge=1)]

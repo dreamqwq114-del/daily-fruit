@@ -15,7 +15,6 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.models import (
-    Fruit,
     Recommendation,
     RecommendationFeedback,
     RecommendationItem,
@@ -26,20 +25,8 @@ from app.services.recommendation_types import FeedbackEvent, HistoryEvent
 RECOMMENDATION_DETAIL_OPTIONS = (
     # items → fruit/nutrition/seasons/feedback 全部批量预加载，避免 N+1。
     # 这是加载策略，不改变历史/反馈的业务统计口径。
-    selectinload(Recommendation.items)
-    .selectinload(RecommendationItem.fruit)
-    .selectinload(Fruit.nutrition),
-    selectinload(Recommendation.items)
-    .selectinload(RecommendationItem.fruit)
-    .selectinload(Fruit.seasons),
-    selectinload(Recommendation.items)
-    .selectinload(RecommendationItem.fruit)
-    .selectinload(Fruit.facts),
     selectinload(Recommendation.items).selectinload(
         RecommendationItem.feedback
-    ),
-    selectinload(Recommendation.items).selectinload(
-        RecommendationItem.selection_option
     ),
 )
 

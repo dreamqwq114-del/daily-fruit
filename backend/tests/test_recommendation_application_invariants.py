@@ -113,3 +113,18 @@ def test_application_invariant_check_is_skipped_for_initial_recommendation(
 
     assert actual is result
     assert calls == 1
+
+
+def test_persistence_rejects_results_without_frozen_fruit_context() -> None:
+    with pytest.raises(
+        service.RecommendationInvariantError,
+        match="未加载快照上下文",
+    ):
+        service._persist_recommendation(
+            object(),
+            user_id=7,
+            recommendation_date=date(2026, 8, 10),
+            refresh_number=0,
+            result=_fake_result(1, 2),
+            fruits=(),
+        )

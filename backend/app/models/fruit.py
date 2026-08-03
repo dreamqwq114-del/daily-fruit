@@ -60,6 +60,14 @@ class Fruit(TimestampMixin, Base):
             name="ck_fruits_crisp_score_range",
         ),
         CheckConstraint(
+            "texture_score BETWEEN 0 AND 1",
+            name="ck_fruits_texture_score_range",
+        ),
+        CheckConstraint(
+            "ripe_storage_score IN (0.10, 0.30, 0.50, 0.70, 0.90)",
+            name="ck_fruits_ripe_storage_score_values",
+        ),
+        CheckConstraint(
             "convenience_score BETWEEN 0 AND 1",
             name="ck_fruits_convenience_score_range",
         ),
@@ -111,6 +119,10 @@ class Fruit(TimestampMixin, Base):
             "data_quality IN ('high', 'medium', 'low')",
             name="ck_fruits_data_quality_values",
         ),
+        CheckConstraint(
+            "typical_purchase_stage IN ('ready_to_eat', 'needs_ripening', 'variable')",
+            name="ck_fruits_typical_purchase_stage_values",
+        ),
     )
 
     id: Mapped[int] = mapped_column(
@@ -155,10 +167,23 @@ class Fruit(TimestampMixin, Base):
         Numeric(4, 3),
         nullable=False,
     )
+    texture_score: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+    )
     convenience_score: Mapped[Decimal] = mapped_column(
         Numeric(4, 3),
         nullable=False,
     )
+    ripe_storage_score: Mapped[Decimal] = mapped_column(
+        Numeric(4, 3),
+        nullable=False,
+    )
+    typical_purchase_stage: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+    )
+    ripening_note: Mapped[str | None] = mapped_column(Text, nullable=True)
     average_price_level: Mapped[int] = mapped_column(
         SmallInteger,
         nullable=False,

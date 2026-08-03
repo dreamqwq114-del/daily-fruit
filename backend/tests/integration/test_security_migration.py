@@ -5,7 +5,7 @@ import sys
 from urllib.parse import urlsplit
 
 import pytest
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
@@ -22,6 +22,12 @@ BUSINESS_TABLES = (
     "recommendations",
     "recommendation_items",
     "recommendation_feedback",
+)
+CURRENT_DATA_TABLES = BUSINESS_TABLES + (
+    "fruit_facts",
+    "product_feedback",
+    "fruit_selection_options",
+    "user_fruit_option_preferences",
 )
 IDENTITY_SEQUENCES = tuple(f"{name}_id_seq" for name in BUSINESS_TABLES)
 
@@ -72,8 +78,30 @@ def object_list(names: tuple[str, ...]) -> str:
     return ", ".join(f'public."{name}"' for name in names)
 
 
+def clear_current_business_data(engine: Engine) -> None:
+    with engine.begin() as connection:
+        existing_tables = set(
+            inspect(connection).get_table_names(schema="public")
+        )
+        targets = tuple(
+            name for name in CURRENT_DATA_TABLES if name in existing_tables
+        )
+        if not targets:
+            return
+        connection.execute(
+            text(
+                "TRUNCATE TABLE "
+                f"{object_list(targets)} "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
+
+
 def prepare_insecure_test_baseline(engine: Engine) -> None:
     with engine.begin() as connection:
+        connection.execute(
+            text("DROP FUNCTION IF EXISTS public.rls_auto_enable()")
+        )
         connection.execute(
             text(
                 """
@@ -214,6 +242,7 @@ def test_security_migration_enforces_and_retains_deny_by_default() -> None:
     database_url = checked_test_url()
     engine = create_engine(database_url, poolclass=NullPool)
     try:
+        clear_current_business_data(engine)
         run_alembic("downgrade", "0001", database_url=database_url)
         prepare_insecure_test_baseline(engine)
         run_alembic("upgrade", "0002", database_url=database_url)

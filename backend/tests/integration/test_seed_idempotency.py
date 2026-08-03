@@ -58,7 +58,7 @@ def run_seed_cli(*arguments: str, database_url: str) -> str:
     return result.stdout
 
 
-def counts(engine: Engine) -> tuple[int, int, int, int]:
+def counts(engine: Engine) -> tuple[int, int, int, int, int]:
     with engine.connect() as connection:
         return (
             connection.execute(text("SELECT count(*) FROM public.fruits"))
@@ -72,6 +72,9 @@ def counts(engine: Engine) -> tuple[int, int, int, int]:
             connection.execute(
                 text("SELECT count(*) FROM public.fruit_seasons")
             ).scalar_one(),
+            connection.execute(
+                text("SELECT count(*) FROM public.fruit_selection_options")
+            ).scalar_one(),
         )
 
 
@@ -80,6 +83,7 @@ def test_seed_is_dry_run_transactional_and_idempotent() -> None:
     engine = create_engine(database_url, poolclass=NullPool)
     dataset = load_seed_dataset()
     with engine.begin() as connection:
+        connection.execute(text("DELETE FROM public.fruit_selection_options"))
         connection.execute(text("DELETE FROM public.fruit_facts"))
         connection.execute(text("DELETE FROM public.fruit_seasons"))
         connection.execute(text("DELETE FROM public.fruit_nutritions"))
@@ -88,24 +92,25 @@ def test_seed_is_dry_run_transactional_and_idempotent() -> None:
     try:
         output = run_seed_cli("--dry-run", database_url=database_url)
         assert "Dry run validated" in output
-        assert counts(engine) == (0, 0, 0, 0)
+        assert counts(engine) == (0, 0, 0, 0, 0)
 
         emitted_sql = run_seed_cli("--emit-sql", database_url=database_url)
         lowered_sql = emitted_sql.lower()
-        assert lowered_sql.count("insert into public.") == 4
+        assert lowered_sql.count("insert into public.") == 5
         assert "insert into public.fruits" in lowered_sql
         assert "insert into public.fruit_facts" in lowered_sql
         assert "insert into public.fruit_nutritions" in lowered_sql
         assert "insert into public.fruit_seasons" in lowered_sql
+        assert "insert into public.fruit_selection_options" in lowered_sql
         assert "delete " not in lowered_sql
         assert "truncate " not in lowered_sql
         assert "public.users" not in lowered_sql
         assert "public.recommendations" not in lowered_sql
-        assert counts(engine) == (0, 0, 0, 0)
+        assert counts(engine) == (0, 0, 0, 0, 0)
 
         run_seed_cli(database_url=database_url)
         first_counts = counts(engine)
-        assert first_counts == (24, 72, 24, 48)
+        assert first_counts == (24, 72, 24, 48, 13)
 
         run_seed_cli(database_url=database_url)
         assert counts(engine) == first_counts
@@ -158,6 +163,8 @@ def test_seed_is_dry_run_transactional_and_idempotent() -> None:
                     + (SELECT count(*) - count(DISTINCT
                          (fruit_id, region, start_month, end_month))
                        FROM public.fruit_seasons)
+                    + (SELECT count(*) - count(DISTINCT (fruit_id, code))
+                       FROM public.fruit_selection_options)
                     """
                 )
             ).scalar_one() == 0

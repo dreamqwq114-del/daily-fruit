@@ -24,6 +24,7 @@ from app.services.recommendation_types import (
     SelectionOptionPreference,
     SeasonWindow,
 )
+from app.services.texture_preference import convert_legacy_texture_preference
 
 
 def user_to_recommendation_input(user: User) -> RecommendationUser:
@@ -62,6 +63,19 @@ def user_to_recommendation_input(user: User) -> RecommendationUser:
     option_preferences = {
         fruit_id: tuple(items) for fruit_id, items in grouped_options.items()
     }
+    texture_preference = (
+        None
+        if getattr(user, "texture_preference", None) is None
+        else float(user.texture_preference)
+    )
+    if texture_preference is None and getattr(user, "texture_preference_source", None) not in {
+        "explicit_new",
+        "migrated_consistent",
+    }:
+        texture_preference, _ = convert_legacy_texture_preference(
+            None if user.soft_preference is None else float(user.soft_preference),
+            None if user.crisp_preference is None else float(user.crisp_preference),
+        )
     return RecommendationUser(
         city=user.city,
         region=user.region,
@@ -82,6 +96,7 @@ def user_to_recommendation_input(user: User) -> RecommendationUser:
         discovery_level=user.discovery_level,
         fruit_preferences=preferences,
         option_preferences=option_preferences,
+        texture_preference=texture_preference,
     )
 
 
@@ -150,6 +165,19 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
             ),
             crisp_score=(
                 None if item.crisp_score is None else float(item.crisp_score)
+            ),
+            texture_score=(
+                None if item.texture_score is None else float(item.texture_score)
+            ),
+            ripe_storage_score=(
+                None
+                if item.ripe_storage_score is None
+                else float(item.ripe_storage_score)
+            ),
+            convenience_score=(
+                None
+                if item.convenience_score is None
+                else float(item.convenience_score)
             ),
             is_default=item.is_default,
             is_active=item.is_active,
@@ -224,6 +252,18 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
         nutrition=nutrition,
         seasons=seasons,
         selection_options=selection_options,
+        texture_score=(
+            None
+            if getattr(fruit, "texture_score", None) is None
+            else float(fruit.texture_score)
+        ),
+        ripe_storage_score=(
+            None
+            if getattr(fruit, "ripe_storage_score", None) is None
+            else float(fruit.ripe_storage_score)
+        ),
+        typical_purchase_stage=getattr(fruit, "typical_purchase_stage", None),
+        ripening_note=getattr(fruit, "ripening_note", None),
     )
 
 
