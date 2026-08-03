@@ -50,7 +50,7 @@ def test_alembic_history_works_without_database_configuration() -> None:
     assert "0004 -> 0005" in result.stdout
     assert "0005 -> 0006" in result.stdout
     assert "0006 -> 0007" in result.stdout
-    assert "0009 -> 0010 (head)" in result.stdout
+    assert "0010 -> 0011 (head)" in result.stdout
     assert "postgresql" not in result.stdout
     assert "supabase" not in result.stdout.lower()
 
@@ -87,6 +87,7 @@ def test_migration_purpose_never_falls_back_to_runtime_url() -> None:
         "current",
         extra_environment={
             "ALEMBIC_DATABASE_PURPOSE": "migration",
+            "MIGRATION_DATABASE_URL": "",
             "DATABASE_URL": (
                 "postgresql+psycopg://fruit:"
                 f"{secret}@localhost:5432/daily_fruit"
