@@ -24,6 +24,40 @@ function mountPicker(modelValue = selection(), fruitList = fruits) {
   })
 }
 
+const optionFruits = [
+  {
+    id: 10,
+    name: '桃',
+    taste: '甜软',
+    selection_options: [
+      { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', is_active: true },
+      { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', is_active: true },
+    ],
+  },
+]
+
+const peachAndKiwiOptionFruits = [
+  {
+    id: 10,
+    name: 'peach',
+    taste: 'sweet',
+    selection_options: [
+      { id: 101, fruit_id: 10, code: 'crisp', name: 'crisp peach', is_active: true },
+      { id: 102, fruit_id: 10, code: 'soft', name: 'soft peach', is_active: true },
+    ],
+  },
+  {
+    id: 20,
+    name: 'kiwifruit',
+    taste: 'tart',
+    selection_options: [
+      { id: 201, fruit_id: 20, code: 'green', name: 'green heart', is_active: true },
+      { id: 202, fruit_id: 20, code: 'yellow', name: 'yellow heart', is_active: true },
+      { id: 203, fruit_id: 20, code: 'red', name: 'red heart', is_active: true },
+    ],
+  },
+]
+
 describe('FruitPreferencePicker', () => {
   it('does not render the old per-fruit select grid before opening the picker', () => {
     const wrapper = mountPicker()
@@ -76,6 +110,52 @@ describe('FruitPreferencePicker', () => {
     expect(latest.favoriteIds).toEqual([])
     expect(latest.forbiddenIds).toEqual([1])
     delete window.confirm
+  })
+
+  it('keeps selection options inside the parent fruit and supports clearing them', async () => {
+    const wrapper = mount(FruitPreferencePicker, {
+      props: {
+        fruits: optionFruits,
+        modelValue: selection(),
+        optionPreferences: [
+          { fruit_id: 10, option_id: 101, preference: 'liked' },
+        ],
+      },
+    })
+
+    await wrapper.find('.fruit-option-toggle').trigger('click')
+    expect(wrapper.findAll('.fruit-option-row')).toHaveLength(2)
+    expect(wrapper.findAll('.fruit-option-row')[0].findAll('.fruit-option-choice.is-selected')).toHaveLength(1)
+    expect(wrapper.findAll('.fruit-option-row')[1].findAll('.fruit-option-choice.is-selected')).toHaveLength(1)
+
+    await wrapper.findAll('.fruit-option-choice')[2].trigger('click')
+    const latest = wrapper.emitted('update:optionPreferences').at(-1)[0]
+    expect(latest).toEqual([])
+  })
+
+  it('renders both peach and kiwifruit options under their parent fruits', async () => {
+    const wrapper = mount(FruitPreferencePicker, {
+      props: {
+        fruits: peachAndKiwiOptionFruits,
+        modelValue: selection(),
+      },
+    })
+
+    expect(wrapper.findAll('.fruit-option-card')).toHaveLength(2)
+    expect(wrapper.text()).toContain('peach')
+    expect(wrapper.text()).toContain('kiwifruit')
+
+    const toggles = wrapper.findAll('.fruit-option-toggle')
+    await toggles[0].trigger('click')
+    expect(wrapper.findAll('.fruit-option-row')).toHaveLength(2)
+    expect(wrapper.text()).toContain('crisp peach')
+    expect(wrapper.text()).toContain('soft peach')
+
+    await toggles[1].trigger('click')
+    expect(wrapper.findAll('.fruit-option-row')).toHaveLength(5)
+    expect(wrapper.text()).toContain('green heart')
+    expect(wrapper.text()).toContain('yellow heart')
+    expect(wrapper.text()).toContain('red heart')
   })
 
   it('enforces the five-fruit favorite limit in the picker', async () => {

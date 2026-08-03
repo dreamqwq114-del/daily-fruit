@@ -103,6 +103,7 @@ def recommend_fruits(
         individual_score=selection.first.base_score,
         pair_score=selection.pair_score,
         nutrition_pair_score=selection.nutrition_pair_score,
+        resolved_candidate=selection.first.resolved_candidate,
     )
     second_item = RecommendationItemResult(
         fruit=selection.second.fruit,
@@ -114,6 +115,7 @@ def recommend_fruits(
         individual_score=selection.second.base_score,
         pair_score=selection.pair_score,
         nutrition_pair_score=selection.nutrition_pair_score,
+        resolved_candidate=selection.second.resolved_candidate,
     )
     return RecommendationResult(
         items=(first_item, second_item),

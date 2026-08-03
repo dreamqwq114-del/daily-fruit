@@ -20,6 +20,8 @@ from app.services.recommendation_types import (
     RecommendationContext,
     RecommendationFruit,
     RecommendationUser,
+    SelectionOption,
+    SelectionOptionPreference,
     SeasonWindow,
 )
 
@@ -46,6 +48,20 @@ def user_to_recommendation_input(user: User) -> RecommendationUser:
         )
         for item in user.fruit_preferences
     }
+    option_preferences: dict[int, tuple[SelectionOptionPreference, ...]] = {}
+    grouped_options: dict[int, list[SelectionOptionPreference]] = {}
+    for item in user.fruit_option_preferences:
+        grouped_options.setdefault(item.fruit_id, []).append(
+            SelectionOptionPreference(
+                user_id=item.user_id,
+                fruit_id=item.fruit_id,
+                option_id=item.option_id,
+                preference=item.preference,
+            )
+        )
+    option_preferences = {
+        fruit_id: tuple(items) for fruit_id, items in grouped_options.items()
+    }
     return RecommendationUser(
         city=user.city,
         region=user.region,
@@ -65,6 +81,7 @@ def user_to_recommendation_input(user: User) -> RecommendationUser:
         convenience_preference=float(user.convenience_preference),
         discovery_level=user.discovery_level,
         fruit_preferences=preferences,
+        option_preferences=option_preferences,
     )
 
 
@@ -115,6 +132,32 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
             ),
         )
         for item in fruit.seasons
+    )
+    selection_options = tuple(
+        SelectionOption(
+            id=item.id,
+            fruit_id=item.fruit_id,
+            code=item.code,
+            name=item.name,
+            sweet_score=(
+                None if item.sweet_score is None else float(item.sweet_score)
+            ),
+            sour_score=(
+                None if item.sour_score is None else float(item.sour_score)
+            ),
+            soft_score=(
+                None if item.soft_score is None else float(item.soft_score)
+            ),
+            crisp_score=(
+                None if item.crisp_score is None else float(item.crisp_score)
+            ),
+            is_default=item.is_default,
+            is_active=item.is_active,
+            display_order=item.display_order,
+            data_quality=item.data_quality,
+            data_source_note=item.data_source_note,
+        )
+        for item in fruit.selection_options
     )
     return RecommendationFruit(
         id=fruit.id,
@@ -180,6 +223,7 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
         is_active=fruit.is_active,
         nutrition=nutrition,
         seasons=seasons,
+        selection_options=selection_options,
     )
 
 

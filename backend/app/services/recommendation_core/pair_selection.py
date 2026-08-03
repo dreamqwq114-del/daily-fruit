@@ -98,15 +98,39 @@ def _pair_novelty(
 def _sensory_category_diversity(
     first: RecommendationFruit,
     second: RecommendationFruit,
+    first_resolved=None,
+    second_resolved=None,
 ) -> float:
     """用四个真实口感维度衡量组合的体验差异。
 
     ``sensory_category_diversity`` 是稳定的 API 字段名；内部不再读取
     ``category``/``display_group``，避免展示分组改变推荐结果。
     """
+    first_values = (
+        first_resolved.effective_sweet_score,
+        first_resolved.effective_sour_score,
+        first_resolved.effective_soft_score,
+        first_resolved.effective_crisp_score,
+    ) if first_resolved is not None else (
+        first.sweet_score,
+        first.sour_score,
+        first.soft_score,
+        first.crisp_score,
+    )
+    second_values = (
+        second_resolved.effective_sweet_score,
+        second_resolved.effective_sour_score,
+        second_resolved.effective_soft_score,
+        second_resolved.effective_crisp_score,
+    ) if second_resolved is not None else (
+        second.sweet_score,
+        second.sour_score,
+        second.soft_score,
+        second.crisp_score,
+    )
     taste_distance = sum(
-        abs(getattr(first, dimension) - getattr(second, dimension))
-        for dimension in ("sweet_score", "sour_score", "soft_score", "crisp_score")
+        abs(left - right)
+        for left, right in zip(first_values, second_values)
     ) / 4
     return clamp_score(taste_distance)
 
@@ -259,7 +283,12 @@ def select_recommendation_pair(
                 normalized.get(first.fruit.id, NutritionProfile()),
                 normalized.get(second.fruit.id, NutritionProfile()),
             )
-            sensory = _sensory_category_diversity(first.fruit, second.fruit)
+            sensory = _sensory_category_diversity(
+                first.fruit,
+                second.fruit,
+                first.resolved_candidate,
+                second.resolved_candidate,
+            )
             novelty = _pair_novelty(first.fruit.id, second.fruit.id, context)
             pair_score = clamp_score(
                 PAIR_SCORE_WEIGHTS["individual_mean"]

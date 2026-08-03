@@ -31,6 +31,7 @@ from app.models.base import Base, CreatedAtMixin
 
 if TYPE_CHECKING:
     from app.models.fruit import Fruit
+    from app.models.selection_option import FruitSelectionOption
     from app.models.user import User
 
 
@@ -139,9 +140,34 @@ class RecommendationItem(CreatedAtMixin, Base):
             "jsonb_typeof(reasons) = 'array'",
             name="ck_recommendation_items_reasons_array",
         ),
+        CheckConstraint(
+            "selection_resolution_source IS NULL OR selection_resolution_source IN "
+            "('explicit', 'inferred_from_global_preference', 'default', 'not_applicable')",
+            name="ck_recommendation_items_selection_resolution_source",
+        ),
+        CheckConstraint(
+            "effective_sweet_score_snapshot IS NULL OR effective_sweet_score_snapshot BETWEEN 0 AND 1",
+            name="ck_recommendation_items_selection_sweet_range",
+        ),
+        CheckConstraint(
+            "effective_sour_score_snapshot IS NULL OR effective_sour_score_snapshot BETWEEN 0 AND 1",
+            name="ck_recommendation_items_selection_sour_range",
+        ),
+        CheckConstraint(
+            "effective_soft_score_snapshot IS NULL OR effective_soft_score_snapshot BETWEEN 0 AND 1",
+            name="ck_recommendation_items_selection_soft_range",
+        ),
+        CheckConstraint(
+            "effective_crisp_score_snapshot IS NULL OR effective_crisp_score_snapshot BETWEEN 0 AND 1",
+            name="ck_recommendation_items_selection_crisp_range",
+        ),
         Index(
             "ix_recommendation_items_fruit_id",
             "fruit_id",
+        ),
+        Index(
+            "ix_recommendation_items_selection_option_id",
+            "selection_option_id",
         ),
     )
 
@@ -180,11 +206,43 @@ class RecommendationItem(CreatedAtMixin, Base):
         default=list,
         server_default=text("'[]'::jsonb"),
     )
+    selection_option_id: Mapped[int | None] = mapped_column(
+        BigInteger,
+        ForeignKey(
+            "public.fruit_selection_options.id",
+            ondelete="RESTRICT",
+        ),
+        nullable=True,
+    )
+    selection_option_name_snapshot: Mapped[str | None] = mapped_column(
+        String(100), nullable=True
+    )
+    selection_option_code_snapshot: Mapped[str | None] = mapped_column(
+        String(40), nullable=True
+    )
+    selection_resolution_source: Mapped[str | None] = mapped_column(
+        String(40), nullable=True
+    )
+    effective_sweet_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
+    effective_sour_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
+    effective_soft_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
+    effective_crisp_score_snapshot: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3), nullable=True
+    )
 
     recommendation: Mapped[Recommendation] = relationship(
         back_populates="items"
     )
     fruit: Mapped[Fruit] = relationship(back_populates="recommendation_items")
+    selection_option: Mapped[FruitSelectionOption | None] = relationship(
+        passive_deletes="all"
+    )
     feedback: Mapped[list[RecommendationFeedback]] = relationship(
         back_populates="recommendation_item",
         cascade="all, delete-orphan",

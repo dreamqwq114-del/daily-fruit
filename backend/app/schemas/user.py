@@ -117,6 +117,12 @@ class UserFruitPreferencesUpdate(ApiSchema):
     """偏好批量合并请求；同一水果只能出现一次，特别喜欢最多五个。"""
 
     preferences: list[UserFruitPreferenceInput] = Field(default_factory=list)
+    # Optional in the request for backward compatibility.  When supplied, the
+    # list replaces the current type-level records in the same transaction;
+    # ``preference=None`` means clear that option back to unknown.
+    option_preferences: list["UserFruitOptionPreferenceInput"] = Field(
+        default_factory=list
+    )
 
     @field_validator("preferences")
     @classmethod
@@ -137,6 +143,33 @@ class UserFruitPreferencesUpdate(ApiSchema):
             raise ValueError("At most five fruits may be marked as especially loved")
         return preferences
 
+    @field_validator("option_preferences")
+    @classmethod
+    def reject_duplicate_options(
+        cls,
+        preferences: list["UserFruitOptionPreferenceInput"],
+    ) -> list["UserFruitOptionPreferenceInput"]:
+        keys = [(item.fruit_id, item.option_id) for item in preferences]
+        if len(keys) != len(set(keys)):
+            raise ValueError("Each fruit selection option may appear only once")
+        return preferences
+
+
+class UserFruitOptionPreferenceInput(ApiSchema):
+    """消费类型偏好；省略记录或传 ``null`` 都表示 unknown/清除。"""
+
+    fruit_id: PositiveId
+    option_id: PositiveId
+    preference: Literal["liked", "disliked"] | None = None
+
+
+class UserFruitOptionPreferenceRead(UserFruitOptionPreferenceInput):
+    id: PositiveId
+    user_id: PositiveId
+    preference: Literal["liked", "disliked"]
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
+
 
 class UserFruitPreferenceRead(UserFruitPreferenceInput):
     id: PositiveId
@@ -149,6 +182,8 @@ __all__ = [
     "UserCreate",
     "UserFruitPreferenceInput",
     "UserFruitPreferenceRead",
+    "UserFruitOptionPreferenceInput",
+    "UserFruitOptionPreferenceRead",
     "UserFruitPreferencesUpdate",
     "UserRead",
     "UserUpdate",

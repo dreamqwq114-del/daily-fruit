@@ -7,6 +7,7 @@ import { listFruits } from '../api/fruit.js'
 import { ApiError } from '../api/http.js'
 import {
   getFruitPreferences,
+  getFruitOptionPreferences,
   getUser,
   replaceFruitPreferences,
   updateUser,
@@ -21,16 +22,32 @@ import {
   preferencesToSelection,
   profileFromUser,
   selectionToPreferences,
+  optionPreferencesToSelection,
 } from '../utils/fruit-preferences.js'
 
 const router = useRouter()
 const profile = reactive(createDefaultProfile())
 const fruits = ref([])
 const preferenceSelection = ref(createDefaultFruitPreferenceSelection())
+const optionPreferences = ref([])
+const optionPreferencesLoaded = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+
+function optionalOptionPreferenceLoader() {
+  try {
+    return getFruitOptionPreferences
+  } catch {
+    return null
+  }
+}
+
+function loadOptionPreferences() {
+  const loader = optionalOptionPreferenceLoader()
+  return loader ? loader() : Promise.resolve(null)
+}
 
 async function handleUserNotFound(error) {
   // 有效登录但尚未建立 public.users 资料时，回到建档页完成绑定。
@@ -45,6 +62,8 @@ async function loadPreferences() {
   // 用户资料与水果目录/偏好并行读取，减少页面等待时间。
   loading.value = true
   errorMessage.value = ''
+  optionPreferencesLoaded.value = false
+  optionPreferences.value = []
   try {
     let user
     try {
@@ -53,13 +72,18 @@ async function loadPreferences() {
       if (await handleUserNotFound(error)) return
       throw error
     }
-    const [fruitList, preferences] = await Promise.all([
+    const [fruitList, preferences, optionPreferenceRows] = await Promise.all([
       listFruits(),
       getFruitPreferences(),
+      loadOptionPreferences(),
     ])
     Object.assign(profile, profileFromUser(user))
     fruits.value = fruitList
     preferenceSelection.value = preferencesToSelection(preferences)
+    if (optionPreferenceRows !== null) {
+      optionPreferences.value = optionPreferencesToSelection(optionPreferenceRows)
+      optionPreferencesLoaded.value = true
+    }
   } catch (error) {
     errorMessage.value = error.message
   } finally {
@@ -80,7 +104,12 @@ async function savePreferences() {
 
     try {
       // 后端偏好接口是 merge，不会删除熟悉度字段。
-      await replaceFruitPreferences(selectionToPreferences(preferenceSelection.value))
+      const parentPreferences = selectionToPreferences(preferenceSelection.value)
+      if (optionPreferencesLoaded.value) {
+        await replaceFruitPreferences(parentPreferences, optionPreferences.value)
+      } else {
+        await replaceFruitPreferences(parentPreferences)
+      }
     } catch (error) {
       errorMessage.value = `基本信息已保存，但水果偏好保存失败：${error.message}`
       return
@@ -112,7 +141,11 @@ onMounted(loadPreferences)
 
     <form v-else class="profile-form" @submit.prevent="savePreferences">
       <ProfileFields v-model="profile" />
-      <FruitPreferencePicker v-model="preferenceSelection" :fruits="fruits" />
+      <FruitPreferencePicker
+        v-model="preferenceSelection"
+        v-model:option-preferences="optionPreferences"
+        :fruits="fruits"
+      />
 
       <p v-if="successMessage" class="inline-message inline-message--success" role="status">
         {{ successMessage }}

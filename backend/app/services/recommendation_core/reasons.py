@@ -68,6 +68,23 @@ def _build_reasons(
         order += 1
 
     preference = user.fruit_preferences.get(fruit.id)
+    resolved = scored.resolved_candidate
+    if resolved is not None and resolved.resolved_option_name:
+        if resolved.resolution_source == "explicit":
+            option_message = f"你明确偏好{resolved.resolved_option_name}"
+        elif resolved.resolution_source == "inferred_from_global_preference":
+            option_message = f"建议优先选择{resolved.resolved_option_name}，更接近你的口感设置"
+        else:
+            option_message = (
+                f"{fruit.name}的不同类型口感差异较大，购买时可优先留意"
+                f"{resolved.resolved_option_name}"
+            )
+        add(
+            0.0,
+            ReasonCode.SELECTION_OPTION,
+            option_message,
+            ReasonComponent.SELECTION,
+        )
     if preference is not None and preference.has_tried is True and (preference.preference_score or 0) >= 1:
         add(
             BASE_SCORE_WEIGHTS["explicit_preference"] * scores.explicit_preference,

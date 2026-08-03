@@ -6,7 +6,13 @@ const props = defineProps({
     type: Array,
     required: true,
   },
+  optionPreferences: {
+    type: Array,
+    default: () => [],
+  },
 })
+
+const emit = defineEmits(['update:optionPreferences'])
 
 const preferenceSelection = defineModel({ type: Object, required: true })
 const pickerOpen = ref(false)
@@ -14,6 +20,13 @@ const activeGroup = ref('favoriteIds')
 const searchTerm = ref('')
 const pickerMessage = ref('')
 const draftSelection = ref(null)
+const expandedOptionFruitIds = ref([])
+
+const optionFruits = computed(() =>
+  props.fruits.filter((fruit) =>
+    Array.isArray(fruit.selection_options) && fruit.selection_options.some((option) => option.is_active),
+  ),
+)
 
 const groups = [
   {
@@ -144,6 +157,33 @@ function removeCommitted(groupKey, fruitId) {
     [groupKey]: ids(preferenceSelection.value, groupKey).filter((id) => id !== fruitId),
   }
 }
+
+function isOptionExpanded(fruitId) {
+  return expandedOptionFruitIds.value.includes(fruitId)
+}
+
+function toggleOptionFruit(fruitId) {
+  expandedOptionFruitIds.value = isOptionExpanded(fruitId)
+    ? expandedOptionFruitIds.value.filter((id) => id !== fruitId)
+    : [...expandedOptionFruitIds.value, fruitId]
+}
+
+function optionPreference(fruitId, optionId) {
+  return props.optionPreferences.find(
+    (item) => Number(item.fruit_id) === fruitId && Number(item.option_id) === optionId,
+  )?.preference ?? null
+}
+
+function setOptionPreference(fruit, option, preference) {
+  const next = props.optionPreferences.filter(
+    (item) =>
+      !(Number(item.fruit_id) === fruit.id && Number(item.option_id) === option.id),
+  )
+  if (preference) {
+    next.push({ fruit_id: fruit.id, option_id: option.id, preference })
+  }
+  emit('update:optionPreferences', next)
+}
 </script>
 
 <template>
@@ -186,6 +226,50 @@ function removeCommitted(groupKey, fruitId) {
     </div>
 
     <p class="section-help fruit-preference-note">特别喜欢最多 5 种；“不喜欢”和“绝对不吃”会分开保存。</p>
+
+    <section v-if="optionFruits.length" class="fruit-option-preferences">
+      <h2>具体类型偏好</h2>
+      <p class="section-help">不同类型口感差异较大的水果，可以单独设置；未设置不会影响父水果选择。</p>
+      <article v-for="fruit in optionFruits" :key="`options-${fruit.id}`" class="fruit-option-card">
+        <button
+          class="fruit-option-toggle"
+          type="button"
+          :aria-expanded="isOptionExpanded(fruit.id)"
+          @click="toggleOptionFruit(fruit.id)"
+        >
+          <span><strong>{{ fruit.name }}</strong><small>设置具体偏好</small></span>
+          <span aria-hidden="true">{{ isOptionExpanded(fruit.id) ? '−' : '+' }}</span>
+        </button>
+        <div v-if="isOptionExpanded(fruit.id)" class="fruit-option-list" role="group" :aria-label="`${fruit.name}具体类型偏好`">
+          <div v-for="option in fruit.selection_options.filter((item) => item.is_active)" :key="option.id" class="fruit-option-row">
+            <span><strong>{{ option.name }}</strong><small>{{ option.code }}</small></span>
+            <div class="fruit-option-actions">
+              <button
+                type="button"
+                class="fruit-option-choice"
+                :class="{ 'is-selected': optionPreference(fruit.id, option.id) === 'liked' }"
+                :aria-pressed="optionPreference(fruit.id, option.id) === 'liked'"
+                @click="setOptionPreference(fruit, option, 'liked')"
+              >喜欢</button>
+              <button
+                type="button"
+                class="fruit-option-choice"
+                :class="{ 'is-selected': optionPreference(fruit.id, option.id) === 'disliked' }"
+                :aria-pressed="optionPreference(fruit.id, option.id) === 'disliked'"
+                @click="setOptionPreference(fruit, option, 'disliked')"
+              >不喜欢</button>
+              <button
+                type="button"
+                class="fruit-option-choice"
+                :class="{ 'is-selected': optionPreference(fruit.id, option.id) === null }"
+                :aria-pressed="optionPreference(fruit.id, option.id) === null"
+                @click="setOptionPreference(fruit, option, null)"
+              >未设置</button>
+            </div>
+          </div>
+        </div>
+      </article>
+    </section>
 
     <div v-if="pickerOpen" class="fruit-picker-backdrop" @click.self="closePicker">
       <section class="fruit-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="fruit-picker-title">

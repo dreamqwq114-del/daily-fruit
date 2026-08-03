@@ -14,7 +14,11 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import User, UserFruitPreference
+from app.models import (
+    User,
+    UserFruitOptionPreference,
+    UserFruitPreference,
+)
 
 
 def get_user(
@@ -27,7 +31,10 @@ def get_user(
 
     statement = select(User).where(User.id == user_id)
     if include_preferences:
-        statement = statement.options(selectinload(User.fruit_preferences))
+        statement = statement.options(
+            selectinload(User.fruit_preferences),
+            selectinload(User.fruit_option_preferences),
+        )
     return session.execute(statement).scalar_one_or_none()
 
 
@@ -41,7 +48,10 @@ def get_user_by_auth_user_id(
 
     statement = select(User).where(User.auth_user_id == auth_user_id)
     if include_preferences:
-        statement = statement.options(selectinload(User.fruit_preferences))
+        statement = statement.options(
+            selectinload(User.fruit_preferences),
+            selectinload(User.fruit_option_preferences),
+        )
     return session.execute(statement).scalar_one_or_none()
 
 
@@ -140,10 +150,73 @@ def replace_preferences(
     return list_preferences(session, user_id)
 
 
+def list_option_preferences(
+    session: Session,
+    user_id: int,
+) -> list[UserFruitOptionPreference]:
+    """按父水果、选项稳定读取当前用户的类型偏好。"""
+
+    statement = (
+        select(UserFruitOptionPreference)
+        .where(UserFruitOptionPreference.user_id == user_id)
+        .order_by(
+            UserFruitOptionPreference.fruit_id,
+            UserFruitOptionPreference.option_id,
+        )
+    )
+    return list(session.execute(statement).scalars())
+
+
+def replace_option_preferences(
+    session: Session,
+    user_id: int,
+    preferences: Iterable[tuple[int, int, str | None]],
+) -> list[UserFruitOptionPreference]:
+    """以幂等替换方式保存类型偏好；``None`` 会删除该记录。"""
+
+    existing = {
+        item.option_id: item
+        for item in list_option_preferences(session, user_id)
+    }
+    submitted: set[int] = set()
+    now = datetime.now(UTC)
+    for fruit_id, option_id, preference in preferences:
+        submitted.add(option_id)
+        item = existing.get(option_id)
+        if preference is None:
+            if item is not None:
+                session.delete(item)
+            continue
+        if item is None:
+            session.add(
+                UserFruitOptionPreference(
+                    user_id=user_id,
+                    fruit_id=fruit_id,
+                    option_id=option_id,
+                    preference=preference,
+                )
+            )
+        else:
+            item.fruit_id = fruit_id
+            item.preference = preference
+            item.updated_at = now
+
+    # An explicitly supplied replacement list is authoritative.  Clearing the
+    # list therefore removes old rows, while an omitted field leaves them.
+    for option_id, item in existing.items():
+        if option_id not in submitted:
+            session.delete(item)
+
+    session.flush()
+    return list_option_preferences(session, user_id)
+
+
 __all__ = [
     "add_user",
     "get_user",
     "get_user_by_auth_user_id",
     "list_preferences",
+    "list_option_preferences",
     "replace_preferences",
+    "replace_option_preferences",
 ]

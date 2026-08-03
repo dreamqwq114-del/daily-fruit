@@ -22,10 +22,19 @@ export function getFruitPreferences() {
   return apiRequest('/api/me/fruit-preferences')
 }
 
-export function replaceFruitPreferences(preferences) {
+export function getFruitOptionPreferences() {
+  return apiRequest('/api/me/fruit-option-preferences')
+}
+
+export function replaceFruitPreferences(preferences, optionPreferences) {
   // PUT 使用后端 merge 语义，不会把熟悉度字段重置为默认值。
   return apiRequest('/api/me/fruit-preferences', {
     method: 'PUT',
-    body: { preferences },
+    body: {
+      preferences,
+      ...(optionPreferences === undefined
+        ? {}
+        : { option_preferences: optionPreferences }),
+    },
   })
 }

@@ -38,6 +38,9 @@ RECOMMENDATION_DETAIL_OPTIONS = (
     selectinload(Recommendation.items).selectinload(
         RecommendationItem.feedback
     ),
+    selectinload(Recommendation.items).selectinload(
+        RecommendationItem.selection_option
+    ),
 )
 
 

@@ -6,6 +6,10 @@ from app.models.recommendation import (
     RecommendationItem,
 )
 from app.models.product_feedback import ProductFeedback
+from app.models.selection_option import (
+    FruitSelectionOption,
+    UserFruitOptionPreference,
+)
 from app.models.user import User, UserFruitPreference
 
 __all__ = [
@@ -18,6 +22,8 @@ __all__ = [
     "RecommendationFeedback",
     "RecommendationItem",
     "ProductFeedback",
+    "FruitSelectionOption",
+    "UserFruitOptionPreference",
     "User",
     "UserFruitPreference",
 ]

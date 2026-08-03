@@ -414,6 +414,46 @@ def _persist_recommendation(
                     reason.model_dump(mode="json")
                     for reason in item.reasons
                 ],
+                selection_option_id=(
+                    item.resolved_candidate.resolved_option_id
+                    if item.resolved_candidate is not None
+                    else None
+                ),
+                selection_option_name_snapshot=(
+                    item.resolved_candidate.resolved_option_name
+                    if item.resolved_candidate is not None
+                    else None
+                ),
+                selection_option_code_snapshot=(
+                    item.resolved_candidate.resolved_option_code
+                    if item.resolved_candidate is not None
+                    else None
+                ),
+                selection_resolution_source=(
+                    item.resolved_candidate.resolution_source
+                    if item.resolved_candidate is not None
+                    else None
+                ),
+                effective_sweet_score_snapshot=(
+                    _score_decimal(item.resolved_candidate.effective_sweet_score)
+                    if item.resolved_candidate is not None
+                    else None
+                ),
+                effective_sour_score_snapshot=(
+                    _score_decimal(item.resolved_candidate.effective_sour_score)
+                    if item.resolved_candidate is not None
+                    else None
+                ),
+                effective_soft_score_snapshot=(
+                    _score_decimal(item.resolved_candidate.effective_soft_score)
+                    if item.resolved_candidate is not None
+                    else None
+                ),
+                effective_crisp_score_snapshot=(
+                    _score_decimal(item.resolved_candidate.effective_crisp_score)
+                    if item.resolved_candidate is not None
+                    else None
+                ),
             )
             for item in result.items
         ],

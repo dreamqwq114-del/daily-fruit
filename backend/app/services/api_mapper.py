@@ -7,6 +7,8 @@ from app.schemas.recommendation import (
     RecommendationFeedbackRead,
     RecommendationItemDetail,
     RecommendationReason,
+    RecommendationSelectionOptionRead,
+    RecommendationSelectionRead,
 )
 from app.services.fruit_fact_service import select_daily_fact
 
@@ -39,6 +41,28 @@ def recommendation_to_detail(
                 individual_score=item.individual_score,
                 pair_score=item.pair_score,
                 nutrition_pair_score=item.nutrition_pair_score,
+                selection=(
+                    None
+                    if item.selection_option_id is None
+                    else RecommendationSelectionRead(
+                        resolution_source=(
+                            item.selection_resolution_source or "default"
+                        ),
+                        resolved_option=RecommendationSelectionOptionRead(
+                            id=item.selection_option_id,
+                            code=(
+                                item.selection_option_code_snapshot
+                                or getattr(item.selection_option, "code", None)
+                                or "unknown"
+                            ),
+                            name=(
+                                item.selection_option_name_snapshot
+                                or getattr(item.selection_option, "name", None)
+                                or "未命名类型"
+                            ),
+                        ),
+                    )
+                ),
                 created_at=item.created_at,
                 fruit=FruitDetail.model_validate(item.fruit),
                 daily_fact=(

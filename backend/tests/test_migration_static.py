@@ -58,7 +58,13 @@ V2_COLUMNS = {
         "accepts_online_purchase",
     },
     "user_fruit_preferences": {"has_tried", "willing_to_try"},
-    "recommendation_items": {"individual_score", "pair_score", "nutrition_pair_score"},
+    "recommendation_items": {
+        "individual_score", "pair_score", "nutrition_pair_score",
+        "selection_option_id", "selection_option_name_snapshot",
+        "selection_option_code_snapshot", "selection_resolution_source",
+        "effective_sweet_score_snapshot", "effective_sour_score_snapshot",
+        "effective_soft_score_snapshot", "effective_crisp_score_snapshot",
+    },
 }
 V2_CONSTRAINTS = {
     "uq_fruits_code",
@@ -87,6 +93,13 @@ V2_CONSTRAINTS = {
     "ck_users_sour_preference_range",
     "ck_users_soft_preference_range",
     "ck_users_crisp_preference_range",
+    "fk_recommendation_items_selection_option",
+    "fk_recommendation_items_selection_option_id_fruit_selection_options",
+    "ck_recommendation_items_selection_resolution_source",
+    "ck_recommendation_items_selection_sweet_range",
+    "ck_recommendation_items_selection_sour_range",
+    "ck_recommendation_items_selection_soft_range",
+    "ck_recommendation_items_selection_crisp_range",
 }
 V2_MODIFIED_COLUMNS = {
     ("user_fruit_preferences", "preference_score"),

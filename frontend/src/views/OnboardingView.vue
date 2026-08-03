@@ -10,6 +10,7 @@ import { ApiError } from '../api/http.js'
 import {
   createUser,
   getFruitPreferences,
+  getFruitOptionPreferences,
   getUser,
   replaceFruitPreferences,
   updateUser,
@@ -24,6 +25,7 @@ import {
   preferencesToSelection,
   profileFromUser,
   selectionToPreferences,
+  optionPreferencesToSelection,
 } from '../utils/fruit-preferences.js'
 
 const router = useRouter()
@@ -31,16 +33,33 @@ const route = useRoute()
 const profile = reactive(createDefaultProfile())
 const fruits = ref([])
 const preferenceSelection = ref(createDefaultFruitPreferenceSelection())
+const optionPreferences = ref([])
+const optionPreferencesLoaded = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const errorMessage = ref('')
 const saveMessage = ref('')
 const existingUser = ref(false)
 
+function optionalOptionPreferenceLoader() {
+  try {
+    return getFruitOptionPreferences
+  } catch {
+    return null
+  }
+}
+
+function loadOptionPreferences() {
+  const loader = optionalOptionPreferenceLoader()
+  return loader ? loader() : Promise.resolve(null)
+}
+
 async function loadPage() {
   // 先加载水果目录，再尝试读取已有资料；404 代表首次建档而非页面错误。
   loading.value = true
   errorMessage.value = ''
+  optionPreferencesLoaded.value = false
+  optionPreferences.value = []
 
   try {
     fruits.value = await listFruits()
@@ -56,8 +75,15 @@ async function loadPage() {
     existingUser.value = true
     Object.assign(profile, profileFromUser(user))
 
-    const preferences = await getFruitPreferences()
+    const [preferences, optionPreferenceRows] = await Promise.all([
+      getFruitPreferences(),
+      loadOptionPreferences(),
+    ])
     preferenceSelection.value = preferencesToSelection(preferences)
+    if (optionPreferenceRows !== null) {
+      optionPreferences.value = optionPreferencesToSelection(optionPreferenceRows)
+      optionPreferencesLoaded.value = true
+    }
   } catch (error) {
     errorMessage.value = error.message
   } finally {
@@ -91,7 +117,12 @@ async function saveOnboarding() {
 
     try {
       // 用户资料成功后再保存偏好；偏好失败会保留资料成功提示，便于重试。
-      await replaceFruitPreferences(selectionToPreferences(preferenceSelection.value))
+      const parentPreferences = selectionToPreferences(preferenceSelection.value)
+      if (optionPreferencesLoaded.value) {
+        await replaceFruitPreferences(parentPreferences, optionPreferences.value)
+      } else {
+        await replaceFruitPreferences(parentPreferences)
+      }
     } catch (error) {
       saveMessage.value = '基本信息已保存，但水果偏好暂未保存。请再次点击保存重试。'
       errorMessage.value = error.message
@@ -132,7 +163,11 @@ onMounted(loadPage)
     <form v-else class="profile-form" @submit.prevent="saveOnboarding">
       <!-- 子组件只负责输入控件，保存流程留在本页面统一编排。 -->
       <ProfileFields v-model="profile" />
-      <FruitPreferencePicker v-model="preferenceSelection" :fruits="fruits" />
+      <FruitPreferencePicker
+        v-model="preferenceSelection"
+        v-model:option-preferences="optionPreferences"
+        :fruits="fruits"
+      />
 
       <div v-if="saveMessage || errorMessage" class="inline-message" role="alert">
         <strong v-if="saveMessage">{{ saveMessage }}</strong>

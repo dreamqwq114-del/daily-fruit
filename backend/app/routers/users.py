@@ -14,6 +14,7 @@ from app.database import get_database_session
 from app.schemas.user import (
     UserCreate,
     UserFruitPreferenceRead,
+    UserFruitOptionPreferenceRead,
     UserFruitPreferencesUpdate,
     UserRead,
     UserUpdate,
@@ -88,6 +89,19 @@ def replace_current_user_fruit_preferences(
         current_user.id,
         payload,
     )
+
+
+@router.get(
+    "/fruit-option-preferences",
+    response_model=list[UserFruitOptionPreferenceRead],
+)
+def get_current_user_fruit_option_preferences(
+    current_user: CurrentUser,
+    session: DatabaseSession,
+) -> list[UserFruitOptionPreferenceRead]:
+    """读取当前用户明确保存的消费类型偏好。"""
+
+    return user_service.get_fruit_option_preferences(session, current_user.id)
 
 
 __all__ = ["router"]
