@@ -50,6 +50,8 @@ DISPLAY_GROUP_BY_CATEGORY = {
     "热带水果": "热带与特色水果",
 }
 
+EXPLICIT_ONLY_OPTION_FRUITS = frozenset({"pomegranate"})
+
 
 class FruitSeed(BaseModel):
     """fruits_seed.json 中一条水果身份和推荐演示属性。"""
@@ -258,6 +260,19 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
     option_fruit_codes = {item.fruit_code for item in selection_options}
     if not option_fruit_codes <= expected_codes:
         raise ValueError("Selection options must reference known fruit codes")
+    for item in selection_options:
+        if item.fruit_code in EXPLICIT_ONLY_OPTION_FRUITS and any(
+            value is not None
+            for value in (
+                item.sweet_score,
+                item.sour_score,
+                item.soft_score,
+                item.crisp_score,
+            )
+        ):
+            raise ValueError(
+                "Explicit-only selection options must not override fruit scores"
+            )
     for fruit_code in option_fruit_codes:
         active = [
             item

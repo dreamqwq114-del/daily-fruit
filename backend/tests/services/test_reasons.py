@@ -2,12 +2,19 @@ import json
 
 from app.services import (
     NutritionProfile,
+    PairSelection,
     RecommendationContext,
     RecommendationFruit,
     RecommendationUser,
+    ResolvedFruitCandidate,
     SeasonWindow,
+    ScoreBreakdown,
+    ScoredFruit,
+    SeasonEvaluation,
+    SelectionOption,
     recommend_fruits,
 )
+from app.services.recommendation_core.reasons import _build_reasons
 
 
 def make_user() -> RecommendationUser:
@@ -169,6 +176,70 @@ def test_reasons_do_not_contain_medical_or_treatment_promises() -> None:
         for phrase in forbidden_phrases
         for message in messages
     )
+
+
+def test_pomegranate_avoidance_is_explained_without_claiming_a_crisp_match() -> None:
+    fruit = RecommendationFruit(
+        id=30,
+        code="pomegranate",
+        name="石榴",
+        sweet_score=0.68,
+        sour_score=0.42,
+        soft_score=0.25,
+        crisp_score=0.55,
+        convenience_score=0.6,
+        average_price_level=2,
+        selection_options=(
+            SelectionOption(
+                id=301,
+                fruit_id=30,
+                code="soft_seed",
+                name="软籽型",
+                is_default=True,
+            ),
+            SelectionOption(
+                id=302,
+                fruit_id=30,
+                code="hard_seed",
+                name="硬籽型",
+            ),
+        ),
+    )
+    resolved = ResolvedFruitCandidate(
+        fruit=fruit,
+        effective_sweet_score=fruit.sweet_score,
+        effective_sour_score=fruit.sour_score,
+        effective_soft_score=fruit.soft_score,
+        effective_crisp_score=fruit.crisp_score,
+        resolved_option_id=301,
+        resolved_option_code="soft_seed",
+        resolved_option_name="软籽型",
+        avoided_option_ids=(302,),
+        resolution_source="default",
+    )
+    scored = ScoredFruit(
+        fruit=fruit,
+        base_score=0.5,
+        scores=ScoreBreakdown(
+            explicit_preference=0.5,
+            taste_match=0.5,
+            availability_and_season=0.5,
+            price_match_score=0.5,
+            convenience_score=0.5,
+            history_diversity_score=0.5,
+        ),
+        season=SeasonEvaluation(0.5, False, False),
+        resolved_candidate=resolved,
+    )
+    reasons = _build_reasons(
+        scored,
+        make_user(),
+        PairSelection(scored, scored, 0.5, 0.5),
+    )
+
+    selection_reason = next(reason for reason in reasons if reason.code == "selection_option")
+    assert selection_reason.message == "已避开硬籽型，优先选择软籽型"
+    assert "脆" not in selection_reason.message
 
 
 def test_full_result_is_reproducible_with_same_seed() -> None:

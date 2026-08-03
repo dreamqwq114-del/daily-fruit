@@ -9,6 +9,7 @@ FRUIT_FILE = DATA_ROOT / "fruits_seed.json"
 NUTRITION_FILE = DATA_ROOT / "nutrition_demo.csv"
 SEASON_FILE = DATA_ROOT / "seasons_demo.csv"
 FACT_FILE = DATA_ROOT / "fruit_facts_seed.json"
+OPTION_FILE = DATA_ROOT / "fruit_selection_options_seed.json"
 REQUIRED_CODES = {
     "apple",
     "banana",
@@ -182,6 +183,18 @@ def test_fruit_fact_seed_has_three_rows_per_fruit() -> None:
     assert all(
         sum(1 for item in facts if item["fruit_code"] == code) == 3
         for code in fruit_codes
+    )
+
+
+def test_selection_option_seed_preserves_pomegranate_score_semantics() -> None:
+    rows = json.loads(OPTION_FILE.read_text(encoding="utf-8"))
+    pomegranate = [row for row in rows if row["fruit_code"] == "pomegranate"]
+
+    assert {row["code"] for row in pomegranate} == {"soft_seed", "hard_seed"}
+    assert all(
+        row.get(field) is None
+        for row in pomegranate
+        for field in ("sweet_score", "sour_score", "soft_score", "crisp_score")
     )
 
 

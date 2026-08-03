@@ -31,8 +31,8 @@ const optionFruits = [
     code: 'peach',
     taste: '甜软',
     selection_options: [
-      { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', is_active: true },
-      { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', is_active: true },
+      { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', soft_score: 0.25, crisp_score: 0.9, is_active: true },
+      { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', soft_score: 0.9, crisp_score: 0.25, is_active: true },
     ],
   },
 ]
@@ -44,8 +44,8 @@ const peachAndKiwiOptionFruits = [
     code: 'peach',
     taste: '甜软',
     selection_options: [
-      { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', is_active: true },
-      { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', is_active: true },
+      { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', soft_score: 0.25, crisp_score: 0.9, is_active: true },
+      { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', soft_score: 0.9, crisp_score: 0.25, is_active: true },
     ],
   },
   {
@@ -54,12 +54,23 @@ const peachAndKiwiOptionFruits = [
     code: 'kiwifruit',
     taste: '酸甜',
     selection_options: [
-      { id: 201, fruit_id: 20, code: 'green', name: '绿心', is_active: true },
-      { id: 202, fruit_id: 20, code: 'yellow', name: '黄心', is_active: true },
-      { id: 203, fruit_id: 20, code: 'red', name: '红心', is_active: true },
+      { id: 201, fruit_id: 20, code: 'green', name: '绿心', sweet_score: 0.55, sour_score: 0.85, is_active: true },
+      { id: 202, fruit_id: 20, code: 'yellow', name: '黄心', sweet_score: 0.8, sour_score: 0.35, is_active: true },
+      { id: 203, fruit_id: 20, code: 'red', name: '红心', sweet_score: 0.85, sour_score: 0.45, is_active: true },
     ],
   },
 ]
+
+const pomegranateOptionFruit = {
+  id: 30,
+  name: '石榴',
+  code: 'pomegranate',
+  taste: '酸甜多汁',
+  selection_options: [
+    { id: 301, fruit_id: 30, code: 'soft_seed', name: '软籽型', is_active: true },
+    { id: 302, fruit_id: 30, code: 'hard_seed', name: '硬籽型', is_active: true },
+  ],
+}
 
 describe('FruitPreferencePicker', () => {
   it('does not render the old per-fruit select grid before opening the picker', () => {
@@ -195,6 +206,32 @@ describe('FruitPreferencePicker', () => {
     await wrapper.findAll('.fruit-option-quick-choice')[1].trigger('click')
     await wrapper.find('.fruit-option-panel-actions .button--ghost').trigger('click')
     expect(wrapper.emitted('update:optionPreferences')).toBeUndefined()
+  })
+
+  it('shows pomegranate explicit-only semantics and allows avoiding a seed type', async () => {
+    const wrapper = mount(FruitPreferencePicker, {
+      props: {
+        fruits: [pomegranateOptionFruit],
+        modelValue: selection(),
+      },
+    })
+
+    await wrapper.find('.button--small').trigger('click')
+    expect(wrapper.text()).toContain('默认不设置类型偏好')
+    await wrapper.find('.fruit-option-edit').trigger('click')
+    expect(wrapper.text()).toContain('仅用于明确喜欢/避开、过滤和推荐文案')
+    expect(wrapper.text()).not.toContain('根据我的软脆偏好自动选择')
+    expect(wrapper.text()).toContain('自定义设置')
+
+    await wrapper.findAll('.fruit-option-quick-choice').at(-1).trigger('click')
+    await wrapper.findAll('.fruit-option-choice')[1].trigger('click')
+    await wrapper.find('.fruit-option-panel-actions .button--primary').trigger('click')
+
+    expect(wrapper.emitted('update:optionPreferences').at(-1)[0]).toContainEqual({
+      fruit_id: 30,
+      option_id: 301,
+      preference: 'disliked',
+    })
   })
 
   it('enforces the five-fruit favorite limit in the picker', async () => {

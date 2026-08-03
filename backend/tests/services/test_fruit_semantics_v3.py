@@ -157,7 +157,7 @@ def test_seed_annotations_preserve_required_relative_relationships() -> None:
     assert rows["apple"]["portability_score"] > rows["watermelon"]["portability_score"]
 
 
-def test_selection_option_seed_has_only_the_two_trial_parent_fruits() -> None:
+def test_selection_option_seed_has_only_the_supported_parent_fruits() -> None:
     root = Path(__file__).resolve().parents[3]
     rows = json.loads(
         (root / "data" / "fruit_selection_options_seed.json").read_text(
@@ -168,7 +168,21 @@ def test_selection_option_seed_has_only_the_two_trial_parent_fruits() -> None:
     for row in rows:
         by_fruit.setdefault(row["fruit_code"], []).append(row)
 
-    assert set(by_fruit) == {"peach", "kiwifruit"}
+    assert set(by_fruit) == {
+        "apple",
+        "grape",
+        "peach",
+        "kiwifruit",
+        "pomegranate",
+    }
+    assert {row["code"] for row in by_fruit["apple"]} == {
+        "crisp",
+        "powdery",
+    }
+    assert {row["code"] for row in by_fruit["grape"]} == {
+        "soft_juicy",
+        "hard_crisp",
+    }
     assert {row["code"] for row in by_fruit["peach"]} == {"crisp", "soft"}
     assert {row["code"] for row in by_fruit["kiwifruit"]} == {
         "green",
@@ -178,12 +192,12 @@ def test_selection_option_seed_has_only_the_two_trial_parent_fruits() -> None:
     for fruit_code, fruit_rows in by_fruit.items():
         assert sum(row["is_default"] and row["is_active"] for row in fruit_rows) == 1
         assert all(row["is_active"] for row in fruit_rows)
-        if fruit_code == "peach":
+        if fruit_code in {"apple", "grape", "peach"}:
             assert matching_dimensions_for(
                 RecommendationFruit(
                     id=1,
-                    code="peach",
-                    name="桃",
+                    code=fruit_code,
+                    name=fruit_code,
                     sweet_score=0.5,
                     sour_score=0.5,
                     soft_score=0.5,
@@ -192,10 +206,11 @@ def test_selection_option_seed_has_only_the_two_trial_parent_fruits() -> None:
                     average_price_level=2,
                 )
             ) == ("soft_score", "crisp_score")
-            assert next(row for row in fruit_rows if row["code"] == "crisp")["crisp_score"] > next(
-                row for row in fruit_rows if row["code"] == "soft"
-            )["crisp_score"]
-        else:
+            crisp_row = max(fruit_rows, key=lambda row: row["crisp_score"])
+            soft_row = max(fruit_rows, key=lambda row: row["soft_score"])
+            assert crisp_row["crisp_score"] == 0.9
+            assert soft_row["soft_score"] == 0.9
+        elif fruit_code == "kiwifruit":
             assert matching_dimensions_for(
                 RecommendationFruit(
                     id=1,
@@ -212,3 +227,22 @@ def test_selection_option_seed_has_only_the_two_trial_parent_fruits() -> None:
             assert next(row for row in fruit_rows if row["code"] == "green")["sour_score"] > next(
                 row for row in fruit_rows if row["code"] == "yellow"
             )["sour_score"]
+        else:
+            assert matching_dimensions_for(
+                RecommendationFruit(
+                    id=1,
+                    code="pomegranate",
+                    name="石榴",
+                    sweet_score=0.68,
+                    sour_score=0.42,
+                    soft_score=0.25,
+                    crisp_score=0.55,
+                    convenience_score=0.5,
+                    average_price_level=2,
+                )
+            ) == ()
+            assert all(
+                row.get(field) is None
+                for row in fruit_rows
+                for field in ("sweet_score", "sour_score", "soft_score", "crisp_score")
+            )

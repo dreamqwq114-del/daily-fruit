@@ -1,16 +1,22 @@
 // 消费类型只影响偏好页的展示与快捷操作。
 // 推荐核心仍然读取 optionPreferences 中的 liked/disliked 记录。
 
-const LABELS_BY_CODE = {
-  crisp: '脆桃',
-  soft: '软桃',
-  green: '绿心',
-  yellow: '黄心',
-  red: '红心',
-}
-
 function activeOptions(fruit) {
   return (fruit?.selection_options ?? []).filter((option) => option?.is_active)
+}
+
+function optionMode(fruit) {
+  const options = activeOptions(fruit)
+  const hasSoftCrisp = options.some(
+    (option) => option.soft_score != null || option.crisp_score != null,
+  )
+  const hasSweetSour = options.some(
+    (option) => option.sweet_score != null || option.sour_score != null,
+  )
+
+  if (hasSoftCrisp && !hasSweetSour) return 'soft-crisp'
+  if (hasSweetSour && !hasSoftCrisp) return 'sweet-sour'
+  return 'explicit-only'
 }
 
 function fruitPreferenceRows(fruit, preferences) {
@@ -22,7 +28,7 @@ function fruitPreferenceRows(fruit, preferences) {
 }
 
 export function displayOptionName(option) {
-  return LABELS_BY_CODE[option?.code] ?? option?.name ?? ''
+  return option?.name ?? ''
 }
 
 export function optionPreferenceSummary(fruit, preferences) {
@@ -33,13 +39,17 @@ export function optionPreferenceSummary(fruit, preferences) {
   if (liked.length === 1 && disliked.length === 0) {
     const option = activeOptions(fruit).find((item) => Number(item.id) === Number(liked[0].option_id))
     if (option) {
-      return fruit?.code === 'peach' || option.code === 'crisp' || option.code === 'soft'
+      return optionMode(fruit) === 'soft-crisp'
         ? `优先${displayOptionName(option)}`
         : `只推荐${displayOptionName(option)}`
     }
   }
 
-  if (rows.length === 0) return '根据口感偏好自动匹配'
+  if (rows.length === 0) {
+    return optionMode(fruit) === 'explicit-only'
+      ? '默认不设置类型偏好'
+      : '根据口感偏好自动匹配'
+  }
   return '自定义设置'
 }
 
@@ -51,14 +61,20 @@ export function hasCustomOptionPreference(fruit, preferences) {
 
 export function optionQuickChoices(fruit, preferences) {
   const options = activeOptions(fruit)
-  const isKiwi = fruit?.code === 'kiwifruit' || options.some((option) => ['green', 'yellow', 'red'].includes(option.code))
+  const mode = optionMode(fruit)
+  const isTasteMatched = mode === 'sweet-sour'
+  const isExplicitOnly = mode === 'explicit-only'
   const choices = [{
     key: 'auto',
-    label: isKiwi ? '根据我的甜酸偏好自动选择' : '根据我的软脆偏好自动选择',
+    label: isExplicitOnly
+      ? '不设置类型偏好'
+      : isTasteMatched
+        ? '根据我的甜酸偏好自动选择'
+        : '根据我的软脆偏好自动选择',
     optionId: null,
   }]
 
-  if (isKiwi) {
+  if (isTasteMatched || isExplicitOnly) {
     for (const option of options) {
       choices.push({
         key: `only-${option.id}`,
@@ -80,10 +96,16 @@ export function optionQuickChoices(fruit, preferences) {
 
   if (hasCustomOptionPreference(fruit, preferences)) {
     choices.push({ key: 'custom', label: '编辑详细设置', optionId: 'custom' })
-  } else if (fruit?.code === 'kiwifruit' || options.length > 2) {
+  } else if (isTasteMatched || isExplicitOnly || options.length > 2) {
     choices.push({ key: 'custom', label: '自定义设置', optionId: 'custom' })
   }
   return choices
+}
+
+export function selectionOptionHint(fruit) {
+  return optionMode(fruit) === 'explicit-only'
+    ? '仅用于明确喜欢/避开、过滤和推荐文案，不改变甜酸软脆评分。'
+    : ''
 }
 
 export function optionRowsForFruit(fruit, preferences) {

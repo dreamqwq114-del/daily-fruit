@@ -1,5 +1,53 @@
 [
   {
+    "fruit_code": "apple",
+    "code": "crisp",
+    "name": "清脆型",
+    "soft_score": 0.25,
+    "crisp_score": 0.9,
+    "is_default": true,
+    "is_active": true,
+    "display_order": 1,
+    "data_quality": "low",
+    "data_source_note": "演示性相对口感标注；沿用软/脆类型匹配标尺，不构成真实品种或市场结论。"
+  },
+  {
+    "fruit_code": "apple",
+    "code": "powdery",
+    "name": "粉面型",
+    "soft_score": 0.9,
+    "crisp_score": 0.25,
+    "is_default": false,
+    "is_active": true,
+    "display_order": 2,
+    "data_quality": "low",
+    "data_source_note": "演示性相对口感标注；沿用软/脆类型匹配标尺，不构成真实品种或市场结论。"
+  },
+  {
+    "fruit_code": "grape",
+    "code": "soft_juicy",
+    "name": "软嫩多汁型",
+    "soft_score": 0.9,
+    "crisp_score": 0.25,
+    "is_default": true,
+    "is_active": true,
+    "display_order": 1,
+    "data_quality": "low",
+    "data_source_note": "演示性相对口感标注；沿用软/脆类型匹配标尺，不构成真实品种或市场结论。"
+  },
+  {
+    "fruit_code": "grape",
+    "code": "hard_crisp",
+    "name": "硬脆提子型",
+    "soft_score": 0.25,
+    "crisp_score": 0.9,
+    "is_default": false,
+    "is_active": true,
+    "display_order": 2,
+    "data_quality": "low",
+    "data_source_note": "演示性相对口感标注；沿用软/脆类型匹配标尺，不构成真实品种或市场结论。"
+  },
+  {
     "fruit_code": "peach",
     "code": "crisp",
     "name": "脆桃型",
@@ -58,5 +106,25 @@
     "display_order": 3,
     "data_quality": "low",
     "data_source_note": "演示性相对口感标注；与绿心、黄心使用相同的甜/酸匹配维度。"
+  },
+  {
+    "fruit_code": "pomegranate",
+    "code": "soft_seed",
+    "name": "软籽型",
+    "is_default": true,
+    "is_active": true,
+    "display_order": 1,
+    "data_quality": "low",
+    "data_source_note": "仅用于明确喜欢/避开、过滤和推荐文案；不覆盖甜酸软脆评分。"
+  },
+  {
+    "fruit_code": "pomegranate",
+    "code": "hard_seed",
+    "name": "硬籽型",
+    "is_default": false,
+    "is_active": true,
+    "display_order": 2,
+    "data_quality": "low",
+    "data_source_note": "仅用于明确喜欢/避开、过滤和推荐文案；不覆盖甜酸软脆评分。"
   }
 ]
