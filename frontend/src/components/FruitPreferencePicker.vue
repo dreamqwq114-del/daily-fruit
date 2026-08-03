@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
 const props = defineProps({
   fruits: {
@@ -77,6 +77,17 @@ function closePicker() {
   draftSelection.value = null
   pickerMessage.value = ''
 }
+
+watch(pickerOpen, (isOpen) => {
+  if (typeof document === 'undefined') return
+  document.body.classList.toggle('fruit-picker-is-open', isOpen)
+})
+
+onBeforeUnmount(() => {
+  if (typeof document !== 'undefined') {
+    document.body.classList.remove('fruit-picker-is-open')
+  }
+})
 
 function confirmPicker() {
   preferenceSelection.value = {
@@ -192,23 +203,25 @@ function removeCommitted(groupKey, fruitId) {
           <input v-model="searchTerm" type="search" placeholder="例如：苹果、甜、脆" autofocus />
         </label>
 
-        <p v-if="pickerMessage" class="inline-message" role="alert">{{ pickerMessage }}</p>
-        <div class="fruit-picker-grid" aria-live="polite">
-          <button
-            v-for="fruit in filteredFruits"
-            :key="fruit.id"
-            class="fruit-picker-option"
-            :class="{ 'is-selected': isDraftSelected(fruit.id) }"
-            type="button"
-            :aria-pressed="isDraftSelected(fruit.id)"
-            @click="toggleDraft(fruit)"
-          >
-            <span class="fruit-initial" aria-hidden="true">{{ fruit.name.slice(0, 1) }}</span>
-            <span><strong>{{ fruit.name }}</strong><small>{{ fruit.taste }}</small></span>
-            <span class="fruit-picker-option-state">{{ isDraftSelected(fruit.id) ? '已选择' : '选择' }}</span>
-          </button>
+        <div class="fruit-picker-scroll-area">
+          <p v-if="pickerMessage" class="inline-message" role="alert">{{ pickerMessage }}</p>
+          <div class="fruit-picker-grid" aria-live="polite">
+            <button
+              v-for="fruit in filteredFruits"
+              :key="fruit.id"
+              class="fruit-picker-option"
+              :class="{ 'is-selected': isDraftSelected(fruit.id) }"
+              type="button"
+              :aria-pressed="isDraftSelected(fruit.id)"
+              @click="toggleDraft(fruit)"
+            >
+              <span class="fruit-initial" aria-hidden="true">{{ fruit.name.slice(0, 1) }}</span>
+              <span><strong>{{ fruit.name }}</strong><small>{{ fruit.taste }}</small></span>
+              <span class="fruit-picker-option-state">{{ isDraftSelected(fruit.id) ? '已选择' : '选择' }}</span>
+            </button>
+          </div>
+          <p v-if="!filteredFruits.length" class="fruit-selection-empty">没找到匹配的水果，可以换个关键词。</p>
         </div>
-        <p v-if="!filteredFruits.length" class="fruit-selection-empty">没找到匹配的水果，可以换个关键词。</p>
 
         <footer class="fruit-picker-actions">
           <button class="button button--ghost" type="button" @click="closePicker">取消</button>
