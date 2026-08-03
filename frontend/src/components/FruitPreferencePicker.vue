@@ -1,6 +1,13 @@
 <script setup>
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 
+import {
+  displayOptionName,
+  optionPreferenceSummary,
+  optionQuickChoices,
+  optionRowsForFruit,
+} from '../utils/selection-option-ui.js'
+
 const props = defineProps({
   fruits: {
     type: Array,
@@ -20,7 +27,9 @@ const activeGroup = ref('favoriteIds')
 const searchTerm = ref('')
 const pickerMessage = ref('')
 const draftSelection = ref(null)
-const expandedOptionFruitIds = ref([])
+const optionPanelFruit = ref(null)
+const optionPanelDraft = ref([])
+const optionPanelMode = ref('quick')
 
 const optionFruits = computed(() =>
   props.fruits.filter((fruit) =>
@@ -74,6 +83,7 @@ function fruitsFor(group) {
 }
 
 function openPicker(groupKey) {
+  closeOptionPanel()
   activeGroup.value = groupKey
   searchTerm.value = ''
   pickerMessage.value = ''
@@ -86,6 +96,7 @@ function openPicker(groupKey) {
 }
 
 function closePicker() {
+  closeOptionPanel()
   pickerOpen.value = false
   draftSelection.value = null
   pickerMessage.value = ''
@@ -158,31 +169,83 @@ function removeCommitted(groupKey, fruitId) {
   }
 }
 
-function isOptionExpanded(fruitId) {
-  return expandedOptionFruitIds.value.includes(fruitId)
-}
-
-function toggleOptionFruit(fruitId) {
-  expandedOptionFruitIds.value = isOptionExpanded(fruitId)
-    ? expandedOptionFruitIds.value.filter((id) => id !== fruitId)
-    : [...expandedOptionFruitIds.value, fruitId]
-}
-
 function optionPreference(fruitId, optionId) {
   return props.optionPreferences.find(
     (item) => Number(item.fruit_id) === fruitId && Number(item.option_id) === optionId,
   )?.preference ?? null
 }
 
-function setOptionPreference(fruit, option, preference) {
-  const next = props.optionPreferences.filter(
-    (item) =>
-      !(Number(item.fruit_id) === fruit.id && Number(item.option_id) === option.id),
-  )
-  if (preference) {
-    next.push({ fruit_id: fruit.id, option_id: option.id, preference })
+function activeOptions(fruit) {
+  return fruit.selection_options?.filter((option) => option.is_active) ?? []
+}
+
+function optionSummary(fruit) {
+  return optionPreferenceSummary(fruit, props.optionPreferences)
+}
+
+function optionChoices(fruit) {
+  return optionQuickChoices(fruit, props.optionPreferences)
+}
+
+function fruitStatus(fruitId) {
+  if (ids(draftSelection.value, 'favoriteIds').includes(fruitId)) return '喜欢'
+  if (ids(draftSelection.value, 'dislikeIds').includes(fruitId)) return '不喜欢'
+  if (ids(draftSelection.value, 'forbiddenIds').includes(fruitId)) return '绝对不吃'
+  return '未设置'
+}
+
+function isQuickChoiceActive(choice) {
+  if (optionPanelMode.value !== 'quick') return false
+  if (choice.key === 'auto') return optionPanelDraft.value.length === 0
+  if (choice.optionId === null || choice.optionId === 'custom') return false
+  return optionPanelDraft.value.length === 1 &&
+    Number(optionPanelDraft.value[0].option_id) === Number(choice.optionId) &&
+    optionPanelDraft.value[0].preference === 'liked'
+}
+
+function isOptionPanelOpen(fruitId) {
+  return Number(optionPanelFruit.value?.id) === Number(fruitId)
+}
+
+function openOptionPanel(fruit) {
+  optionPanelFruit.value = fruit
+  optionPanelDraft.value = optionRowsForFruit(fruit, props.optionPreferences).map((item) => ({ ...item }))
+  optionPanelMode.value = 'quick'
+}
+
+function closeOptionPanel() {
+  optionPanelFruit.value = null
+  optionPanelDraft.value = []
+  optionPanelMode.value = 'quick'
+}
+
+function setQuickOption(fruit, choice) {
+  if (choice.optionId === 'custom') {
+    optionPanelMode.value = 'custom'
+    return
   }
+  optionPanelMode.value = 'quick'
+  optionPanelDraft.value = choice.optionId === null
+    ? []
+    : [{ fruit_id: fruit.id, option_id: choice.optionId, preference: 'liked' }]
+}
+
+function setCustomOption(fruit, option, preference) {
+  const next = optionPanelDraft.value.filter(
+    (item) => !(Number(item.fruit_id) === Number(fruit.id) && Number(item.option_id) === Number(option.id)),
+  )
+  if (preference) next.push({ fruit_id: fruit.id, option_id: option.id, preference })
+  optionPanelDraft.value = next
+}
+
+function confirmOptionPanel() {
+  if (!optionPanelFruit.value) return
+  const fruitId = Number(optionPanelFruit.value.id)
+  const others = props.optionPreferences.filter((item) => Number(item.fruit_id) !== fruitId)
+  const next = [...others, ...optionPanelDraft.value]
+    .sort((left, right) => Number(left.fruit_id) - Number(right.fruit_id) || Number(left.option_id) - Number(right.option_id))
   emit('update:optionPreferences', next)
+  closeOptionPanel()
 }
 </script>
 
@@ -227,50 +290,6 @@ function setOptionPreference(fruit, option, preference) {
 
     <p class="section-help fruit-preference-note">特别喜欢最多 5 种；“不喜欢”和“绝对不吃”会分开保存。</p>
 
-    <section v-if="optionFruits.length" class="fruit-option-preferences">
-      <h2>具体类型偏好</h2>
-      <p class="section-help">不同类型口感差异较大的水果，可以单独设置；未设置不会影响父水果选择。</p>
-      <article v-for="fruit in optionFruits" :key="`options-${fruit.id}`" class="fruit-option-card">
-        <button
-          class="fruit-option-toggle"
-          type="button"
-          :aria-expanded="isOptionExpanded(fruit.id)"
-          @click="toggleOptionFruit(fruit.id)"
-        >
-          <span><strong>{{ fruit.name }}</strong><small>设置具体偏好</small></span>
-          <span aria-hidden="true">{{ isOptionExpanded(fruit.id) ? '−' : '+' }}</span>
-        </button>
-        <div v-if="isOptionExpanded(fruit.id)" class="fruit-option-list" role="group" :aria-label="`${fruit.name}具体类型偏好`">
-          <div v-for="option in fruit.selection_options.filter((item) => item.is_active)" :key="option.id" class="fruit-option-row">
-            <span><strong>{{ option.name }}</strong><small>{{ option.code }}</small></span>
-            <div class="fruit-option-actions">
-              <button
-                type="button"
-                class="fruit-option-choice"
-                :class="{ 'is-selected': optionPreference(fruit.id, option.id) === 'liked' }"
-                :aria-pressed="optionPreference(fruit.id, option.id) === 'liked'"
-                @click="setOptionPreference(fruit, option, 'liked')"
-              >喜欢</button>
-              <button
-                type="button"
-                class="fruit-option-choice"
-                :class="{ 'is-selected': optionPreference(fruit.id, option.id) === 'disliked' }"
-                :aria-pressed="optionPreference(fruit.id, option.id) === 'disliked'"
-                @click="setOptionPreference(fruit, option, 'disliked')"
-              >不喜欢</button>
-              <button
-                type="button"
-                class="fruit-option-choice"
-                :class="{ 'is-selected': optionPreference(fruit.id, option.id) === null }"
-                :aria-pressed="optionPreference(fruit.id, option.id) === null"
-                @click="setOptionPreference(fruit, option, null)"
-              >未设置</button>
-            </div>
-          </div>
-        </div>
-      </article>
-    </section>
-
     <div v-if="pickerOpen" class="fruit-picker-backdrop" @click.self="closePicker">
       <section class="fruit-picker-dialog" role="dialog" aria-modal="true" aria-labelledby="fruit-picker-title">
         <header class="fruit-picker-header">
@@ -290,19 +309,68 @@ function setOptionPreference(fruit, option, preference) {
         <div class="fruit-picker-scroll-area">
           <p v-if="pickerMessage" class="inline-message" role="alert">{{ pickerMessage }}</p>
           <div class="fruit-picker-grid" aria-live="polite">
-            <button
+            <article
               v-for="fruit in filteredFruits"
               :key="fruit.id"
               class="fruit-picker-option"
               :class="{ 'is-selected': isDraftSelected(fruit.id) }"
-              type="button"
-              :aria-pressed="isDraftSelected(fruit.id)"
-              @click="toggleDraft(fruit)"
             >
-              <span class="fruit-initial" aria-hidden="true">{{ fruit.name.slice(0, 1) }}</span>
-              <span><strong>{{ fruit.name }}</strong><small>{{ fruit.taste }}</small></span>
-              <span class="fruit-picker-option-state">{{ isDraftSelected(fruit.id) ? '已选择' : '选择' }}</span>
-            </button>
+              <button
+                class="fruit-picker-option-main"
+                type="button"
+                :aria-pressed="isDraftSelected(fruit.id)"
+                @click="toggleDraft(fruit)"
+              >
+                <span class="fruit-initial" aria-hidden="true">{{ fruit.name.slice(0, 1) }}</span>
+                <span><strong>{{ fruit.name }}</strong><small>{{ fruit.taste }}</small></span>
+                <span class="fruit-picker-option-state">{{ isDraftSelected(fruit.id) ? '已选择' : '选择' }}</span>
+              </button>
+              <div v-if="optionFruits.some((item) => Number(item.id) === Number(fruit.id))" class="fruit-option-summary">
+                <div>
+                  <strong class="fruit-option-parent-status" :class="`is-${fruitStatus(fruit.id) === '喜欢' ? 'favorite' : fruitStatus(fruit.id) === '不喜欢' ? 'dislike' : fruitStatus(fruit.id) === '绝对不吃' ? 'forbidden' : 'unset'}`">{{ fruitStatus(fruit.id) }}</strong>
+                  <span :class="{ 'is-muted': optionSummary(fruit) === '根据口感偏好自动匹配' }">类型偏好：{{ optionSummary(fruit) }}</span>
+                </div>
+                <button
+                  class="fruit-option-edit"
+                  type="button"
+                  :aria-expanded="isOptionPanelOpen(fruit.id)"
+                  :aria-label="`修改${fruit.name}类型偏好`"
+                  @click.stop="openOptionPanel(fruit)"
+                >修改 <span aria-hidden="true">›</span></button>
+              </div>
+              <div v-if="isOptionPanelOpen(fruit.id)" class="fruit-option-panel" role="dialog" :aria-label="`${fruit.name}类型偏好`">
+                <h3>{{ fruit.name }}类型偏好</h3>
+                <div class="fruit-option-quick-list" role="radiogroup" :aria-label="`${fruit.name}快捷类型偏好`">
+                  <button
+                    v-for="choice in optionChoices(fruit)"
+                    :key="choice.key"
+                    type="button"
+                    class="fruit-option-quick-choice"
+                    :class="{ 'is-active': (choice.key === 'custom' && optionPanelMode === 'custom') || isQuickChoiceActive(choice) }"
+                    role="radio"
+                    :aria-checked="(choice.key === 'custom' && optionPanelMode === 'custom') || isQuickChoiceActive(choice)"
+                    @click="setQuickOption(fruit, choice)"
+                  >
+                    <span aria-hidden="true">{{ (choice.key === 'custom' && optionPanelMode === 'custom') || isQuickChoiceActive(choice) ? '●' : '○' }}</span>
+                    {{ choice.label }}
+                  </button>
+                </div>
+                <div v-if="optionPanelMode === 'custom'" class="fruit-option-custom-list" role="group" :aria-label="`${fruit.name}详细类型偏好`">
+                  <div v-for="option in activeOptions(fruit)" :key="option.id" class="fruit-option-custom-row">
+                    <strong>{{ displayOptionName(option) }}</strong>
+                    <div class="fruit-option-actions">
+                      <button type="button" class="fruit-option-choice" :class="{ 'is-liked': optionPreference(fruit.id, option.id) === 'liked' || optionPanelDraft.find((item) => Number(item.option_id) === Number(option.id))?.preference === 'liked' }" @click="setCustomOption(fruit, option, 'liked')">喜欢</button>
+                      <button type="button" class="fruit-option-choice" :class="{ 'is-disliked': optionPreference(fruit.id, option.id) === 'disliked' || optionPanelDraft.find((item) => Number(item.option_id) === Number(option.id))?.preference === 'disliked' }" @click="setCustomOption(fruit, option, 'disliked')">避开</button>
+                      <button type="button" class="fruit-option-choice" @click="setCustomOption(fruit, option, null)">不确定</button>
+                    </div>
+                  </div>
+                </div>
+                <div class="fruit-option-panel-actions">
+                  <button type="button" class="button button--ghost" @click.stop="closeOptionPanel">取消</button>
+                  <button type="button" class="button button--primary" @click.stop="confirmOptionPanel">确认</button>
+                </div>
+              </div>
+            </article>
           </div>
           <p v-if="!filteredFruits.length" class="fruit-selection-empty">没找到匹配的水果，可以换个关键词。</p>
         </div>
