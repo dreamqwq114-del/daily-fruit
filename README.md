@@ -76,7 +76,13 @@ Pair = 0.70 × mean(U1, U2)
 
 - `taste_match` 比较甜、酸、软、脆四个维度。
 - `nutrition_pair` 比较维生素 C、膳食纤维、钾、叶酸和类胡萝卜素的覆盖、多样性与数据置信度；能量不进入组合互补分。
-- `sensory_category_diversity` 使用类别、食用方式与口感距离。
+- `sensory_category_diversity` 只比较甜、酸、软、脆的体验差异，不读取 `category` 或 `display_group`。
+- `daily_recommendation_role` 只允许 `main` 与 `supporting`；默认普通推荐关闭 supporting。
+- `display_group` 是消费者友好的展示分组，只用于目录、筛选和文案，不参与任何推荐评分；旧 `category` 仅作兼容字段并已标记 deprecated。
+- 尝鲜是用户与水果之间的动态关系：明确 `has_tried=False` 且愿意尝试时才可标记为尝鲜状态。
+- `discovery_level=0/1/2` 分别表示过滤明确未尝试、最多允许一个、最多允许两个明确未尝试水果；未知值不计入。
+- `novelty_level` 表示普通用户第一次尝试该水果的接受门槛，目前仅作解释性元数据，不直接改变排序。
+- `commonness_score` 是面向中国大陆普通商超和主流电商环境的演示性市场常见度，不是全球固定属性。
 - 历史展示、吃过记录和反馈采用指数时间衰减；不同反馈有不同衰减周期。
 - 所有合法组合都会被评分；算法在距离最佳分不超过既定阈值的组合中使用稳定 seed 选择。在候选数据、用户画像、历史和反馈等输入不变时，同一用户、日期和刷新序号可以复现结果。
 - 推荐理由来自真实的加权贡献，不调用 LLM，也不生成医疗诊断或治疗承诺。
@@ -161,7 +167,7 @@ python -m app.seed.seed_fruits --dry-run
 
 执行 migration 前必须显式配置 `ALEMBIC_DATABASE_PURPOSE=migration` 与 `MIGRATION_DATABASE_URL`，并重新确认目标数据库；测试环境则使用 `ALEMBIC_DATABASE_PURPOSE=test` 与 `TEST_DATABASE_URL`。不要在不确定的数据库上执行 upgrade、downgrade 或 seed。
 
-当前 seed 写入器要求 schema 版本为 `0008`。默认写入只允许本地可丢弃的 `daily_fruit_test`；向已确认的 Supabase 迁移库写入时，必须显式设置 `MIGRATION_DATABASE_URL`、`DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes` 并传入 `--migration`。连接串只能来自本地环境或部署 Secret。
+当前 seed 写入器要求 schema 版本为 `0010`。默认写入只允许本地可丢弃的 `daily_fruit_test`；向已确认的 Supabase 迁移库写入时，必须显式设置 `MIGRATION_DATABASE_URL`、`DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes` 并传入 `--migration`。连接串只能来自本地环境或部署 Secret。
 
 ### 测试与构建
 
@@ -209,7 +215,8 @@ npm run build
 | 水果目录 | `GET /api/fruits`、`GET /api/fruits/{fruit_id}` |
 | 推荐 | `GET /api/recommendations/today`、`POST /api/recommendations/refresh` |
 | 历史 | `GET /api/me/recommendations` |
-| 反馈 | `POST /api/recommendations/items/{item_id}/feedback` |
+| 推荐结果反馈 | `POST /api/recommendations/items/{item_id}/feedback` |
+| 产品意见反馈 | `POST /api/product-feedback` |
 
 除 `/health` 外，业务 API 要求有效 Supabase access token。FastAPI 校验签名、issuer、audience、有效期、角色和会话声明，并从 JWT `sub` 推导当前用户；客户端不能通过提交 `user_id` 冒充其他用户。开发环境可访问 `/docs`，生产环境关闭该入口。
 

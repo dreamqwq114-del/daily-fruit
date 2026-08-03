@@ -1,17 +1,33 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import { getSession, onAuthStateChange, signOut } from './auth/session.js'
 import AppNavigation from './components/AppNavigation.vue'
+import ProductFeedbackDialog from './components/ProductFeedbackDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
 const showNavigation = computed(() => route.meta.showNavigation !== false)
+const pageKeyByRouteName = {
+  today: 'today',
+  preferences: 'preferences',
+  history: 'history',
+}
+const feedbackPageKey = computed(
+  () => pageKeyByRouteName[route.name] ?? null,
+)
 const authenticated = ref(false)
 const loggingOut = ref(false)
 const logoutError = ref('')
+const feedbackOpen = ref(false)
 let unsubscribe = () => {}
+
+const feedbackAvailable = computed(
+  () => Boolean(
+    authenticated.value && showNavigation.value && feedbackPageKey.value,
+  ),
+)
 
 async function logout() {
   if (loggingOut.value) return
@@ -26,6 +42,14 @@ async function logout() {
     loggingOut.value = false
   }
 }
+
+function openFeedback() {
+  if (feedbackAvailable.value) feedbackOpen.value = true
+}
+
+watch(feedbackAvailable, (available) => {
+  if (!available) feedbackOpen.value = false
+})
 
 onMounted(async () => {
   try {
@@ -50,16 +74,26 @@ onBeforeUnmount(() => unsubscribe())
           <small>今天吃什么，交给好选择</small>
         </span>
       </RouterLink>
-      <div v-if="authenticated" class="logout-controls">
+      <div v-if="authenticated" class="header-actions">
         <button
-          class="button button--ghost"
+          v-if="feedbackAvailable"
+          class="button button--ghost feedback-trigger"
           type="button"
-          :disabled="loggingOut"
-          @click="logout"
+          @click="openFeedback"
         >
-          {{ loggingOut ? '正在退出…' : '退出登录' }}
+          反馈
         </button>
-        <small v-if="logoutError" class="logout-error" role="alert">{{ logoutError }}</small>
+        <div class="logout-controls">
+          <button
+            class="button button--ghost"
+            type="button"
+            :disabled="loggingOut"
+            @click="logout"
+          >
+            {{ loggingOut ? '正在退出…' : '退出登录' }}
+          </button>
+          <small v-if="logoutError" class="logout-error" role="alert">{{ logoutError }}</small>
+        </div>
       </div>
     </header>
 
@@ -68,5 +102,11 @@ onBeforeUnmount(() => unsubscribe())
     </main>
 
     <AppNavigation v-if="showNavigation" />
+    <ProductFeedbackDialog
+      v-if="authenticated"
+      :open="feedbackOpen"
+      :page-key="feedbackPageKey"
+      @close="feedbackOpen = false"
+    />
   </div>
 </template>

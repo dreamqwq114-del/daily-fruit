@@ -80,7 +80,9 @@ FEEDBACK_DECAY_DAYS = {
 }
 MIN_FEEDBACK_ADJUSTMENT = -0.15
 MAX_FEEDBACK_ADJUSTMENT = 0.15
-EXPLORATION_COLD_START_PENALTY = 0.08
+# Deprecated compatibility export.  Exploration is now a user/fruit state and
+# never changes a fruit's score by static role.
+EXPLORATION_COLD_START_PENALTY = 0.0
 HISTORY_SHOWN_WEIGHT = 0.12
 HISTORY_EATEN_WEIGHT = 0.18
 HISTORY_SHOWN_TAU_DAYS = 7.0
@@ -458,25 +460,26 @@ def _explicit_preference_score(
     return clamp_score(0.40 + 0.10 * fruit.commonness_score)
 
 
-def _exploration_adjustment(
+def is_exploration_recommendation(
     fruit: RecommendationFruit,
+    preference: FruitPreference | None,
     user: RecommendationUser,
-) -> float:
-    """Lower unfamiliar exploration fruits, unless the user explicitly likes one.
+) -> bool:
+    """Return a dynamic exploration label without changing the score.
 
-    这里的“explicitly liked”当前只检查 preference_score>=1，没有再次要求
-    ``has_tried=True``；这与 FruitPreference 的理想字段语义存在边界差异，
-    但保持现状是为了不在注释任务中改变排序。
+    A missing ``has_tried`` value is unknown rather than untried.  The label is
+    intentionally derived per user and fruit, so it is never persisted as a
+    permanent fruit role.
     """
-    if fruit.daily_recommendation_role != "exploration":
-        return 0.0
-    preference = user.fruit_preferences.get(fruit.id)
-    explicitly_liked = (
+
+    del fruit  # The relationship is represented by the supplied preference.
+    return bool(
         preference is not None
-        and preference.preference_score is not None
-        and preference.preference_score >= 1
+        and preference.has_tried is False
+        and preference.willing_to_try is not False
+        and preference.is_forbidden is False
+        and user.discovery_level != 0
     )
-    return 0.0 if explicitly_liked else EXPLORATION_COLD_START_PENALTY
 
 
 def _derived_convenience(fruit: RecommendationFruit) -> float:
@@ -576,10 +579,7 @@ def _score_fruit(
         month=context.month,
     )
     feedback_adjustment = _feedback_adjustment(fruit.id, context)
-    explicit = clamp_score(
-        _explicit_preference_score(fruit, user)
-        - _exploration_adjustment(fruit, user)
-    )
+    explicit = clamp_score(_explicit_preference_score(fruit, user))
     taste = _taste_match(fruit, user)
     convenience = _derived_convenience(fruit)
     scores = ScoreBreakdown(
@@ -678,7 +678,7 @@ def _validate_inputs(
         )
         if fruit.default_portion_grams <= 0 or fruit.novelty_level not in {0, 1, 2}:
             raise InvalidRecommendationInputError("水果身份字段超出范围")
-        if fruit.daily_recommendation_role not in {"main", "exploration", "supporting"}:
+        if fruit.daily_recommendation_role not in {"main", "supporting"}:
             raise InvalidRecommendationInputError("水果推荐角色无效")
     for fruit_id, preference in user.fruit_preferences.items():
         if fruit_id <= 0:

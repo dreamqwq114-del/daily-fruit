@@ -87,6 +87,10 @@ p {
 }
 
 .app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
   position: relative;
   z-index: 5;
   width: min(100%, 1180px);
@@ -94,8 +98,15 @@ p {
   padding: 22px clamp(16px, 4vw, 36px) 8px;
 }
 
+.header-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .logout-controls {
-  float: right;
   display: grid;
   justify-items: end;
   gap: 4px;
@@ -910,6 +921,139 @@ p {
   color: var(--muted);
 }
 
+.product-feedback-backdrop {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  overflow-y: auto;
+  background: rgb(22 48 35 / 42%);
+}
+
+.product-feedback-dialog {
+  width: min(100%, 560px);
+  max-height: min(760px, calc(100vh - 40px));
+  overflow-y: auto;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid #d8e1d2;
+  border-radius: 24px;
+  background: var(--surface, #fffdf7);
+  box-shadow: 0 24px 80px rgb(22 48 35 / 24%);
+}
+
+.product-feedback-dialog__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.product-feedback-dialog__header h2 {
+  margin: 4px 0 0;
+}
+
+.product-feedback-dialog__close {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid #cbd9ca;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--green-dark);
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.product-feedback-dialog__description {
+  margin: 8px 0 22px;
+  color: var(--muted);
+}
+
+.product-feedback-form {
+  display: grid;
+  gap: 12px;
+}
+
+.product-feedback-form fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+
+.product-feedback-form legend,
+.product-feedback-form__label {
+  margin-bottom: 8px;
+  font-weight: 800;
+}
+
+.product-feedback-categories {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.product-feedback-category {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid #cad8c7;
+  border-radius: 12px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.product-feedback-category--selected {
+  border-color: var(--green);
+  background: #e8f1e7;
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+
+.product-feedback-form textarea {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  resize: vertical;
+  padding: 12px 14px;
+  border: 1px solid #cad8c7;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.product-feedback-form__meta,
+.product-feedback-form__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.product-feedback-form__meta {
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.product-feedback-form__note {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: .8rem;
+  line-height: 1.55;
+}
+
+.product-feedback-success {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #a9c7ac;
+  border-radius: 12px;
+  background: #e8f1e7;
+  color: var(--green-dark);
+}
+
 .inline-message,
 .action-message {
   margin: 0;
@@ -1498,8 +1642,22 @@ p {
     padding-top: 15px;
   }
 
+  .header-actions {
+    gap: 4px;
+  }
+
   .brand small {
     display: none;
+  }
+
+  .product-feedback-backdrop {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .product-feedback-dialog {
+    max-height: calc(100vh - 20px);
+    border-radius: 20px;
   }
 
   .view-shell,
@@ -1590,6 +1748,33 @@ p {
     grid-template-columns: repeat(5, minmax(52px, 1fr));
     overflow-x: auto;
     padding-bottom: 4px;
+  }
+}
+
+@media (max-width: 420px) {
+  .app-header {
+    gap: 8px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .header-actions .button {
+    padding-right: 11px;
+    padding-left: 11px;
+  }
+
+  .product-feedback-categories {
+    grid-template-columns: 1fr;
+  }
+
+  .product-feedback-form__meta,
+  .product-feedback-form__actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .product-feedback-form__actions .button {
+    width: 100%;
   }
 }
 

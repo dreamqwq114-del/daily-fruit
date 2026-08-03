@@ -30,3 +30,30 @@ unavailable fruit. Nutrition normalization uses the complete active library's
 enumerates legal combinations, applies the 0.70/0.15/0.10/0.05 formula, and
 uses a deterministic near-top random choice when seeded. Reasons carry the
 actual weighted contribution.
+
+## Fruit semantic correction audit
+
+- `display_group` is a presentation and directory grouping field. It is not
+  read by the pure recommendation core, so changing a group's label cannot
+  change a base score, pair score, or ranking.
+- The public field name `sensory_category_diversity` is retained for API
+  compatibility, but its implementation is Scheme A: the average absolute
+  difference across sweet, sour, soft, and crisp scores only. It does not read
+  `category` or `display_group`.
+- Static `daily_recommendation_role=exploration` is no longer valid. Exploration
+  is derived per user from explicit familiarity and willingness fields; the
+  compatibility cold-start constant is zero and contributes no score.
+- `novelty_level` remains explanatory metadata and does not directly affect
+  ranking. Supporting fruit is excluded from ordinary two-main-fruit output by
+  the default selection path.
+- `commonness_score` is a demonstration estimate for ordinary supermarkets and
+  mainstream e-commerce in mainland China; it is distinct from `novelty_level`
+  and is not treated as a universal botanical property.
+
+The season loader still has an audit item: an out-of-window row can have
+`season_score=0` while retaining its demonstration `availability_score`. This
+is recorded for a separate data-semantics task and is intentionally unchanged
+here. Soft/crisp remain four independent, equally weighted taste dimensions;
+their observed correlation is not sufficient evidence to change the API or
+formula in this task. Supabase RLS and the existing security-advisor warning
+were observed but not modified.

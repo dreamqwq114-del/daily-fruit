@@ -128,6 +128,7 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
         convenience_score=float(fruit.convenience_score),
         average_price_level=fruit.average_price_level,
         category=fruit.category,
+        display_group=getattr(fruit, "display_group", "") or fruit.category,
         taste=fruit.taste,
         # 100g 只是在旧行缺失份量时的兼容元数据；当前 nutrition_demo 是
         # 无物理单位分数，份量换算不会因此变成真实营养计算。

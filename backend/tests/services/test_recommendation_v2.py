@@ -220,10 +220,10 @@ def test_future_history_and_unknown_feedback_are_rejected() -> None:
         )
 
 
-def test_exploration_role_is_lower_for_cold_start_but_favorite_overrides() -> None:
+def test_static_exploration_role_no_longer_changes_score() -> None:
     fruits = [
         fruit(1, role="main"),
-        fruit(2, role="exploration"),
+        fruit(2, role="main"),
     ]
     cold_start = {
         item.fruit.id: item
@@ -233,7 +233,7 @@ def test_exploration_role_is_lower_for_cold_start_but_favorite_overrides() -> No
             RecommendationContext(month=7),
         )
     }
-    assert cold_start[1].base_score > cold_start[2].base_score
+    assert cold_start[1].base_score == pytest.approx(cold_start[2].base_score)
 
     explicit_favorite = {
         item.fruit.id: item

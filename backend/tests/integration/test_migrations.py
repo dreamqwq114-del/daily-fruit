@@ -24,6 +24,7 @@ EXPECTED_TABLES = {
     "recommendations",
     "recommendation_items",
     "recommendation_feedback",
+    "product_feedback",
 }
 EXPECTED_INDEXES = {
     "fruit_facts": {"ix_fruit_facts_fruit_active"},
@@ -38,6 +39,10 @@ EXPECTED_INDEXES = {
     "recommendation_items": {"ix_recommendation_items_fruit_id"},
     "recommendation_feedback": {
         "ix_recommendation_feedback_user_created_at"
+    },
+    "product_feedback": {
+        "ix_product_feedback_status_created_at",
+        "ix_product_feedback_user_id",
     },
 }
 
@@ -182,7 +187,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     with engine.connect() as connection:
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
-        ).scalar_one() == "0008"
+        ).scalar_one() == "0010"
         users_columns = {
             item["name"]
             for item in inspect(connection).get_columns(
@@ -220,7 +225,7 @@ def test_actual_indexes_and_foreign_key_delete_rules(
                     foreign_key["options"]["ondelete"]
                 )
 
-    assert actual_delete_rules == {
+        assert actual_delete_rules == {
         ("fruit_nutritions", "fruit_id"): "CASCADE",
         ("fruit_seasons", "fruit_id"): "CASCADE",
         ("fruit_facts", "fruit_id"): "CASCADE",
@@ -232,7 +237,103 @@ def test_actual_indexes_and_foreign_key_delete_rules(
         ("recommendation_feedback", "recommendation_item_id"): "CASCADE",
         ("recommendation_feedback", "user_id"): "RESTRICT",
         ("users", "auth_user_id"): "SET NULL",
+        ("product_feedback", "user_id"): "SET NULL",
     }
+
+
+def test_product_feedback_constraints_and_user_deidentification(
+    migrated_database: tuple[Engine, str],
+) -> None:
+    """The new table rejects invalid values and nulls ownership on deletion."""
+
+    engine, database_url = migrated_database
+    run_alembic("upgrade", "head", database_url=database_url)
+    connection = engine.connect()
+    transaction = connection.begin()
+    try:
+        user_id = insert_user(connection)
+        feedback_id = connection.execute(
+            text(
+                """
+                INSERT INTO public.product_feedback (
+                    user_id, category, content, page_key
+                ) VALUES (:user_id, 'bug', 'A valid report', 'today')
+                RETURNING id
+                """
+            ),
+            {"user_id": user_id},
+        ).scalar_one()
+
+        invalid_rows = (
+            {
+                "category": "not-a-category",
+                "content": "A valid report",
+                "page_key": "today",
+                "status": "new",
+                "resolved_at": None,
+            },
+            {
+                "category": "bug",
+                "content": "   ",
+                "page_key": "today",
+                "status": "new",
+                "resolved_at": None,
+            },
+            {
+                "category": "bug",
+                "content": "A valid report",
+                "page_key": "settings",
+                "status": "new",
+                "resolved_at": None,
+            },
+            {
+                "category": "bug",
+                "content": "A valid report",
+                "page_key": "today",
+                "status": "new",
+                "resolved_at": "2026-08-03 00:00:00+00",
+            },
+            {
+                "category": "bug",
+                "content": "A valid report",
+                "page_key": "today",
+                "status": "resolved",
+                "resolved_at": None,
+            },
+        )
+        for row in invalid_rows:
+            with pytest.raises(IntegrityError):
+                with connection.begin_nested():
+                    connection.execute(
+                        text(
+                            """
+                            INSERT INTO public.product_feedback (
+                                user_id, category, content, page_key,
+                                status, resolved_at
+                            ) VALUES (
+                                :user_id, :category, :content, :page_key,
+                                :status, :resolved_at
+                            )
+                            """
+                        ),
+                        {"user_id": user_id, **row},
+                    )
+
+        connection.execute(
+            text("DELETE FROM public.users WHERE id = :user_id"),
+            {"user_id": user_id},
+        )
+        assert connection.execute(
+            text(
+                """
+                SELECT user_id FROM public.product_feedback WHERE id = :id
+                """
+            ),
+            {"id": feedback_id},
+        ).scalar_one() is None
+    finally:
+        transaction.rollback()
+        connection.close()
 
 
 def test_database_constraints_and_cascades_are_enforced(

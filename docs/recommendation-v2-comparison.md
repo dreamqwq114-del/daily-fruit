@@ -9,7 +9,7 @@ This report compares the fixed offline profiles used by
 regression report, not a nutrition or market-price evaluation.
 
 The run uses the 24 fruits in `data/fruits_seed.json`, month 7, region `华东`,
-and `random_seed=20260731`. The V2 run uses the new identity, role, portion
+and `random_seed=20260731`. The V2 run uses the new identity, role, display-group and portion
 metadata,
 convenience, familiarity, availability, and data-quality fields. The legacy
 season CSV is enriched by the seed loader with an explicit region level,
@@ -42,24 +42,25 @@ bounded penalty. History and feedback use date-based exponential decay.
 
 ## Fixed profile output
 
-> This five-row summary was regenerated with the current V2 code. The
-> authoritative seven-profile run with all V2 top-10 lists is in the next
-> section; use that section for acceptance.
+> This seven-profile summary was regenerated with the current semantic-correction
+> code. The complete top-10 lists are in the next section.
 
 | Profile | V1 pair | V2 pair | V2 total score | Notes |
 | --- | --- | --- | ---: | --- |
-| cold start | 芒果 + 榴莲 | 葡萄 + 木瓜 | 0.7141 | default/common fruits win instead of a single exotic pair |
-| low budget / crisp / convenient | 芒果 + 榴莲 | 苹果 + 木瓜 | 0.6710 | above-budget fruit receives a lower utility |
-| sweet / soft / higher budget | 芒果 + 榴莲 | 桃 + 木瓜 | 0.7447 | taste and pair diversity both contribute |
-| mango forbidden | 木瓜 + 榴莲 | 葡萄 + 木瓜 | 0.7141 | forbidden mango is removed before scoring |
-| known-only discovery | 芒果 + 榴莲 | 葡萄 + 木瓜 | 0.7277 | all 24 fruits marked tried; discovery level 0 only permits known fruits |
+| low budget / crisp / convenient | 芒果 + 榴莲 | 苹果 + 木瓜 | 0.6103 | above-budget fruit receives a lower utility |
+| sour-sweet / accepts cutting | 芒果 + 榴莲 | 苹果 + 木瓜 | 0.6386 | taste, price and pair terms are scored together |
+| sweet / soft / higher budget | 芒果 + 榴莲 | 芒果 + 榴莲 | 0.6668 | explicit taste match can make a tropical pair competitive |
+| mango forbidden | 木瓜 + 榴莲 | 木瓜 + 苹果 | 0.6372 | forbidden mango is removed before scoring |
+| recently ate mango | 木瓜 + 榴莲 | 木瓜 + 苹果 | 0.6372 | recent history lowers mango freshness |
+| not tried avocado and durian | 葡萄 + 木瓜 | 葡萄 + 木瓜 | 0.6362 | level 1 does not allow both explicit unfamiliar fruits |
+| cold start / no explicit preference | 葡萄 + 木瓜 | 葡萄 + 木瓜 | 0.6362 | default profile remains deterministic |
 
-The exact V2 individual scores for the first two rows are:
+The exact current individual scores for representative rows are:
 
-- cold start: 葡萄 `0.6636`, 木瓜 `0.6328`;
 - low budget: 苹果 `0.6174`, 木瓜 `0.5423`;
-- sweet/soft: 桃 `0.7144`, 木瓜 `0.6854`;
-- known-only: 葡萄 `0.6810`, 木瓜 `0.6544`.
+- sour-sweet: 桃 `0.6703`, 葡萄 `0.6701`;
+- sweet/soft: 芒果 `0.6968`, 榴莲 `0.6815`;
+- unfamiliar level 1: 葡萄 `0.6636`, 木瓜 `0.6328`.
 
 The result is no longer a greedy “top two base scores” selection: all legal
 pairs are enumerated, then the pair objective is applied. A deterministic
@@ -74,13 +75,13 @@ about real market or nutrition rankings.
 
 | Profile | V2 base-score top 10 (high → low) | Final pair | Pair score |
 | --- | --- | --- | ---: |
-| low budget / crisp / convenient | 香蕉 .6360; 西瓜 .6205; 苹果 .6174; 桃 .6002; 梨 .5981; 葡萄 .5957; 柑橘 .5898; 橙子 .5642; 蓝莓 .5640; 哈密瓜 .5620 | 苹果 + 木瓜 | .6710 |
-| sour-sweet / accepts cutting | 桃 .6703; 葡萄 .6701; 西瓜 .6525; 哈密瓜 .6434; 香蕉 .6425; 菠萝 .6319; 蓝莓 .6306; 龙眼 .6256; 苹果 .6204; 木瓜 .6201 | 葡萄 + 木瓜 | .7119 |
-| sweet / soft / higher budget | 西瓜 .7165; 桃 .7144; 香蕉 .7096; 哈密瓜 .6920; 葡萄 .6886; 木瓜 .6854; 荔枝 .6763; 蓝莓 .6760; 龙眼 .6740; 芒果 .6728 | 桃 + 木瓜 | .7447 |
-| mango forbidden | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 哈密瓜 .6480; 木瓜 .6328; 龙眼 .6300; 蓝莓 .6237; 火龙果 .6161; 菠萝 .6141 | 葡萄 + 木瓜 | .7141 |
-| recently ate mango | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 哈密瓜 .6480; 木瓜 .6328; 龙眼 .6300; 蓝莓 .6237; 芒果 .6163; 火龙果 .6161 | 葡萄 + 木瓜 | .7141 |
-| not tried avocado and durian | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 哈密瓜 .6480; 木瓜 .6328; 龙眼 .6300; 蓝莓 .6237; 芒果 .6208; 火龙果 .6161 | 葡萄 + 木瓜 | .7141 |
-| cold start / no explicit preference | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 哈密瓜 .6480; 木瓜 .6328; 龙眼 .6300; 蓝莓 .6237; 芒果 .6208; 火龙果 .6161 | 葡萄 + 木瓜 | .7141 |
+| low budget / crisp / convenient | 香蕉 .6360; 西瓜 .6205; 苹果 .6174; 桃 .6002; 梨 .5981; 葡萄 .5957; 橘子 .5898; 龙眼 .5747; 橙子 .5642; 蓝莓 .5640 | 苹果 + 木瓜 | .6103 |
+| sour-sweet / accepts cutting | 桃 .6703; 葡萄 .6701; 菠萝 .6559; 西瓜 .6525; 龙眼 .6496; 哈密瓜 .6434; 香蕉 .6425; 芒果 .6423; 蓝莓 .6306; 火龙果 .6260 | 苹果 + 木瓜 | .6386 |
+| sweet / soft / higher budget | 西瓜 .7165; 桃 .7144; 香蕉 .7096; 荔枝 .7003; 龙眼 .6980; 芒果 .6968; 哈密瓜 .6920; 葡萄 .6886; 木瓜 .6854; 榴莲 .6815 | 芒果 + 榴莲 | .6668 |
+| mango forbidden | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 龙眼 .6540; 哈密瓜 .6480; 火龙果 .6401; 菠萝 .6381; 木瓜 .6328; 蓝莓 .6237 | 木瓜 + 苹果 | .6372 |
+| recently ate mango | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 龙眼 .6540; 哈密瓜 .6480; 芒果 .6403; 火龙果 .6401; 菠萝 .6381; 木瓜 .6328 | 木瓜 + 苹果 | .6372 |
+| not tried avocado and durian | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 龙眼 .6540; 哈密瓜 .6480; 芒果 .6448; 火龙果 .6401; 菠萝 .6381; 木瓜 .6328 | 葡萄 + 木瓜 | .6362 |
+| cold start / no explicit preference | 桃 .6751; 西瓜 .6640; 葡萄 .6636; 香蕉 .6586; 龙眼 .6540; 哈密瓜 .6480; 芒果 .6448; 火龙果 .6401; 菠萝 .6381; 木瓜 .6328 | 葡萄 + 木瓜 | .6362 |
 
 The “recently ate mango” profile uses a two-day-old history event and lowers
 mango's history-freshness term. The “not tried” profile marks avocado and
@@ -97,15 +98,23 @@ being treated as “tried”.
   data-curation task can replace those defaults with sourced regional data.
 - User familiarity is optional. Unknown answers are not treated as either
   “tried” or “forbidden”.
+- `display_group` is a consumer-facing directory label only. It is not read by
+  single-fruit scoring, pair scoring, nutrition, season, history, or exploration
+  rules. The compatibility field `category` is deprecated.
+- `sensory_category_diversity` keeps its public name for compatibility but now
+  means the average absolute difference of sweet, sour, soft, and crisp scores.
+- Static `exploration` roles are no longer valid. Exploration is a per-user
+  state derived from `has_tried`, `willing_to_try`, and `discovery_level`.
 
 ## Verification
 
-- Backend: `197 passed, 30 skipped` with the repository's Python 3.11 environment.
+- Backend: `207 passed, 30 skipped` with the repository's Python 3.11 environment.
 - Frontend: `npm test` passed (23 Node tests, 25 component tests).
 - Frontend production build: `npm run build` passed.
-- Remote Supabase project `Daily Fruit`, ref `frzbbpocyzlqxljsrsiw`, is now at
-  version `0005`; read-only verification found the V2 columns/checks, RLS
-  enabled with zero policies, and unchanged 24/24/48/11/57/11/22/4 counts.
+- Remote Supabase project `Daily Fruit` is at migration version `0009`; read-only
+  verification found 24 active fruits, 23 `main`, one `supporting`, complete
+  display groups, 24 nutrition rows and 48 season rows. RLS remains enabled with
+  no policies, and the existing security-advisor warning is outside this task.
 - The V2 seed ran twice after migration; both runs kept 24/24/48 rows and
   unique natural keys.
 - `backend/tests/services/test_fixed_profiles_v2.py` rebuilds the seven fixed
