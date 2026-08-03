@@ -17,6 +17,7 @@ from app.repositories import fruit_repository, user_repository
 from app.schemas.user import (
     UserCreate,
     UserFruitPreferenceRead,
+    UserFruitOptionPreferenceRead,
     UserFruitPreferencesUpdate,
     UserRead,
     UserUpdate,
@@ -86,6 +87,19 @@ def get_fruit_preferences(
     ]
 
 
+def get_fruit_option_preferences(
+    session: Session,
+    user_id: int,
+) -> list[UserFruitOptionPreferenceRead]:
+    """读取当前用户的具体消费类型偏好。"""
+
+    _require_user(session, user_id)
+    return [
+        UserFruitOptionPreferenceRead.model_validate(item)
+        for item in user_repository.list_option_preferences(session, user_id)
+    ]
+
+
 def replace_fruit_preferences(
     session: Session,
     user_id: int,
@@ -105,6 +119,22 @@ def replace_fruit_preferences(
             f"水果不存在：{', '.join(map(str, missing_ids))}"
         )
 
+    if "option_preferences" in payload.model_fields_set:
+        option_ids = {item.option_id for item in payload.option_preferences}
+        option_rows = fruit_repository.get_selection_options(session, option_ids)
+        options_by_id = {item.id: item for item in option_rows}
+        missing_options = sorted(option_ids - options_by_id.keys())
+        if missing_options:
+            raise ResourceNotFoundError(
+                f"消费类型不存在：{', '.join(map(str, missing_options))}"
+            )
+        for item in payload.option_preferences:
+            option = options_by_id[item.option_id]
+            if option.fruit_id != item.fruit_id:
+                raise ResourceConflictError("消费类型与父水果不匹配")
+            if item.preference is not None and not option.is_active:
+                raise ResourceConflictError("停用的消费类型不能设置偏好")
+
     preferences = user_repository.replace_preferences(
         session,
         user_id,
@@ -121,6 +151,15 @@ def replace_fruit_preferences(
             for item in payload.preferences
         ),
     )
+    if "option_preferences" in payload.model_fields_set:
+        user_repository.replace_option_preferences(
+            session,
+            user_id,
+            (
+                (item.fruit_id, item.option_id, item.preference)
+                for item in payload.option_preferences
+            ),
+        )
     session.commit()
     return [
         UserFruitPreferenceRead.model_validate(item)
@@ -141,6 +180,7 @@ __all__ = [
     "create_user",
     "create_user_for_principal",
     "get_fruit_preferences",
+    "get_fruit_option_preferences",
     "get_user",
     "replace_fruit_preferences",
     "update_user",

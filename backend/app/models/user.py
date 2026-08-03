@@ -49,6 +49,7 @@ if TYPE_CHECKING:
         Recommendation,
         RecommendationFeedback,
     )
+    from app.models.selection_option import UserFruitOptionPreference
 
 
 class User(TimestampMixin, Base):
@@ -155,6 +156,11 @@ class User(TimestampMixin, Base):
     )
 
     fruit_preferences: Mapped[list[UserFruitPreference]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    fruit_option_preferences: Mapped[list[UserFruitOptionPreference]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
         passive_deletes=True,

@@ -83,6 +83,27 @@ export function selectionToPreferences(selection) {
   )
 }
 
+export function optionPreferencesToSelection(preferences) {
+  return [...(preferences ?? [])]
+    .filter(
+      (item) =>
+        item?.preference === 'liked' || item?.preference === 'disliked',
+    )
+    .map((item) => ({
+      fruit_id: Number(item.fruit_id),
+      option_id: Number(item.option_id),
+      preference: item.preference,
+    }))
+    .sort(
+      (left, right) =>
+        left.fruit_id - right.fruit_id || left.option_id - right.option_id,
+    )
+}
+
+export function selectionToOptionPreferences(preferences) {
+  return optionPreferencesToSelection(preferences)
+}
+
 export function createDefaultProfile() {
   // 与 UserBase 默认值保持一致：discovery=1、horizon=4、market=2。
   return {

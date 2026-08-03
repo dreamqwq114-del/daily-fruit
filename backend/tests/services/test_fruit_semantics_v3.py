@@ -16,6 +16,7 @@ from app.services import (
     select_recommendation_pair,
 )
 from app.services.recommendation_core.common import NoRecommendationCandidatesError
+from app.services.recommendation_core.selection_options import matching_dimensions_for
 
 
 def make_user(*, discovery_level: int = 1, preferences: dict[int, FruitPreference] | None = None) -> RecommendationUser:
@@ -154,3 +155,60 @@ def test_seed_annotations_preserve_required_relative_relationships() -> None:
     assert rows["durian"]["aroma_intensity"] > rows["blueberry"]["aroma_intensity"]
     assert rows["pineapple"]["preparation_difficulty"] > rows["banana"]["preparation_difficulty"]
     assert rows["apple"]["portability_score"] > rows["watermelon"]["portability_score"]
+
+
+def test_selection_option_seed_has_only_the_two_trial_parent_fruits() -> None:
+    root = Path(__file__).resolve().parents[3]
+    rows = json.loads(
+        (root / "data" / "fruit_selection_options_seed.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    by_fruit = {}
+    for row in rows:
+        by_fruit.setdefault(row["fruit_code"], []).append(row)
+
+    assert set(by_fruit) == {"peach", "kiwifruit"}
+    assert {row["code"] for row in by_fruit["peach"]} == {"crisp", "soft"}
+    assert {row["code"] for row in by_fruit["kiwifruit"]} == {
+        "green",
+        "yellow",
+        "red",
+    }
+    for fruit_code, fruit_rows in by_fruit.items():
+        assert sum(row["is_default"] and row["is_active"] for row in fruit_rows) == 1
+        assert all(row["is_active"] for row in fruit_rows)
+        if fruit_code == "peach":
+            assert matching_dimensions_for(
+                RecommendationFruit(
+                    id=1,
+                    code="peach",
+                    name="桃",
+                    sweet_score=0.5,
+                    sour_score=0.5,
+                    soft_score=0.5,
+                    crisp_score=0.5,
+                    convenience_score=0.5,
+                    average_price_level=2,
+                )
+            ) == ("soft_score", "crisp_score")
+            assert next(row for row in fruit_rows if row["code"] == "crisp")["crisp_score"] > next(
+                row for row in fruit_rows if row["code"] == "soft"
+            )["crisp_score"]
+        else:
+            assert matching_dimensions_for(
+                RecommendationFruit(
+                    id=1,
+                    code="kiwifruit",
+                    name="猕猴桃",
+                    sweet_score=0.5,
+                    sour_score=0.5,
+                    soft_score=0.5,
+                    crisp_score=0.5,
+                    convenience_score=0.5,
+                    average_price_level=2,
+                )
+            ) == ("sweet_score", "sour_score")
+            assert next(row for row in fruit_rows if row["code"] == "green")["sour_score"] > next(
+                row for row in fruit_rows if row["code"] == "yellow"
+            )["sour_score"]

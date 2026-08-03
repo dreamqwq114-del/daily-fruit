@@ -72,6 +72,27 @@ class FruitRead(FruitBase):
     id: PositiveId
     created_at: AwareDatetime
     updated_at: AwareDatetime
+    selection_options: list["FruitSelectionOptionRead"] = Field(default_factory=list)
+
+
+class FruitSelectionOptionRead(ApiSchema):
+    """父水果下的可选消费类型，仅包含展示和口感覆盖字段。"""
+
+    id: PositiveId
+    fruit_id: PositiveId
+    code: Annotated[str, Field(min_length=1, max_length=40)]
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+    sweet_score: NormalizedScore | None = None
+    sour_score: NormalizedScore | None = None
+    soft_score: NormalizedScore | None = None
+    crisp_score: NormalizedScore | None = None
+    is_default: bool
+    is_active: bool
+    display_order: Annotated[int, Field(ge=1)]
+    data_quality: DataQuality
+    data_source_note: Annotated[str, Field(max_length=500)] | None = None
+    created_at: AwareDatetime
+    updated_at: AwareDatetime
 
 
 class FruitFactRead(ApiSchema):
@@ -121,6 +142,7 @@ class FruitSeasonRead(FruitSeasonBase):
 class FruitDetail(FruitRead):
     nutrition: FruitNutritionRead | None = None
     seasons: list[FruitSeasonRead] = Field(default_factory=list)
+    selection_options: list[FruitSelectionOptionRead] = Field(default_factory=list)
 
 
 __all__ = [
@@ -132,4 +154,5 @@ __all__ = [
     "FruitRead",
     "FruitSeasonBase",
     "FruitSeasonRead",
+    "FruitSelectionOptionRead",
 ]

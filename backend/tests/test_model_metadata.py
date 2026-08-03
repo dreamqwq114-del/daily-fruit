@@ -29,6 +29,8 @@ EXPECTED_TABLES = {
     "public.recommendation_items",
     "public.recommendation_feedback",
     "public.product_feedback",
+    "public.fruit_selection_options",
+    "public.user_fruit_option_preferences",
 }
 EXPECTED_EXTERNAL_TABLES = {"auth.users"}
 
@@ -113,7 +115,7 @@ def assert_numeric(
         assert column_type.scale == scale
 
 
-def test_metadata_contains_exactly_ten_public_tables() -> None:
+def test_metadata_contains_expected_public_tables() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES | EXPECTED_EXTERNAL_TABLES
     assert {target.schema for target in business_tables()} == {"public"}
     assert Base.metadata.tables["auth.users"].info["external"] is True
@@ -278,6 +280,8 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     assert "ck_recommendation_items_individual_score_range" in check_sql(items)
     assert "ck_recommendation_items_pair_score_range" in check_sql(items)
     assert "ck_recommendation_items_nutrition_pair_score_range" in check_sql(items)
+    assert "selection_option_id" in items.c
+    assert "selection_option_name_snapshot" in items.c
 
     feedback = table("recommendation_feedback")
     assert unique_column_sets(feedback) == {
@@ -342,6 +346,26 @@ def test_foreign_key_delete_rules_are_explicit() -> None:
         ("product_feedback", "user_id"): (
             "public.users.id",
             "SET NULL",
+        ),
+        ("fruit_selection_options", "fruit_id"): (
+            "public.fruits.id",
+            "RESTRICT",
+        ),
+        ("user_fruit_option_preferences", "user_id"): (
+            "public.users.id",
+            "CASCADE",
+        ),
+        ("user_fruit_option_preferences", "fruit_id"): (
+            "public.fruit_selection_options.fruit_id",
+            "RESTRICT",
+        ),
+        ("user_fruit_option_preferences", "option_id"): (
+            "public.fruit_selection_options.id",
+            "RESTRICT",
+        ),
+        ("recommendation_items", "selection_option_id"): (
+            "public.fruit_selection_options.id",
+            "RESTRICT",
         ),
     }
 

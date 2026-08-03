@@ -25,6 +25,8 @@ EXPECTED_TABLES = {
     "recommendation_items",
     "recommendation_feedback",
     "product_feedback",
+    "fruit_selection_options",
+    "user_fruit_option_preferences",
 }
 EXPECTED_INDEXES = {
     "fruit_facts": {"ix_fruit_facts_fruit_active"},
@@ -36,13 +38,25 @@ EXPECTED_INDEXES = {
     "user_fruit_preferences": {
         "ix_user_fruit_preferences_fruit_id"
     },
-    "recommendation_items": {"ix_recommendation_items_fruit_id"},
+    "recommendation_items": {
+        "ix_recommendation_items_fruit_id",
+        "ix_recommendation_items_selection_option_id",
+    },
     "recommendation_feedback": {
         "ix_recommendation_feedback_user_created_at"
     },
     "product_feedback": {
         "ix_product_feedback_status_created_at",
         "ix_product_feedback_user_id",
+    },
+    "fruit_selection_options": {
+        "ix_fruit_selection_options_fruit_active_order",
+        "uq_fruit_selection_options_active_default",
+    },
+    "user_fruit_option_preferences": {
+        "ix_user_fruit_option_preferences_user_fruit",
+        "ix_user_fruit_option_preferences_fruit_id",
+        "ix_user_fruit_option_preferences_option_id",
     },
 }
 
@@ -187,7 +201,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     with engine.connect() as connection:
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
-        ).scalar_one() == "0010"
+        ).scalar_one() == "0012"
         users_columns = {
             item["name"]
             for item in inspect(connection).get_columns(

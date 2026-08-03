@@ -28,6 +28,9 @@ from app.services.recommendation_types import (
     ScoreBreakdown,
     SeasonEvaluation,
     SeasonWindow,
+    ResolvedFruitCandidate,
+    SelectionOption,
+    SelectionOptionPreference,
 )
 
 __all__ = [
@@ -48,6 +51,9 @@ __all__ = [
     "ScoreBreakdown",
     "SeasonEvaluation",
     "SeasonWindow",
+    "ResolvedFruitCandidate",
+    "SelectionOption",
+    "SelectionOptionPreference",
     "calculate_base_score",
     "evaluate_season",
     "filter_eligible_fruits",

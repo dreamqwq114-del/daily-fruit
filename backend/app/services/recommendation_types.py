@@ -73,6 +73,39 @@ class FruitPreference:
 
 
 @dataclass(frozen=True, slots=True)
+class SelectionOption:
+    """一个父水果下可购买、可辨认的消费类型档案。
+
+    选项不是新的顶层水果，也不携带营养、价格或季节数据。可空口感字段
+    在进入推荐核心前由 resolver 继承父水果值，避免构造不存在的平均档案。
+    """
+
+    id: int
+    fruit_id: int
+    code: str
+    name: str
+    sweet_score: float | None = None
+    sour_score: float | None = None
+    soft_score: float | None = None
+    crisp_score: float | None = None
+    is_default: bool = False
+    is_active: bool = True
+    display_order: int = 1
+    data_quality: str = "low"
+    data_source_note: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class SelectionOptionPreference:
+    """用户对一个消费类型的明确态度；缺失记录表示 unknown。"""
+
+    user_id: int
+    fruit_id: int
+    option_id: int
+    preference: str
+
+
+@dataclass(frozen=True, slots=True)
 class HistoryEvent:
     """历史展示/食用聚合事件，用于时间衰减去重。
 
@@ -146,6 +179,7 @@ class RecommendationFruit:
     is_active: bool = True
     nutrition: NutritionProfile | None = None
     seasons: tuple[SeasonWindow, ...] = ()
+    selection_options: tuple[SelectionOption, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +203,9 @@ class RecommendationUser:
     city: str = ""
     discovery_level: int = 1
     fruit_preferences: Mapping[int, FruitPreference] = field(
+        default_factory=dict
+    )
+    option_preferences: Mapping[int, tuple[SelectionOptionPreference, ...]] = field(
         default_factory=dict
     )
 
@@ -258,6 +295,26 @@ class ScoredFruit:
     base_score: float
     scores: ScoreBreakdown
     season: SeasonEvaluation
+    resolved_candidate: "ResolvedFruitCandidate | None" = None
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedFruitCandidate:
+    """进入完整评分前确定的唯一父水果消费类型快照。"""
+
+    fruit: RecommendationFruit
+    effective_sweet_score: float
+    effective_sour_score: float
+    effective_soft_score: float
+    effective_crisp_score: float
+    resolved_option_id: int | None = None
+    resolved_option_code: str | None = None
+    resolved_option_name: str | None = None
+    acceptable_option_ids: tuple[int, ...] = ()
+    avoided_option_ids: tuple[int, ...] = ()
+    resolution_source: str = "not_applicable"
+    effective_explicit_preference: float = 0.0
+    option_explicitly_liked: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -299,6 +356,7 @@ class RecommendationItemResult:
     individual_score: float | None = None
     pair_score: float | None = None
     nutrition_pair_score: float | None = None
+    resolved_candidate: ResolvedFruitCandidate | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,6 +382,9 @@ __all__ = [
     "RecommendationItemResult",
     "RecommendationResult",
     "RecommendationUser",
+    "ResolvedFruitCandidate",
+    "SelectionOption",
+    "SelectionOptionPreference",
     "ScoredFruit",
     "ScoreBreakdown",
     "SeasonEvaluation",

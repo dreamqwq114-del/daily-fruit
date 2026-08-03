@@ -26,14 +26,20 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.config import Settings, _is_supabase_host
 from app.database import create_database_engine
-from app.models import Fruit, FruitFact, FruitNutrition, FruitSeason
+from app.models import (
+    Fruit,
+    FruitFact,
+    FruitNutrition,
+    FruitSeason,
+    FruitSelectionOption,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
 # 写入前的 schema 保护；该值必须与当前可写目标数据库的 alembic_version
 # 同步，否则脚本应拒绝写入而不是猜测数据库状态。
-EXPECTED_ALEMBIC_VERSION = "0010"
+EXPECTED_ALEMBIC_VERSION = "0012"
 
 DISPLAY_GROUP_BY_CATEGORY = {
     "仁果": "苹果梨类",
@@ -128,12 +134,32 @@ class FruitFactSeed(BaseModel):
     source_note: str | None = Field(default=None, max_length=500)
 
 
+class SelectionOptionSeed(BaseModel):
+    """父水果消费类型的演示性相对口感档案。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    fruit_code: str = Field(min_length=1, max_length=60)
+    code: str = Field(min_length=1, max_length=40)
+    name: str = Field(min_length=1, max_length=100)
+    sweet_score: Decimal | None = Field(default=None, ge=0, le=1)
+    sour_score: Decimal | None = Field(default=None, ge=0, le=1)
+    soft_score: Decimal | None = Field(default=None, ge=0, le=1)
+    crisp_score: Decimal | None = Field(default=None, ge=0, le=1)
+    is_default: bool = False
+    is_active: bool = True
+    display_order: int = Field(ge=1, le=100)
+    data_quality: str = Field(default="low", pattern="^(high|medium|low)$")
+    data_source_note: str | None = Field(default=None, max_length=500)
+
+
 @dataclass(frozen=True)
 class SeedDataset:
     fruits: tuple[FruitSeed, ...]
     nutritions: tuple[NutritionSeed, ...]
     seasons: tuple[SeasonSeed, ...]
     facts: tuple[FruitFactSeed, ...]
+    selection_options: tuple[SelectionOptionSeed, ...]
 
 
 @dataclass(frozen=True)
@@ -142,6 +168,7 @@ class SeedSummary:
     nutritions: int
     seasons: int
     facts: int
+    selection_options: int
 
 
 def read_csv(path: Path) -> list[dict[str, str]]:
@@ -185,6 +212,12 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
         (data_root / "fruit_facts_seed.json").read_text(encoding="utf-8")
     )
     facts = tuple(FruitFactSeed.model_validate(item) for item in fact_payload)
+    option_payload = json.loads(
+        (data_root / "fruit_selection_options_seed.json").read_text(encoding="utf-8")
+    )
+    selection_options = tuple(
+        SelectionOptionSeed.model_validate(item) for item in option_payload
+    )
 
     fruit_names = [item.name for item in fruits]
     fruit_codes = [item.code for item in fruits]
@@ -199,11 +232,13 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
         for item in seasons
     ]
     fact_keys = [(item.fruit_code, item.sort_order) for item in facts]
+    option_keys = [(item.fruit_code, item.code) for item in selection_options]
     require_unique(fruit_names, "fruit name")
     require_unique(fruit_codes, "fruit code")
     require_unique(nutrition_names, "nutrition fruit name")
     require_unique(season_keys, "season natural key")
     require_unique(fact_keys, "fruit fact natural key")
+    require_unique(option_keys, "selection option natural key")
 
     expected_names = set(fruit_names)
     if set(nutrition_names) != expected_names:
@@ -220,11 +255,26 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
     if set(fact_counts.values()) != {3}:
         raise ValueError("Every fruit must have exactly three fact rows")
 
+    option_fruit_codes = {item.fruit_code for item in selection_options}
+    if not option_fruit_codes <= expected_codes:
+        raise ValueError("Selection options must reference known fruit codes")
+    for fruit_code in option_fruit_codes:
+        active = [
+            item
+            for item in selection_options
+            if item.fruit_code == fruit_code and item.is_active
+        ]
+        if sum(item.is_default for item in active) != 1:
+            raise ValueError(
+                "Every fruit with selection options must have exactly one active default"
+            )
+
     return SeedDataset(
         fruits=fruits,
         nutritions=nutritions,
         seasons=seasons,
         facts=facts,
+        selection_options=selection_options,
     )
 
 
@@ -486,6 +536,97 @@ def build_season_statement(dataset: SeedDataset) -> object:
     )
 
 
+def selection_option_values_table(dataset: SeedDataset) -> object:
+    """将 JSON 选项按父水果 code 批量映射，不在推荐循环内查询。"""
+
+    seed_values = values(
+        column("fruit_code", String(60)),
+        column("code", String(40)),
+        column("name", String(100)),
+        column("sweet_score", FruitSelectionOption.sweet_score.type),
+        column("sour_score", FruitSelectionOption.sour_score.type),
+        column("soft_score", FruitSelectionOption.soft_score.type),
+        column("crisp_score", FruitSelectionOption.crisp_score.type),
+        column("is_default", FruitSelectionOption.is_default.type),
+        column("is_active", FruitSelectionOption.is_active.type),
+        column("display_order", FruitSelectionOption.display_order.type),
+        column("data_quality", String(20)),
+        column("data_source_note", FruitSelectionOption.data_source_note.type),
+        name="seed_selection_option",
+    )
+    return seed_values.data(
+        [
+            (
+                item.fruit_code,
+                item.code,
+                item.name,
+                item.sweet_score,
+                item.sour_score,
+                item.soft_score,
+                item.crisp_score,
+                item.is_default,
+                item.is_active,
+                item.display_order,
+                item.data_quality,
+                item.data_source_note,
+            )
+            for item in dataset.selection_options
+        ]
+    )
+
+
+def build_selection_option_statement(dataset: SeedDataset) -> object:
+    seed_values = selection_option_values_table(dataset)
+    selected = select(
+        Fruit.id,
+        seed_values.c.code,
+        seed_values.c.name,
+        seed_values.c.sweet_score,
+        seed_values.c.sour_score,
+        seed_values.c.soft_score,
+        seed_values.c.crisp_score,
+        seed_values.c.is_default,
+        seed_values.c.is_active,
+        seed_values.c.display_order,
+        seed_values.c.data_quality,
+        seed_values.c.data_source_note,
+    ).join(seed_values, Fruit.code == seed_values.c.fruit_code)
+    statement = insert(FruitSelectionOption).from_select(
+        (
+            "fruit_id",
+            "code",
+            "name",
+            "sweet_score",
+            "sour_score",
+            "soft_score",
+            "crisp_score",
+            "is_default",
+            "is_active",
+            "display_order",
+            "data_quality",
+            "data_source_note",
+        ),
+        selected,
+    )
+    excluded = statement.excluded
+    return statement.on_conflict_do_update(
+        index_elements=[FruitSelectionOption.fruit_id, FruitSelectionOption.code],
+        set_={
+            "name": excluded.name,
+            "sweet_score": excluded.sweet_score,
+            "sour_score": excluded.sour_score,
+            "soft_score": excluded.soft_score,
+            "crisp_score": excluded.crisp_score,
+            "is_default": excluded.is_default,
+            "is_active": excluded.is_active,
+            "display_order": excluded.display_order,
+            "data_quality": excluded.data_quality,
+            "data_source_note": excluded.data_source_note,
+            "updated_at": func.now(),
+        },
+    )
+
+
 def seed_database(
     engine: Engine,
     dataset: SeedDataset,
@@ -502,6 +643,7 @@ def seed_database(
             raise RuntimeError("Database schema is not at the expected version")
 
         connection.execute(build_fruit_statement(dataset))
+        connection.execute(build_selection_option_statement(dataset))
         connection.execute(build_fact_statement(dataset))
         connection.execute(build_nutrition_statement(dataset))
         if before_seasons is not None:
@@ -513,6 +655,7 @@ def seed_database(
         nutritions=len(dataset.nutritions),
         seasons=len(dataset.seasons),
         facts=len(dataset.facts),
+        selection_options=len(dataset.selection_options),
     )
 
 
@@ -530,6 +673,7 @@ def render_seed_sql(dataset: SeedDataset) -> str:
 
     statements = (
         build_fruit_statement(dataset),
+        build_selection_option_statement(dataset),
         build_fact_statement(dataset),
         build_nutrition_statement(dataset),
         build_season_statement(dataset),
@@ -615,6 +759,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         nutritions=len(dataset.nutritions),
         seasons=len(dataset.seasons),
         facts=len(dataset.facts),
+        selection_options=len(dataset.selection_options),
     )
 
     if options.dry_run:
@@ -623,6 +768,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
             f"fruits={summary.fruits}, "
             f"facts={summary.facts}, "
             f"nutritions={summary.nutritions}, seasons={summary.seasons}"
+            f", selection_options={summary.selection_options}"
         )
         return 0
     if options.emit_sql:
@@ -649,6 +795,7 @@ def main(arguments: Sequence[str] | None = None) -> int:
         f"fruits={summary.fruits}, "
         f"facts={summary.facts}, "
         f"nutritions={summary.nutritions}, seasons={summary.seasons}"
+        f", selection_options={summary.selection_options}"
     )
     return 0
 

@@ -2,7 +2,7 @@
 
 from datetime import date
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import Field, field_validator
 
@@ -55,6 +55,7 @@ class ReasonCode(StrEnum):
     HISTORY_FRESHNESS = "history_freshness"
     PAIR_NOVELTY = "pair_novelty"
     DEFAULT_MATCH = "default_match"
+    SELECTION_OPTION = "selection_option"
 
 
 class ReasonComponent(StrEnum):
@@ -75,6 +76,7 @@ class ReasonComponent(StrEnum):
     PAIR_SCORE = "pair_score"
     PAIR_NOVELTY = "pair_novelty"
     FAMILIARITY = "familiarity"
+    SELECTION = "selection"
 
 
 class RecommendationReason(ApiSchema):
@@ -93,6 +95,30 @@ Reasons = Annotated[
 Rank = Annotated[int, Field(ge=1, le=2)]
 
 
+class RecommendationSelectionOptionRead(ApiSchema):
+    """本次父水果评分实际采用的消费类型。"""
+
+    id: PositiveId
+    code: Annotated[str, Field(min_length=1, max_length=40)]
+    name: Annotated[str, Field(min_length=1, max_length=100)]
+
+
+class RecommendationSelectionRead(ApiSchema):
+    resolution_source: Literal[
+        "explicit",
+        "inferred_from_global_preference",
+        "default",
+        "not_applicable",
+    ]
+    resolved_option: RecommendationSelectionOptionRead | None = None
+    acceptable_options: list[RecommendationSelectionOptionRead] = Field(
+        default_factory=list
+    )
+    avoided_options: list[RecommendationSelectionOptionRead] = Field(
+        default_factory=list
+    )
+
+
 class RecommendationItemCreate(ApiSchema):
     fruit_id: PositiveId
     score: RecommendationScore
@@ -101,6 +127,7 @@ class RecommendationItemCreate(ApiSchema):
     individual_score: RecommendationScore | None = None
     pair_score: RecommendationScore | None = None
     nutrition_pair_score: RecommendationScore | None = None
+    selection: RecommendationSelectionRead | None = None
 
 
 class RecommendationItemRead(RecommendationItemCreate):

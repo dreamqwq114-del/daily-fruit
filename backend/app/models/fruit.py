@@ -32,6 +32,7 @@ from app.models.base import Base, CreatedAtMixin, TimestampMixin
 
 if TYPE_CHECKING:
     from app.models.recommendation import RecommendationItem
+    from app.models.selection_option import FruitSelectionOption
     from app.models.user import UserFruitPreference
 
 
@@ -265,6 +266,11 @@ class Fruit(TimestampMixin, Base):
     user_preferences: Mapped[list[UserFruitPreference]] = relationship(
         back_populates="fruit",
         passive_deletes="all",
+    )
+    selection_options: Mapped[list[FruitSelectionOption]] = relationship(
+        back_populates="fruit",
+        passive_deletes="all",
+        order_by="FruitSelectionOption.display_order",
     )
     recommendation_items: Mapped[list[RecommendationItem]] = relationship(
         back_populates="fruit",

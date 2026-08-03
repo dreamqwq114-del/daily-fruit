@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Iterable, Mapping
+from dataclasses import replace
 from datetime import UTC, date, datetime
 from typing import cast
 
@@ -25,6 +26,7 @@ from app.services.recommendation_types import (
     ScoreBreakdown,
     SeasonEvaluation,
     SeasonWindow,
+    ResolvedFruitCandidate,
 )
 
 from .common import (
@@ -33,6 +35,7 @@ from .common import (
     _validate_unit_scores,
     clamp_score,
 )
+from .selection_options import resolve_fruit_candidate
 
 MISSING_SEASON_SCORE = 0.35
 
@@ -303,7 +306,21 @@ def filter_eligible_fruits(
 
     fruit_list = list(fruits)
     _validate_inputs(fruit_list, user, context)
-    eligible: list[RecommendationFruit] = []
+    return [
+        fruit
+        for fruit, _ in _eligible_resolved_fruits(fruit_list, user, context)
+    ]
+
+
+def _eligible_resolved_fruits(
+    fruits: Iterable[RecommendationFruit],
+    user: RecommendationUser,
+    context: RecommendationContext,
+) -> list[tuple[RecommendationFruit, ResolvedFruitCandidate]]:
+    """过滤并解析父水果；同一轮每个父水果只解析一次。"""
+
+    fruit_list = list(fruits)
+    eligible: list[tuple[RecommendationFruit, ResolvedFruitCandidate]] = []
     # 先做硬过滤，再让后续 score_candidates 处理软偏好；排序只为保证
     # 没有随机 seed 时的 tie-break 稳定，不代表这里已经完成最终排名。
     for fruit in fruit_list:
@@ -324,6 +341,29 @@ def filter_eligible_fruits(
             if user.discovery_level == 0 and preference.has_tried is False:
                 continue
 
+        resolution_user = user
+        if (
+            not context.exclude_disliked
+            and preference is not None
+            and preference.preference_score is not None
+            and math.isclose(float(preference.preference_score), -1.0)
+        ):
+            # ``exclude_disliked=False`` is a public compatibility mode: a
+            # disliked fruit may still be scored.  Keep that switch at the
+            # filtering boundary rather than letting the option resolver
+            # turn it into a hard exclusion.
+            resolution_user = replace(
+                user,
+                fruit_preferences={
+                    **user.fruit_preferences,
+                    fruit.id: replace(preference, preference_score=0.0),
+                },
+            )
+
+        resolved = resolve_fruit_candidate(fruit, resolution_user)
+        if resolved is None:
+            continue
+
         season = evaluate_season(
             fruit.seasons,
             region=user.region,
@@ -332,8 +372,8 @@ def filter_eligible_fruits(
         )
         if season.supply_status == "unavailable":
             continue
-        eligible.append(fruit)
-    return sorted(eligible, key=lambda fruit: fruit.id)
+        eligible.append((fruit, resolved))
+    return sorted(eligible, key=lambda item: item[0].id)
 
 
 def _score_candidates_with_normalized(
@@ -350,7 +390,8 @@ def _score_candidates_with_normalized(
     """
 
     fruit_list = list(fruits)
-    eligible = filter_eligible_fruits(fruit_list, user, context)
+    _validate_inputs(fruit_list, user, context)
+    eligible = _eligible_resolved_fruits(fruit_list, user, context)
     if len(eligible) < 2:
         raise NoRecommendationCandidatesError(
             "符合当前条件的水果不足两种，请调整禁忌、熟悉度或地区设置"
@@ -360,12 +401,12 @@ def _score_candidates_with_normalized(
     )
     scored = [
         _score_fruit(
-            fruit,
+            resolved,
             user,
             context,
             normalized.get(fruit.id, NutritionProfile()),
         )
-        for fruit in eligible
+        for fruit, resolved in eligible
     ]
     return sorted(scored, key=lambda item: (-item.base_score, item.fruit.id)), normalized
 
@@ -411,12 +452,30 @@ def _nutrition_values(
             values.append(float(value))
     return values
 
-def _taste_match(fruit: RecommendationFruit, user: RecommendationUser) -> float:
+def _taste_match(
+    fruit: RecommendationFruit,
+    user: RecommendationUser,
+    resolved: ResolvedFruitCandidate | None = None,
+) -> float:
+    if resolved is not None:
+        values = (
+            resolved.effective_sweet_score,
+            resolved.effective_sour_score,
+            resolved.effective_soft_score,
+            resolved.effective_crisp_score,
+        )
+    else:
+        values = (
+            fruit.sweet_score,
+            fruit.sour_score,
+            fruit.soft_score,
+            fruit.crisp_score,
+        )
     dimensions = (
-        (fruit.sweet_score, user.sweet_preference),
-        (fruit.sour_score, user.sour_preference),
-        (fruit.soft_score, user.soft_preference),
-        (fruit.crisp_score, user.crisp_preference),
+        (values[0], user.sweet_preference),
+        (values[1], user.sour_preference),
+        (values[2], user.soft_preference),
+        (values[3], user.crisp_preference),
     )
     # The sliders describe how much the user likes a dimension, not a target
     # fruit value: low preference therefore rewards a low fruit value.
@@ -433,6 +492,7 @@ def _taste_match(fruit: RecommendationFruit, user: RecommendationUser) -> float:
 def _explicit_preference_score(
     fruit: RecommendationFruit,
     user: RecommendationUser,
+    resolved: ResolvedFruitCandidate | None = None,
 ) -> float:
     """将单水果偏好映射为 0～1 的个人匹配先验。
 
@@ -441,6 +501,10 @@ def _explicit_preference_score(
     因而 UNKNOWN 行若同时带有偏好分也会影响排序。这是当前实现事实，
     与“偏好分只描述已吃过水果”的理想语义并不完全一致，本任务不改动它。
     """
+    if resolved is not None and resolved.option_explicitly_liked:
+        # An option-level like is the single effective explicit preference;
+        # parent and option likes are never added together.
+        return 1.0
     preference = user.fruit_preferences.get(fruit.id)
     if preference is None:
         return clamp_score(0.35 + 0.10 * fruit.commonness_score)
@@ -559,7 +623,7 @@ def _history_freshness(
 
 
 def _score_fruit(
-    fruit: RecommendationFruit,
+    resolved: ResolvedFruitCandidate,
     user: RecommendationUser,
     context: RecommendationContext,
     nutrition: NutritionProfile,
@@ -572,6 +636,7 @@ def _score_fruit(
     ``nutrition_diversity_score`` 单独加权；这些字段的存在不能被解释成已
     参与排序。
     """
+    fruit = resolved.fruit
     season = evaluate_season(
         fruit.seasons,
         region=user.region,
@@ -579,8 +644,8 @@ def _score_fruit(
         month=context.month,
     )
     feedback_adjustment = _feedback_adjustment(fruit.id, context)
-    explicit = clamp_score(_explicit_preference_score(fruit, user))
-    taste = _taste_match(fruit, user)
+    explicit = clamp_score(_explicit_preference_score(fruit, user, resolved))
+    taste = _taste_match(fruit, user, resolved)
     convenience = _derived_convenience(fruit)
     scores = ScoreBreakdown(
         explicit_preference=explicit,
@@ -615,6 +680,7 @@ availability_score=season.availability_score,
         base_score=calculate_base_score(scores),
         scores=scores,
         season=season,
+        resolved_candidate=resolved,
     )
 
 

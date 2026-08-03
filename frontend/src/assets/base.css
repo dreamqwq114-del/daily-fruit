@@ -636,6 +636,109 @@ p {
   margin-bottom: 0;
 }
 
+.fruit-option-preferences {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.fruit-option-preferences h2 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.fruit-option-card {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--green-soft);
+}
+
+.fruit-option-toggle,
+.fruit-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 16px;
+}
+
+.fruit-option-toggle {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.fruit-option-toggle span:first-child,
+.fruit-option-row > span {
+  display: grid;
+  gap: 3px;
+}
+
+.fruit-option-toggle small,
+.fruit-option-row small {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.fruit-option-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 12px 12px;
+}
+
+.fruit-option-row {
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--card);
+}
+
+.fruit-option-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.fruit-option-choice {
+  min-height: 36px;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.fruit-option-choice.is-selected {
+  border-color: var(--green);
+  background: var(--green-soft);
+  font-weight: 700;
+}
+
+.fruit-option-toggle:focus-visible,
+.fruit-option-choice:focus-visible {
+  outline: 3px solid rgb(52 126 91 / 30%);
+  outline-offset: 2px;
+}
+
+@media (max-width: 560px) {
+  .fruit-option-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .fruit-option-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+}
+
 .fruit-picker-backdrop {
   display: grid;
   position: fixed;

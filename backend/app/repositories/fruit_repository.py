@@ -3,7 +3,7 @@
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from app.models import Fruit
+from app.models import Fruit, FruitSelectionOption
 
 
 FRUIT_DETAIL_OPTIONS = (
@@ -11,6 +11,7 @@ FRUIT_DETAIL_OPTIONS = (
     selectinload(Fruit.nutrition),
     selectinload(Fruit.seasons),
     selectinload(Fruit.facts),
+    selectinload(Fruit.selection_options),
 )
 
 
@@ -47,8 +48,25 @@ def existing_fruit_ids(
     return set(session.execute(statement).scalars())
 
 
+def get_selection_options(
+    session: Session,
+    option_ids: set[int],
+) -> list[FruitSelectionOption]:
+    """批量读取类型选项，供 service 校验父水果归属并避免 N+1。"""
+
+    if not option_ids:
+        return []
+    statement = (
+        select(FruitSelectionOption)
+        .where(FruitSelectionOption.id.in_(option_ids))
+        .order_by(FruitSelectionOption.fruit_id, FruitSelectionOption.display_order)
+    )
+    return list(session.execute(statement).scalars())
+
+
 __all__ = [
     "existing_fruit_ids",
+    "get_selection_options",
     "get_active_fruit",
     "list_active_fruits",
 ]
