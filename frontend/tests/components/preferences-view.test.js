@@ -27,6 +27,7 @@ const user = {
   sour_preference: 0.2,
   soft_preference: 0.9,
   crisp_preference: 0,
+  texture_preference: 0.8,
   price_level: 2,
   convenience_preference: 0.9,
   discovery_level: 1,
@@ -100,5 +101,34 @@ describe('PreferencesView fruit preference saving', () => {
 
     expect(userApi.updateUser).toHaveBeenCalledTimes(1)
     expect(userApi.replaceFruitPreferences).toHaveBeenCalledTimes(1)
+  })
+
+  it('retries an explicit null clear after a failed profile update', async () => {
+    userApi.updateUser
+      .mockRejectedValueOnce(new Error('资料服务暂时不可用'))
+      .mockResolvedValueOnce(user)
+    const wrapper = mountPreferences()
+    await flushPromises()
+
+    const textureField = wrapper
+      .find('input[name="texture_preference"]')
+      .element.closest('.range-field')
+    await textureField.querySelector('button.range-clear').click()
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+
+    expect(userApi.updateUser).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ texture_preference: null }),
+    )
+    expect(wrapper.text()).toContain('资料服务暂时不可用')
+
+    await wrapper.find('form').trigger('submit')
+    await flushPromises()
+    expect(userApi.updateUser).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ texture_preference: null }),
+    )
+    expect(wrapper.text()).toContain('偏好已经保存')
   })
 })

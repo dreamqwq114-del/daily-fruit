@@ -5,6 +5,8 @@ import {
   createDefaultProfile,
   preferencesToSelection,
   profileFromUser,
+  profileToApiPayload,
+  SENSORY_ANCHORS,
   selectionToPreferences,
 } from '../src/utils/fruit-preferences.js'
 globalThis.window = {
@@ -69,6 +71,28 @@ test('profile defaults omit city and use the new region and horizon defaults', (
   assert.equal(createDefaultProfile().price_level, 2)
   assert.equal(createDefaultProfile().market_access_level, 2)
   assert.equal(createDefaultProfile().accepts_online_purchase, false)
+  assert.equal(createDefaultProfile().sweet_preference, null)
+  assert.equal(createDefaultProfile().texture_preference, null)
+  assert.equal(profileFromUser({ texture_preference: null }).texture_preference, null)
+  assert.equal(profileFromUser({ soft_preference: 0.2, crisp_preference: 0.8 }).texture_preference, 0.8)
+  assert.equal(profileFromUser({ soft_preference: 0.1, crisp_preference: 0.1 }).texture_preference, null)
+  assert.equal(profileToApiPayload(createDefaultProfile()).texture_preference, undefined)
+  const cleared = createDefaultProfile()
+  cleared.__explicitlyChangedPreferences.add('texture_preference')
+  assert.equal(profileToApiPayload(cleared).texture_preference, null)
+})
+
+test('sensory anchors stay centralized and show five equally spaced labels', () => {
+  assert.deepEqual(
+    SENSORY_ANCHORS.texture_preference.map((anchor) => [anchor.name, anchor.percent]),
+    [
+      ['榴莲', '0%'],
+      ['软桃', '25%'],
+      ['火龙果', '50%'],
+      ['梨', '75%'],
+      ['清脆苹果', '100%'],
+    ],
+  )
 })
 
 test('apiRequest returns json for successful responses', async () => {

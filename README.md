@@ -13,8 +13,8 @@
 
 | 类别 | 当前事实 |
 | --- | --- |
-| 已实现 | 邮箱密码认证、用户资料与水果偏好、两种水果推荐、换一组、反馈、历史记录、响应式 Web 页面 |
-| 已参与推荐 | 地区、价格、甜/酸/软/脆、食用便利、尝鲜程度、喜欢/不喜欢/禁止、是否吃过、是否愿意尝试、季节与供应、历史和反馈 |
+| 已实现 | 邮箱密码认证、用户资料与水果偏好、两种水果推荐、换一组、反馈、冻结后的历史记录、响应式 Web 页面 |
+| 已参与推荐 | 地区、价格、甜/酸/质地、食用便利、尝鲜程度、喜欢/不喜欢/禁止、是否吃过、是否愿意尝试、季节与供应、历史和反馈 |
 | 已保存但尚未参与推荐 | `consumption_horizon_days`、`market_access_level`、`accepts_online_purchase` |
 | 兼容字段 | `city` 仍可用于城市级季节数据匹配，但当前页面不采集，演示季节数据也没有城市级记录 |
 | 计划中 | 更细的本地可获得性、真实用户评估、购买与库存计划、PWA 或微信小程序 |
@@ -26,9 +26,11 @@
 - 建立并更新地区、价格、口感、便利性、尝鲜和购买条件等资料。
 - 标记特别喜欢、不喜欢或不能食用的水果，不强迫逐项填写全部水果。
 - 返回同一天稳定的两种水果推荐；主动换组会保存旧记录并尽量避开相同组合。
+- 水果目录保留 24 个父水果；苹果、桃、葡萄、猕猴桃、石榴和火龙果的子类型只在父水果入选后解析，不会变成额外候选。
+- 当前共有 13 个消费子类型；默认子类型的覆盖字段为空并继承父水果，非默认子类型只覆盖实际不同的字段。
 - 每种水果返回 2～4 条与实际评分贡献一致的理由。
 - 记录吃过、喜欢、不喜欢、买不到、太贵、吃腻和换组等反馈。
-- 查看 active 与 replaced 推荐历史。
+- 查看 active 与 replaced 推荐历史；推荐项保存当时的水果详情、冷知识、解析类型、有效评分和模型/水果档案版本，不随当前目录编辑重算。
 
 ## 系统架构
 
@@ -74,9 +76,12 @@ Pair = 0.70 × mean(U1, U2)
      + 0.05 × pair_novelty
 ```
 
-- `taste_match` 比较甜、酸、软、脆四个维度。
+- `taste_match` 对已配置维度使用 `1 - abs(candidate - user)`；甜、酸、质地的内层权重为 `0.40`、`0.25`、`0.35`，未设置维度跳过并对剩余权重重新归一化，同时记录实际覆盖维度。
+- `texture_score=0` 表示绵软，`1` 表示爽脆；旧 `soft_score`/`crisp_score` 与 `soft_preference`/`crisp_preference` 保留作兼容和回滚，不参与新的水果评分，旧用户冲突迁移不会被猜成 `0.50`。
+- 资料页的甜度、酸味和质地滑块使用集中定义的五个水果语义锚点；锚点只帮助理解，不改变数值、seed 或推荐结果。未操作的滑块不会随其它资料保存，用户可清除为 `null`。
+- `ripe_storage_score` 与 `typical_purchase_stage` 是水果资料和展示数据，不额外增加推荐外层权重；`ripening_note` 说明需要后熟或适食判断的水果。
 - `nutrition_pair` 比较维生素 C、膳食纤维、钾、叶酸和类胡萝卜素的覆盖、多样性与数据置信度；能量不进入组合互补分。
-- `sensory_category_diversity` 只比较甜、酸、软、脆的体验差异，不读取 `category` 或 `display_group`。
+- `sensory_category_diversity` 只比较甜、酸、质地的体验差异，不读取 `category` 或 `display_group`。
 - `daily_recommendation_role` 只允许 `main` 与 `supporting`；默认普通推荐关闭 supporting。
 - `display_group` 是消费者友好的展示分组，只用于目录、筛选和文案，不参与任何推荐评分；旧 `category` 仅作兼容字段并已标记 deprecated。
 - 尝鲜是用户与水果之间的动态关系：明确 `has_tried=False` 且愿意尝试时才可标记为尝鲜状态。
@@ -93,7 +98,9 @@ Pair = 0.70 × mean(U1, U2)
 
 | 数据文件 | 用途与语义 |
 | --- | --- |
-| `data/fruits_seed.json` | 24 种水果的身份、类别、口感、价格、便利性、角色和演示属性 |
+| `data/fruits_seed.json` | 24 种水果的身份、兼容口感字段、价格、便利性、角色和演示属性 |
+| `data/fruit_profile_seed.json` | 24 种水果的人工校准甜度、酸度、质地、便利度、适食后常温保存档位和购买状态 |
+| `data/fruit_selection_options_seed.json` | 13 个父水果内消费子类型；默认项覆盖字段为空 |
 | `data/nutrition_demo.csv` | 六项 0～1 的无物理单位营养演示分数 |
 | `data/seasons_demo.csv` | 地区、月份和季节分数；加载时补充演示供应状态与分数 |
 
@@ -167,7 +174,9 @@ python -m app.seed.seed_fruits --dry-run
 
 执行 migration 前必须显式配置 `ALEMBIC_DATABASE_PURPOSE=migration` 与 `MIGRATION_DATABASE_URL`，并重新确认目标数据库；测试环境则使用 `ALEMBIC_DATABASE_PURPOSE=test` 与 `TEST_DATABASE_URL`。不要在不确定的数据库上执行 upgrade、downgrade 或 seed。
 
-当前 seed 写入器要求 schema 版本为 `0010`。默认写入只允许本地可丢弃的 `daily_fruit_test`；向已确认的 Supabase 迁移库写入时，必须显式设置 `MIGRATION_DATABASE_URL`、`DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes` 并传入 `--migration`。连接串只能来自本地环境或部署 Secret。
+seed 写入器会同时读取 `fruits_seed.json`、`fruit_profile_seed.json`、冷知识和消费类型 seed；后者是甜、酸、质地、便利和适食后常温保存等人工标注的单一配置源。重复运行使用幂等 upsert，默认写入只允许本地可丢弃的 `daily_fruit_test`。向已确认的 Supabase 迁移库写入时，必须显式设置 `MIGRATION_DATABASE_URL`、`DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes` 并传入 `--migration`。连接串只能来自本地环境或部署 Secret。
+
+历史冻结采用两条路径：新推荐在应用层写入完整水果/冷知识 JSONB 快照；已有历史在结构迁移时冻结当时数据库中可重建的水果详情和按推荐日期选出的冷知识。已有记录的原始历史版本如果此前没有保存，无法被事后恢复，这一点不等同于重新计算旧推荐。
 
 ### 测试与构建
 
