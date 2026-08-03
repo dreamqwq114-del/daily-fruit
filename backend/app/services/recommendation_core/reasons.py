@@ -70,7 +70,22 @@ def _build_reasons(
     preference = user.fruit_preferences.get(fruit.id)
     resolved = scored.resolved_candidate
     if resolved is not None and resolved.resolved_option_name:
-        if resolved.resolution_source == "explicit":
+        avoided_names = tuple(
+            option.name
+            for option in fruit.selection_options
+            if option.id in resolved.avoided_option_ids
+        )
+        if fruit.code == "pomegranate" and avoided_names:
+            avoided_text = "、".join(avoided_names)
+            if resolved.option_explicitly_liked:
+                option_message = (
+                    f"你明确偏好{resolved.resolved_option_name}，并避开{avoided_text}"
+                )
+            else:
+                option_message = (
+                    f"已避开{avoided_text}，优先选择{resolved.resolved_option_name}"
+                )
+        elif resolved.resolution_source == "explicit":
             option_message = f"你明确偏好{resolved.resolved_option_name}"
         elif resolved.resolution_source == "inferred_from_global_preference":
             option_message = f"建议优先选择{resolved.resolved_option_name}，更接近你的口感设置"

@@ -24,7 +24,14 @@ from .common import InvalidRecommendationInputError, clamp_score
 MATCHING_DIMENSIONS: Mapping[str, tuple[str, ...]] = {
     "peach": ("soft_score", "crisp_score"),
     "kiwifruit": ("sweet_score", "sour_score"),
+    "apple": ("soft_score", "crisp_score"),
+    "grape": ("soft_score", "crisp_score"),
 }
+
+# 石榴籽的硬度属于籽本身，不等于果肉的 crisp_score。它只能由用户
+# 明确喜欢/避开来约束候选，不能被全局软脆偏好自动推断，也不能产生
+# 默认类型文案。
+EXPLICIT_ONLY_OPTION_FRUITS = frozenset({"pomegranate"})
 
 
 def matching_dimensions_for(fruit: RecommendationFruit) -> tuple[str, ...]:
@@ -157,6 +164,17 @@ def resolve_selection_option(
     )
     if parent_disliked and not liked_ids:
         return None
+
+    if fruit.code in EXPLICIT_ONLY_OPTION_FRUITS and not (
+        liked_ids or disliked_ids
+    ):
+        return ResolvedFruitCandidate(
+            fruit=fruit,
+            effective_sweet_score=fruit.sweet_score,
+            effective_sour_score=fruit.sour_score,
+            effective_soft_score=fruit.soft_score,
+            effective_crisp_score=fruit.crisp_score,
+        )
     if not allowed:
         return None
 
@@ -227,6 +245,7 @@ def resolve_fruit_candidate(
 
 
 __all__ = [
+    "EXPLICIT_ONLY_OPTION_FRUITS",
     "MATCHING_DIMENSIONS",
     "matching_dimensions_for",
     "resolve_fruit_candidate",

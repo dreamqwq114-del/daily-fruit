@@ -115,6 +115,38 @@ def make_kiwifruit() -> RecommendationFruit:
     )
 
 
+def make_pomegranate() -> RecommendationFruit:
+    return RecommendationFruit(
+        id=30,
+        code="pomegranate",
+        name="石榴",
+        sweet_score=0.68,
+        sour_score=0.42,
+        soft_score=0.25,
+        crisp_score=0.55,
+        convenience_score=0.6,
+        average_price_level=2,
+        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        selection_options=(
+            SelectionOption(
+                id=301,
+                fruit_id=30,
+                code="soft_seed",
+                name="软籽型",
+                is_default=True,
+                display_order=1,
+            ),
+            SelectionOption(
+                id=302,
+                fruit_id=30,
+                code="hard_seed",
+                name="硬籽型",
+                display_order=2,
+            ),
+        ),
+    )
+
+
 def test_global_soft_and_crisp_preferences_resolve_a_real_peach_option() -> None:
     peach = make_peach()
     crisp_user = make_user(soft_preference=0.1, crisp_preference=0.9)
@@ -250,3 +282,74 @@ def test_kiwifruit_explicit_green_preference_excludes_unknown_siblings() -> None
     assert resolved.resolved_option_code == "green"
     assert resolved.acceptable_option_ids == ()
     assert resolved.avoided_option_ids == (202, 203)
+
+
+def test_pomegranate_without_type_preference_keeps_parent_scores_and_no_selection() -> None:
+    fruit = make_pomegranate()
+    resolved = resolve_selection_option(
+        fruit,
+        fruit.selection_options,
+        None,
+        (),
+        make_user(soft_preference=0.95, crisp_preference=0.05),
+    )
+
+    assert resolved is not None
+    assert resolved.resolved_option_id is None
+    assert resolved.resolution_source == "not_applicable"
+    assert (
+        resolved.effective_sweet_score,
+        resolved.effective_sour_score,
+        resolved.effective_soft_score,
+        resolved.effective_crisp_score,
+    ) == (
+        fruit.sweet_score,
+        fruit.sour_score,
+        fruit.soft_score,
+        fruit.crisp_score,
+    )
+
+
+def test_pomegranate_explicit_like_and_avoid_filter_without_score_override() -> None:
+    fruit = make_pomegranate()
+    liked = resolve_selection_option(
+        fruit,
+        fruit.selection_options,
+        None,
+        (SelectionOptionPreference(1, 30, 301, "liked"),),
+        make_user(),
+    )
+    avoided = resolve_selection_option(
+        fruit,
+        fruit.selection_options,
+        None,
+        (SelectionOptionPreference(1, 30, 302, "disliked"),),
+        make_user(),
+    )
+
+    assert liked is not None and liked.resolved_option_code == "soft_seed"
+    assert avoided is not None and avoided.resolved_option_code == "soft_seed"
+    assert avoided.avoided_option_ids == (302,)
+    for resolved in (liked, avoided):
+        assert (
+            resolved.effective_sweet_score,
+            resolved.effective_sour_score,
+            resolved.effective_soft_score,
+            resolved.effective_crisp_score,
+        ) == (0.68, 0.42, 0.25, 0.55)
+
+
+def test_pomegranate_all_types_disliked_is_filtered() -> None:
+    fruit = make_pomegranate()
+    resolved = resolve_selection_option(
+        fruit,
+        fruit.selection_options,
+        None,
+        (
+            SelectionOptionPreference(1, 30, 301, "disliked"),
+            SelectionOptionPreference(1, 30, 302, "disliked"),
+        ),
+        make_user(),
+    )
+
+    assert resolved is None

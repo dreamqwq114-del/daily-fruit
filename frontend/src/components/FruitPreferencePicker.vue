@@ -6,6 +6,7 @@ import {
   optionPreferenceSummary,
   optionQuickChoices,
   optionRowsForFruit,
+  selectionOptionHint,
 } from '../utils/selection-option-ui.js'
 
 const props = defineProps({
@@ -187,6 +188,10 @@ function optionChoices(fruit) {
   return optionQuickChoices(fruit, props.optionPreferences)
 }
 
+function optionHint(fruit) {
+  return selectionOptionHint(fruit)
+}
+
 function fruitStatus(fruitId) {
   if (ids(draftSelection.value, 'favoriteIds').includes(fruitId)) return '喜欢'
   if (ids(draftSelection.value, 'dislikeIds').includes(fruitId)) return '不喜欢'
@@ -340,6 +345,7 @@ function confirmOptionPanel() {
               </div>
               <div v-if="isOptionPanelOpen(fruit.id)" class="fruit-option-panel" role="dialog" :aria-label="`${fruit.name}类型偏好`">
                 <h3>{{ fruit.name }}类型偏好</h3>
+                <p v-if="optionHint(fruit)" class="section-help">{{ optionHint(fruit) }}</p>
                 <div class="fruit-option-quick-list" role="radiogroup" :aria-label="`${fruit.name}快捷类型偏好`">
                   <button
                     v-for="choice in optionChoices(fruit)"
