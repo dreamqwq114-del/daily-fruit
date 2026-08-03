@@ -33,7 +33,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
 # 写入前的 schema 保护；该值必须与当前可写目标数据库的 alembic_version
 # 同步，否则脚本应拒绝写入而不是猜测数据库状态。
-EXPECTED_ALEMBIC_VERSION = "0009"
+EXPECTED_ALEMBIC_VERSION = "0010"
 
 DISPLAY_GROUP_BY_CATEGORY = {
     "仁果": "苹果梨类",

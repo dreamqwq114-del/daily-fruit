@@ -167,7 +167,7 @@ python -m app.seed.seed_fruits --dry-run
 
 执行 migration 前必须显式配置 `ALEMBIC_DATABASE_PURPOSE=migration` 与 `MIGRATION_DATABASE_URL`，并重新确认目标数据库；测试环境则使用 `ALEMBIC_DATABASE_PURPOSE=test` 与 `TEST_DATABASE_URL`。不要在不确定的数据库上执行 upgrade、downgrade 或 seed。
 
-当前 seed 写入器要求 schema 版本为 `0009`。默认写入只允许本地可丢弃的 `daily_fruit_test`；向已确认的 Supabase 迁移库写入时，必须显式设置 `MIGRATION_DATABASE_URL`、`DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes` 并传入 `--migration`。连接串只能来自本地环境或部署 Secret。
+当前 seed 写入器要求 schema 版本为 `0010`。默认写入只允许本地可丢弃的 `daily_fruit_test`；向已确认的 Supabase 迁移库写入时，必须显式设置 `MIGRATION_DATABASE_URL`、`DAILY_FRUIT_ALLOW_MIGRATION_SEED=yes` 并传入 `--migration`。连接串只能来自本地环境或部署 Secret。
 
 ### 测试与构建
 
@@ -215,7 +215,8 @@ npm run build
 | 水果目录 | `GET /api/fruits`、`GET /api/fruits/{fruit_id}` |
 | 推荐 | `GET /api/recommendations/today`、`POST /api/recommendations/refresh` |
 | 历史 | `GET /api/me/recommendations` |
-| 反馈 | `POST /api/recommendations/items/{item_id}/feedback` |
+| 推荐结果反馈 | `POST /api/recommendations/items/{item_id}/feedback` |
+| 产品意见反馈 | `POST /api/product-feedback` |
 
 除 `/health` 外，业务 API 要求有效 Supabase access token。FastAPI 校验签名、issuer、audience、有效期、角色和会话声明，并从 JWT `sub` 推导当前用户；客户端不能通过提交 `user_id` 冒充其他用户。开发环境可访问 `/docs`，生产环境关闭该入口。
 

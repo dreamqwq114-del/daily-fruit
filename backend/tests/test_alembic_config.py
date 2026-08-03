@@ -50,7 +50,7 @@ def test_alembic_history_works_without_database_configuration() -> None:
     assert "0004 -> 0005" in result.stdout
     assert "0005 -> 0006" in result.stdout
     assert "0006 -> 0007" in result.stdout
-    assert "0008 -> 0009 (head)" in result.stdout
+    assert "0009 -> 0010 (head)" in result.stdout
     assert "postgresql" not in result.stdout
     assert "supabase" not in result.stdout.lower()
 

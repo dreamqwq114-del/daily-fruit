@@ -9,7 +9,12 @@ from pydantic import BaseModel
 from app.config import get_settings
 from app.database import check_database_connection
 from app.errors import register_exception_handlers
-from app.routers import fruits_router, recommendations_router, users_router
+from app.routers import (
+    fruits_router,
+    product_feedback_router,
+    recommendations_router,
+    users_router,
+)
 
 
 class HealthResponse(BaseModel):
@@ -42,6 +47,7 @@ app.add_middleware(
 register_exception_handlers(app)
 app.include_router(users_router)
 app.include_router(fruits_router)
+app.include_router(product_feedback_router)
 app.include_router(recommendations_router)
 
 

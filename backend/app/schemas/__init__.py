@@ -24,6 +24,14 @@ from app.schemas.recommendation import (
     RecommendationRefreshRequest,
     RecommendationStatus,
 )
+from app.schemas.product_feedback import (
+    ProductFeedbackCategory,
+    ProductFeedbackContent,
+    ProductFeedbackCreate,
+    ProductFeedbackPageKey,
+    ProductFeedbackRead,
+    ProductFeedbackStatus,
+)
 from app.schemas.user import (
     UserCreate,
     UserFruitPreferenceInput,
@@ -43,6 +51,12 @@ __all__ = [
     "FruitRead",
     "FruitSeasonBase",
     "FruitSeasonRead",
+    "ProductFeedbackCategory",
+    "ProductFeedbackContent",
+    "ProductFeedbackCreate",
+    "ProductFeedbackPageKey",
+    "ProductFeedbackRead",
+    "ProductFeedbackStatus",
     "ReasonCode",
     "ReasonComponent",
     "RecommendationCreate",

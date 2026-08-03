@@ -5,6 +5,7 @@ from app.models.recommendation import (
     RecommendationFeedback,
     RecommendationItem,
 )
+from app.models.product_feedback import ProductFeedback
 from app.models.user import User, UserFruitPreference
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     "Recommendation",
     "RecommendationFeedback",
     "RecommendationItem",
+    "ProductFeedback",
     "User",
     "UserFruitPreference",
 ]

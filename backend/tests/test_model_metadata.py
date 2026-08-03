@@ -28,6 +28,7 @@ EXPECTED_TABLES = {
     "public.recommendations",
     "public.recommendation_items",
     "public.recommendation_feedback",
+    "public.product_feedback",
 }
 EXPECTED_EXTERNAL_TABLES = {"auth.users"}
 
@@ -112,7 +113,7 @@ def assert_numeric(
         assert column_type.scale == scale
 
 
-def test_metadata_contains_exactly_nine_public_tables() -> None:
+def test_metadata_contains_exactly_ten_public_tables() -> None:
     assert set(Base.metadata.tables) == EXPECTED_TABLES | EXPECTED_EXTERNAL_TABLES
     assert {target.schema for target in business_tables()} == {"public"}
     assert Base.metadata.tables["auth.users"].info["external"] is True
@@ -284,6 +285,28 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     }
     assert "ck_recommendation_feedback_type_values" in check_sql(feedback)
 
+    product_feedback = table("product_feedback")
+    assert set(check_sql(product_feedback)) == {
+        "ck_product_feedback_category_values",
+        "ck_product_feedback_content_length",
+        "ck_product_feedback_page_key_values",
+        "ck_product_feedback_status_values",
+        "ck_product_feedback_status_resolved_at_consistency",
+    }
+    assert product_feedback.c.user_id.nullable is True
+    assert product_feedback.c.resolved_at.nullable is True
+    assert product_feedback.c.status.server_default is not None
+    assert {
+        index.name: index_expression_names(index)
+        for index in product_feedback.indexes
+    } == {
+        "ix_product_feedback_status_created_at": (
+            "status",
+            "created_at",
+        ),
+        "ix_product_feedback_user_id": ("user_id",),
+    }
+
 
 def test_foreign_key_delete_rules_are_explicit() -> None:
     expected = {
@@ -316,6 +339,10 @@ def test_foreign_key_delete_rules_are_explicit() -> None:
             "RESTRICT",
         ),
         ("users", "auth_user_id"): ("auth.users.id", "SET NULL"),
+        ("product_feedback", "user_id"): (
+            "public.users.id",
+            "SET NULL",
+        ),
     }
 
     actual: dict[tuple[str, str], tuple[str, str | None]] = {}
