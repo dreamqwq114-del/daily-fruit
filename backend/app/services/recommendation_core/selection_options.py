@@ -17,18 +17,22 @@ from app.services.recommendation_types import (
     SelectionOptionPreference,
 )
 
-from .common import InvalidRecommendationInputError, clamp_score
+from .common import (
+    InvalidRecommendationInputError,
+    TASTE_DIMENSION_WEIGHTS,
+    clamp_score,
+)
 
 
 # matching_dimensions 是父水果的消费体验配置，不是数据库中的新全局评分字段。
 MATCHING_DIMENSIONS: Mapping[str, tuple[str, ...]] = {
-    "peach": ("soft_score", "crisp_score"),
+    "peach": ("texture_score",),
     "kiwifruit": ("sweet_score", "sour_score"),
-    "apple": ("soft_score", "crisp_score"),
-    "grape": ("soft_score", "crisp_score"),
+    "apple": ("texture_score",),
+    "grape": ("texture_score",),
 }
 
-# 石榴籽的硬度属于籽本身，不等于果肉的 crisp_score。它只能由用户
+# 石榴籽的硬度属于籽本身，不等于果肉的 texture_score。它只能由用户
 # 明确喜欢/避开来约束候选，不能被全局软脆偏好自动推断，也不能产生
 # 默认类型文案。
 EXPLICIT_ONLY_OPTION_FRUITS = frozenset({"pomegranate"})
@@ -40,27 +44,59 @@ def matching_dimensions_for(fruit: RecommendationFruit) -> tuple[str, ...]:
     return MATCHING_DIMENSIONS.get(fruit.code, ())
 
 
-def _complete_option_scores(
+def _complete_option_profile(
     fruit: RecommendationFruit,
     option: SelectionOption,
-) -> tuple[float, float, float, float]:
-    """将 NULL 维度继承父水果值，不对兄弟选项做平均。"""
+) -> tuple[float, float, float | None, float | None, float | None, float, float | None]:
+    """Resolve every nullable child override from the parent fruit."""
 
-    values = (
-        option.sweet_score
-        if option.sweet_score is not None
-        else fruit.sweet_score,
-        option.sour_score
-        if option.sour_score is not None
-        else fruit.sour_score,
-        option.soft_score
-        if option.soft_score is not None
-        else fruit.soft_score,
-        option.crisp_score
-        if option.crisp_score is not None
-        else fruit.crisp_score,
+    # 石榴籽型只表达显式喜欢/避开与推荐文案，不把籽硬度或其演示元数据
+    # 转换成甜、酸、全局质地、便利或保存评分。
+    if fruit.code in EXPLICIT_ONLY_OPTION_FRUITS:
+        texture = None if fruit.texture_score is None else float(fruit.texture_score)
+        return (
+            clamp_score(float(fruit.sweet_score)),
+            clamp_score(float(fruit.sour_score)),
+            None if texture is None else clamp_score(1.0 - texture),
+            None if texture is None else clamp_score(texture),
+            None if texture is None else clamp_score(texture),
+            clamp_score(float(fruit.convenience_score)),
+            (
+                None
+                if fruit.ripe_storage_score is None
+                else clamp_score(float(fruit.ripe_storage_score))
+            ),
+        )
+
+    sweet = option.sweet_score if option.sweet_score is not None else fruit.sweet_score
+    sour = option.sour_score if option.sour_score is not None else fruit.sour_score
+    texture = (
+        option.texture_score
+        if option.texture_score is not None
+        else fruit.texture_score
     )
-    return tuple(clamp_score(float(value)) for value in values)  # type: ignore[return-value]
+    texture = None if texture is None else clamp_score(float(texture))
+    soft = None if texture is None else clamp_score(1.0 - texture)
+    crisp = texture
+    ripe = (
+        option.ripe_storage_score
+        if option.ripe_storage_score is not None
+        else fruit.ripe_storage_score
+    )
+    convenience = (
+        option.convenience_score
+        if option.convenience_score is not None
+        else fruit.convenience_score
+    )
+    return (
+        clamp_score(float(sweet)),
+        clamp_score(float(sour)),
+        soft,
+        crisp,
+        texture,
+        clamp_score(float(convenience)),
+        None if ripe is None else clamp_score(float(ripe)),
+    )  # type: ignore[return-value]
 
 
 def _taste_match_for_option(
@@ -68,19 +104,28 @@ def _taste_match_for_option(
     option: SelectionOption,
     user: RecommendationUser,
 ) -> float:
-    """复用推荐核心现有的 target * value 匹配语义。"""
+    """Use symmetric distance on the dimensions configured for this parent."""
 
-    values = _complete_option_scores(fruit, option)
-    by_name = dict(zip(("sweet_score", "sour_score", "soft_score", "crisp_score"), values))
-    configured = []
+    values = _complete_option_profile(fruit, option)
+    by_name = dict(zip(
+        ("sweet_score", "sour_score", "soft_score", "crisp_score", "texture_score"),
+        values,
+    ))
+    configured: list[tuple[float, float]] = []
     for dimension in matching_dimensions_for(fruit):
         target = getattr(user, dimension.replace("_score", "_preference"), None)
-        if target is not None:
+        if target is not None and by_name[dimension] is not None:
             value = by_name[dimension]
-            configured.append(
-                float(target) * value + (1 - float(target)) * (1 - value)
-            )
-    return clamp_score(sum(configured) / len(configured)) if configured else 0.5
+            configured.append((
+                1 - abs(float(target) - float(value)),
+                TASTE_DIMENSION_WEIGHTS[dimension],
+            ))
+    if not configured:
+        return 0.5
+    weight_sum = sum(weight for _, weight in configured)
+    return clamp_score(
+        sum(similarity * weight for similarity, weight in configured) / weight_sum
+    )
 
 
 def _option_preferences_for(
@@ -129,8 +174,19 @@ def resolve_selection_option(
             fruit=fruit,
             effective_sweet_score=fruit.sweet_score,
             effective_sour_score=fruit.sour_score,
-            effective_soft_score=fruit.soft_score,
-            effective_crisp_score=fruit.crisp_score,
+            effective_soft_score=(
+                None
+                if fruit.texture_score is None
+                else 1 - float(fruit.texture_score)
+            ),
+            effective_crisp_score=(
+                None
+                if fruit.texture_score is None
+                else float(fruit.texture_score)
+            ),
+            effective_texture_score=fruit.texture_score,
+            effective_convenience_score=fruit.convenience_score,
+            effective_ripe_storage_score=fruit.ripe_storage_score,
         )
 
     if user is None:
@@ -172,16 +228,38 @@ def resolve_selection_option(
             fruit=fruit,
             effective_sweet_score=fruit.sweet_score,
             effective_sour_score=fruit.sour_score,
-            effective_soft_score=fruit.soft_score,
-            effective_crisp_score=fruit.crisp_score,
+            effective_soft_score=(
+                None
+                if fruit.texture_score is None
+                else 1 - float(fruit.texture_score)
+            ),
+            effective_crisp_score=(
+                None
+                if fruit.texture_score is None
+                else float(fruit.texture_score)
+            ),
+            effective_texture_score=fruit.texture_score,
+            effective_convenience_score=fruit.convenience_score,
+            effective_ripe_storage_score=fruit.ripe_storage_score,
         )
     if not allowed:
         return None
 
     configured = any(
-        getattr(user, dimension.replace("_score", "_preference"), None) is not None
+        (
+            user.texture_preference is not None
+        )
+        if dimension == "texture_score"
+        else getattr(user, dimension.replace("_score", "_preference"), None) is not None
         for dimension in matching_dimensions_for(fruit)
     )
+    # A low texture preference is not evidence for powdery apples.  The
+    # powdery option remains explicit/history driven; a high texture preference
+    # may select the crisp sibling.
+    if fruit.code == "apple" and configured and (
+        user.texture_preference or 0
+    ) < 0.5:
+        configured = False
     if liked_ids:
         source = "explicit"
         chosen = max(
@@ -209,7 +287,9 @@ def resolve_selection_option(
         chosen = next((option for option in allowed if option.is_default), allowed[0])
         effective_explicit = 0.0
 
-    sweet, sour, soft, crisp = _complete_option_scores(fruit, chosen)
+    sweet, sour, soft, crisp, texture, convenience, ripe = _complete_option_profile(
+        fruit, chosen
+    )
     acceptable = tuple(sorted(liked_ids - {chosen.id}))
     avoided = tuple(sorted(disliked_ids))
     return ResolvedFruitCandidate(
@@ -218,6 +298,9 @@ def resolve_selection_option(
         effective_sour_score=sour,
         effective_soft_score=soft,
         effective_crisp_score=crisp,
+        effective_texture_score=texture,
+        effective_convenience_score=convenience,
+        effective_ripe_storage_score=ripe,
         resolved_option_id=chosen.id,
         resolved_option_code=chosen.code,
         resolved_option_name=chosen.name,

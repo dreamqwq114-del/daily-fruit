@@ -10,6 +10,13 @@ import math
 from collections.abc import Mapping
 
 
+TASTE_DIMENSION_WEIGHTS: Mapping[str, float] = {
+    "sweet_score": 0.40,
+    "sour_score": 0.25,
+    "texture_score": 0.35,
+}
+
+
 class RecommendationError(Exception):
     """Base class for understandable recommendation domain errors."""
 
@@ -48,5 +55,6 @@ __all__ = [
     "InvalidRecommendationInputError",
     "NoRecommendationCandidatesError",
     "RecommendationError",
+    "TASTE_DIMENSION_WEIGHTS",
     "clamp_score",
 ]

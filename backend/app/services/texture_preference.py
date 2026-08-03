@@ -5,7 +5,7 @@ from __future__ import annotations
 from math import isfinite
 
 
-SCORING_MODEL_VERSION = "taste-v1"
+SCORING_MODEL_VERSION = "taste-v2"
 FRUIT_PROFILE_VERSION = "2026-08-texture-v1"
 TEXTURE_PREFERENCE_SOURCES = frozenset(
     {

@@ -190,9 +190,19 @@ def test_selection_option_seed_has_only_the_supported_parent_fruits() -> None:
         "yellow",
         "red",
     }
+    assert {row["code"] for row in by_fruit["dragon_fruit"]} == {"red", "white"}
+    expected_defaults = {
+        "apple": "crisp",
+        "grape": "hard_crisp",
+        "peach": "crisp",
+        "kiwifruit": "green",
+        "pomegranate": "soft_seed",
+        "dragon_fruit": "red",
+    }
     for fruit_code, fruit_rows in by_fruit.items():
         assert sum(row["is_default"] and row["is_active"] for row in fruit_rows) == 1
         assert all(row["is_active"] for row in fruit_rows)
+        assert next(row for row in fruit_rows if row["is_default"])["code"] == expected_defaults[fruit_code]
         if fruit_code in {"apple", "grape", "peach"}:
             assert matching_dimensions_for(
                 RecommendationFruit(
@@ -206,11 +216,17 @@ def test_selection_option_seed_has_only_the_supported_parent_fruits() -> None:
                     convenience_score=0.5,
                     average_price_level=2,
                 )
-            ) == ("soft_score", "crisp_score")
+            ) == ("texture_score",)
             assert next(row for row in fruit_rows if row["is_default"]).get("texture_score") is None
             assert min(
                 row["texture_score"] for row in fruit_rows if "texture_score" in row
             ) in {0.15, 0.20, 0.25}
+            if fruit_code == "grape":
+                soft_juicy = next(row for row in fruit_rows if row["code"] == "soft_juicy")
+                assert soft_juicy["sweet_score"] == 0.70
+                assert soft_juicy["sour_score"] == 0.30
+                assert soft_juicy["texture_score"] == 0.20
+                assert soft_juicy["ripe_storage_score"] == 0.10
         elif fruit_code == "kiwifruit":
             assert matching_dimensions_for(
                 RecommendationFruit(
@@ -225,12 +241,8 @@ def test_selection_option_seed_has_only_the_supported_parent_fruits() -> None:
                     average_price_level=2,
                 )
             ) == ("sweet_score", "sour_score")
-            assert "sour_score" not in next(
-                row for row in fruit_rows if row["code"] == "green"
-            )
-            assert next(
-                row for row in fruit_rows if row["code"] == "yellow"
-            )["sour_score"] == 0.4
+            assert "sour_score" not in next(row for row in fruit_rows if row["code"] == "green")
+            assert next(row for row in fruit_rows if row["code"] == "yellow")["sour_score"] == 0.4
         elif fruit_code == "pomegranate":
             assert matching_dimensions_for(
                 RecommendationFruit(
@@ -245,7 +257,9 @@ def test_selection_option_seed_has_only_the_supported_parent_fruits() -> None:
                     average_price_level=2,
                 )
             ) == ()
-            hard_seed = next(row for row in fruit_rows if row["code"] == "hard_seed")
+            hard_seed = next(
+                row for row in fruit_rows if row["code"] == "hard_seed"
+            )
             assert hard_seed["sweet_score"] == 0.70
             assert hard_seed["sour_score"] == 0.25
             assert hard_seed["convenience_score"] == 0.20
@@ -255,4 +269,16 @@ def test_selection_option_seed_has_only_the_supported_parent_fruits() -> None:
                 for field in ("soft_score", "crisp_score", "texture_score")
             )
         else:
-            assert fruit_code == "dragon_fruit"
+            assert matching_dimensions_for(
+                RecommendationFruit(
+                    id=1,
+                    code="dragon_fruit",
+                    name="火龙果",
+                    sweet_score=0.6,
+                    sour_score=0.1,
+                    soft_score=0.65,
+                    crisp_score=0.35,
+                    convenience_score=0.8,
+                    average_price_level=2,
+                )
+            ) == ()

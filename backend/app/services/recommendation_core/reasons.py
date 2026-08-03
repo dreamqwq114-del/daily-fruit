@@ -115,10 +115,34 @@ def _build_reasons(
             ReasonComponent.FAMILIARITY,
         )
     else:
+        configured = scores.configured_dimensions
+        if configured == ("texture_score",):
+            taste_code = ReasonCode.TEXTURE_MATCH
+            taste_message = "质地与你设置的偏好较接近"
+        elif configured == ("sweet_score",):
+            taste_code = ReasonCode.SWEET_MATCH
+            taste_message = "甜度与你设置的偏好较接近"
+        elif configured == ("sour_score",):
+            taste_code = ReasonCode.SOUR_MATCH
+            taste_message = "酸味与你设置的偏好较接近"
+        elif configured:
+            labels = {
+                "sweet_score": "甜度",
+                "sour_score": "酸味",
+                "texture_score": "质地",
+            }
+            configured_labels = "、".join(
+                labels[dimension] for dimension in configured
+            )
+            taste_code = ReasonCode.SWEET_MATCH
+            taste_message = f"{configured_labels}与你设置的偏好较接近"
+        else:
+            taste_code = ReasonCode.DEFAULT_MATCH
+            taste_message = "已综合水果的基础口味与当前设置"
         add(
             BASE_SCORE_WEIGHTS["taste_match"] * scores.taste_match,
-            ReasonCode.SWEET_MATCH,
-            "甜度和口感与你设置的偏好较接近",
+            taste_code,
+            taste_message,
             ReasonComponent.TASTE_MATCH,
         )
 

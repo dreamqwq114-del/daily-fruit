@@ -25,8 +25,9 @@ def make_user(**changes: object) -> RecommendationUser:
         "region": "华东",
         "sweet_preference": 0.7,
         "sour_preference": 0.3,
-        "soft_preference": 0.2,
-        "crisp_preference": 0.8,
+        "soft_preference": None,
+        "crisp_preference": None,
+        "texture_preference": 0.8,
         "price_level": 2,
         "convenience_preference": 0.5,
     }
@@ -45,6 +46,7 @@ def make_peach() -> RecommendationFruit:
         crisp_score=0.5,
         convenience_score=0.6,
         average_price_level=2,
+        texture_score=0.8,
         seasons=(SeasonWindow("全国", 1, 12, 0.9),),
         selection_options=(
             SelectionOption(
@@ -54,6 +56,7 @@ def make_peach() -> RecommendationFruit:
                 name="脆桃型",
                 soft_score=0.2,
                 crisp_score=0.9,
+                texture_score=0.8,
                 is_default=True,
                 display_order=1,
             ),
@@ -64,6 +67,7 @@ def make_peach() -> RecommendationFruit:
                 name="软桃型",
                 soft_score=0.9,
                 crisp_score=0.2,
+                texture_score=0.15,
                 display_order=2,
             ),
         ),
@@ -75,12 +79,13 @@ def make_kiwifruit() -> RecommendationFruit:
         id=11,
         code="kiwifruit",
         name="猕猴桃",
-        sweet_score=0.7,
-        sour_score=0.4,
+        sweet_score=0.4,
+        sour_score=0.6,
         soft_score=0.5,
         crisp_score=0.5,
         convenience_score=0.6,
         average_price_level=2,
+        texture_score=0.25,
         seasons=(SeasonWindow("全国", 1, 12, 0.9),),
         selection_options=(
             SelectionOption(
@@ -88,8 +93,6 @@ def make_kiwifruit() -> RecommendationFruit:
                 fruit_id=11,
                 code="green",
                 name="绿心",
-                sweet_score=0.55,
-                sour_score=0.85,
                 is_default=True,
                 display_order=1,
             ),
@@ -98,8 +101,8 @@ def make_kiwifruit() -> RecommendationFruit:
                 fruit_id=11,
                 code="yellow",
                 name="黄心",
-                sweet_score=0.8,
-                sour_score=0.35,
+                sweet_score=0.6,
+                sour_score=0.4,
                 display_order=2,
             ),
             SelectionOption(
@@ -107,8 +110,8 @@ def make_kiwifruit() -> RecommendationFruit:
                 fruit_id=11,
                 code="red",
                 name="红心",
-                sweet_score=0.85,
-                sour_score=0.45,
+                sweet_score=0.65,
+                sour_score=0.3,
                 display_order=3,
             ),
         ),
@@ -126,6 +129,7 @@ def make_pomegranate() -> RecommendationFruit:
         crisp_score=0.55,
         convenience_score=0.6,
         average_price_level=2,
+        texture_score=0.35,
         seasons=(SeasonWindow("全国", 1, 12, 0.9),),
         selection_options=(
             SelectionOption(
@@ -141,6 +145,9 @@ def make_pomegranate() -> RecommendationFruit:
                 fruit_id=30,
                 code="hard_seed",
                 name="硬籽型",
+                sweet_score=0.70,
+                sour_score=0.25,
+                convenience_score=0.20,
                 display_order=2,
             ),
         ),
@@ -149,16 +156,16 @@ def make_pomegranate() -> RecommendationFruit:
 
 def test_global_soft_and_crisp_preferences_resolve_a_real_peach_option() -> None:
     peach = make_peach()
-    crisp_user = make_user(soft_preference=0.1, crisp_preference=0.9)
-    soft_user = make_user(soft_preference=0.9, crisp_preference=0.1)
+    crisp_user = make_user(texture_preference=0.9)
+    soft_user = make_user(texture_preference=0.1)
 
     crisp = resolve_selection_option(peach, peach.selection_options, None, (), crisp_user)
     soft = resolve_selection_option(peach, peach.selection_options, None, (), soft_user)
 
     assert crisp is not None and crisp.resolved_option_code == "crisp"
     assert soft is not None and soft.resolved_option_code == "soft"
-    assert crisp.effective_soft_score == 0.2
-    assert soft.effective_soft_score == 0.9
+    assert crisp.effective_soft_score == pytest.approx(0.2)
+    assert soft.effective_soft_score == pytest.approx(0.85)
 
 
 def test_liked_option_wins_over_unknown_and_parent_dislike_can_have_exception() -> None:
@@ -230,7 +237,7 @@ def test_parent_is_scored_once_and_option_is_not_a_second_top_level_fruit() -> N
     assert peach_score.resolved_candidate is not None
     # The score uses the selected real option; it is never an averaged profile.
     assert peach_score.resolved_candidate.resolved_option_code == "crisp"
-    assert peach_score.resolved_candidate.effective_crisp_score == 0.9
+    assert peach_score.resolved_candidate.effective_crisp_score == 0.8
 
 
 def test_adding_late_near_duplicate_option_does_not_change_resolution() -> None:
@@ -240,7 +247,7 @@ def test_adding_late_near_duplicate_option_does_not_change_resolution() -> None:
         peach.selection_options,
         None,
         (),
-        make_user(soft_preference=0.1, crisp_preference=0.9),
+        make_user(texture_preference=0.9),
     )
     duplicate = SelectionOption(
         id=199,
@@ -249,6 +256,7 @@ def test_adding_late_near_duplicate_option_does_not_change_resolution() -> None:
         name="脆桃型（重复演示）",
         soft_score=0.2,
         crisp_score=0.9,
+        texture_score=0.8,
         display_order=99,
     )
     changed = resolve_selection_option(
@@ -256,7 +264,7 @@ def test_adding_late_near_duplicate_option_does_not_change_resolution() -> None:
         (*peach.selection_options, duplicate),
         None,
         (),
-        make_user(soft_preference=0.1, crisp_preference=0.9),
+        make_user(texture_preference=0.9),
     )
 
     assert baseline is not None and changed is not None
@@ -284,6 +292,26 @@ def test_kiwifruit_explicit_green_preference_excludes_unknown_siblings() -> None
     assert resolved.avoided_option_ids == (202, 203)
 
 
+def test_kiwifruit_inference_uses_the_shared_normalized_taste_weights() -> None:
+    fruit = make_kiwifruit()
+    resolved = resolve_selection_option(
+        fruit,
+        fruit.selection_options,
+        None,
+        (),
+        make_user(
+            sweet_preference=0.10,
+            sour_preference=0.10,
+            texture_preference=None,
+        ),
+    )
+
+    # Equal weighting chooses red for this profile. The shared 0.40/0.25
+    # sweet/sour weights correctly choose the green parent profile.
+    assert resolved is not None
+    assert resolved.resolved_option_code == "green"
+
+
 def test_pomegranate_without_type_preference_keeps_parent_scores_and_no_selection() -> None:
     fruit = make_pomegranate()
     resolved = resolve_selection_option(
@@ -291,7 +319,7 @@ def test_pomegranate_without_type_preference_keeps_parent_scores_and_no_selectio
         fruit.selection_options,
         None,
         (),
-        make_user(soft_preference=0.95, crisp_preference=0.05),
+        make_user(texture_preference=0.05),
     )
 
     assert resolved is not None
@@ -302,12 +330,7 @@ def test_pomegranate_without_type_preference_keeps_parent_scores_and_no_selectio
         resolved.effective_sour_score,
         resolved.effective_soft_score,
         resolved.effective_crisp_score,
-    ) == (
-        fruit.sweet_score,
-        fruit.sour_score,
-        fruit.soft_score,
-        fruit.crisp_score,
-    )
+    ) == (fruit.sweet_score, fruit.sour_score, 0.65, 0.35)
 
 
 def test_pomegranate_explicit_like_and_avoid_filter_without_score_override() -> None:
@@ -336,7 +359,8 @@ def test_pomegranate_explicit_like_and_avoid_filter_without_score_override() -> 
             resolved.effective_sour_score,
             resolved.effective_soft_score,
             resolved.effective_crisp_score,
-        ) == (0.68, 0.42, 0.25, 0.55)
+        ) == (0.68, 0.42, 0.65, 0.35)
+        assert resolved.effective_convenience_score == fruit.convenience_score
 
 
 def test_pomegranate_all_types_disliked_is_filtered() -> None:

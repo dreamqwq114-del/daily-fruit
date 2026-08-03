@@ -349,6 +349,7 @@ class PairSelection:
     nutrition_pair_score: float = 0.0
     sensory_category_diversity: float = 0.0
     pair_novelty: float = 1.0
+    near_top_count: int = 1
 
 
 @dataclass(frozen=True, slots=True)
