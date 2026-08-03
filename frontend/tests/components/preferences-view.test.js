@@ -74,7 +74,7 @@ describe('PreferencesView fruit preference saving', () => {
     await flushPromises()
 
     await wrapper.find('.button--small').trigger('click')
-    await wrapper.find('.fruit-picker-option').trigger('click')
+    await wrapper.find('.fruit-picker-option-main').trigger('click')
     await wrapper.find('.fruit-picker-actions .button--primary').trigger('click')
     await wrapper.find('form').trigger('submit')
     await flushPromises()

@@ -28,6 +28,7 @@ const optionFruits = [
   {
     id: 10,
     name: '桃',
+    code: 'peach',
     taste: '甜软',
     selection_options: [
       { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', is_active: true },
@@ -39,21 +40,23 @@ const optionFruits = [
 const peachAndKiwiOptionFruits = [
   {
     id: 10,
-    name: 'peach',
-    taste: 'sweet',
+    name: '桃',
+    code: 'peach',
+    taste: '甜软',
     selection_options: [
-      { id: 101, fruit_id: 10, code: 'crisp', name: 'crisp peach', is_active: true },
-      { id: 102, fruit_id: 10, code: 'soft', name: 'soft peach', is_active: true },
+      { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', is_active: true },
+      { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', is_active: true },
     ],
   },
   {
     id: 20,
-    name: 'kiwifruit',
-    taste: 'tart',
+    name: '猕猴桃',
+    code: 'kiwifruit',
+    taste: '酸甜',
     selection_options: [
-      { id: 201, fruit_id: 20, code: 'green', name: 'green heart', is_active: true },
-      { id: 202, fruit_id: 20, code: 'yellow', name: 'yellow heart', is_active: true },
-      { id: 203, fruit_id: 20, code: 'red', name: 'red heart', is_active: true },
+      { id: 201, fruit_id: 20, code: 'green', name: '绿心', is_active: true },
+      { id: 202, fruit_id: 20, code: 'yellow', name: '黄心', is_active: true },
+      { id: 203, fruit_id: 20, code: 'red', name: '红心', is_active: true },
     ],
   },
 ]
@@ -74,7 +77,7 @@ describe('FruitPreferencePicker', () => {
     expect(wrapper.find('.fruit-picker-dialog').exists()).toBe(true)
     expect(wrapper.find('.fruit-picker-scroll-area').exists()).toBe(true)
 
-    await wrapper.find('.fruit-picker-option').trigger('click')
+    await wrapper.find('.fruit-picker-option-main').trigger('click')
     expect(wrapper.find('.fruit-picker-option').classes()).toContain('is-selected')
     await wrapper.find('.fruit-picker-actions .button--primary').trigger('click')
 
@@ -92,7 +95,7 @@ describe('FruitPreferencePicker', () => {
     expect(wrapper.text()).toContain('香蕉')
     expect(wrapper.text()).not.toContain('苹果')
 
-    await wrapper.find('.fruit-picker-option').trigger('click')
+    await wrapper.find('.fruit-picker-option-main').trigger('click')
     await wrapper.find('.fruit-picker-actions .button--ghost').trigger('click')
     expect(wrapper.emitted('update:modelValue')).toBeUndefined()
   })
@@ -102,7 +105,7 @@ describe('FruitPreferencePicker', () => {
     window.confirm = confirmSpy
     const wrapper = mountPicker(selection({ favoriteIds: [1] }))
     await wrapper.findAll('.button--small')[2].trigger('click')
-    await wrapper.find('.fruit-picker-option').trigger('click')
+    await wrapper.find('.fruit-picker-option-main').trigger('click')
     await wrapper.find('.fruit-picker-actions .button--primary').trigger('click')
 
     const latest = wrapper.emitted('update:modelValue').at(-1)[0]
@@ -112,7 +115,7 @@ describe('FruitPreferencePicker', () => {
     delete window.confirm
   })
 
-  it('keeps selection options inside the parent fruit and supports clearing them', async () => {
+  it('keeps selection options inside the parent fruit and supports quick clearing', async () => {
     const wrapper = mount(FruitPreferencePicker, {
       props: {
         fruits: optionFruits,
@@ -123,12 +126,16 @@ describe('FruitPreferencePicker', () => {
       },
     })
 
-    await wrapper.find('.fruit-option-toggle').trigger('click')
-    expect(wrapper.findAll('.fruit-option-row')).toHaveLength(2)
-    expect(wrapper.findAll('.fruit-option-row')[0].findAll('.fruit-option-choice.is-selected')).toHaveLength(1)
-    expect(wrapper.findAll('.fruit-option-row')[1].findAll('.fruit-option-choice.is-selected')).toHaveLength(1)
+    await wrapper.find('.button--small').trigger('click')
+    expect(wrapper.find('.fruit-option-preferences').exists()).toBe(false)
+    expect(wrapper.findAll('.fruit-option-panel')).toHaveLength(0)
+    expect(wrapper.text()).toContain('类型偏好')
 
-    await wrapper.findAll('.fruit-option-choice')[2].trigger('click')
+    await wrapper.find('.fruit-option-edit').trigger('click')
+    expect(wrapper.find('.fruit-option-panel').exists()).toBe(true)
+    expect(wrapper.text()).not.toContain('crisp')
+    await wrapper.find('.fruit-option-quick-choice').trigger('click')
+    await wrapper.find('.fruit-option-panel-actions .button--primary').trigger('click')
     const latest = wrapper.emitted('update:optionPreferences').at(-1)[0]
     expect(latest).toEqual([])
   })
@@ -141,28 +148,60 @@ describe('FruitPreferencePicker', () => {
       },
     })
 
-    expect(wrapper.findAll('.fruit-option-card')).toHaveLength(2)
-    expect(wrapper.text()).toContain('peach')
-    expect(wrapper.text()).toContain('kiwifruit')
+    await wrapper.find('.button--small').trigger('click')
+    expect(wrapper.findAll('.fruit-option-summary')).toHaveLength(2)
+    expect(wrapper.text()).toContain('桃')
+    expect(wrapper.text()).toContain('猕猴桃')
+    expect(wrapper.text()).toContain('根据口感偏好自动匹配')
+    expect(wrapper.text()).not.toContain('green')
+    expect(wrapper.text()).not.toContain('crisp')
 
-    const toggles = wrapper.findAll('.fruit-option-toggle')
-    await toggles[0].trigger('click')
-    expect(wrapper.findAll('.fruit-option-row')).toHaveLength(2)
-    expect(wrapper.text()).toContain('crisp peach')
-    expect(wrapper.text()).toContain('soft peach')
+    await wrapper.findAll('.fruit-option-edit')[1].trigger('click')
+    expect(wrapper.find('.fruit-option-panel').text()).toContain('只推荐绿心')
+    expect(wrapper.findAll('.fruit-option-custom-row')).toHaveLength(0)
+  })
 
-    await toggles[1].trigger('click')
-    expect(wrapper.findAll('.fruit-option-row')).toHaveLength(5)
-    expect(wrapper.text()).toContain('green heart')
-    expect(wrapper.text()).toContain('yellow heart')
-    expect(wrapper.text()).toContain('red heart')
+  it('supports a quick peach choice and custom kiwi avoid state with one confirmation', async () => {
+    const wrapper = mount(FruitPreferencePicker, {
+      props: {
+        fruits: peachAndKiwiOptionFruits,
+        modelValue: selection(),
+      },
+    })
+
+    await wrapper.find('.button--small').trigger('click')
+    await wrapper.find('.fruit-option-edit').trigger('click')
+    await wrapper.findAll('.fruit-option-quick-choice')[1].trigger('click')
+    await wrapper.find('.fruit-option-panel-actions .button--primary').trigger('click')
+    expect(wrapper.emitted('update:optionPreferences')).toHaveLength(1)
+    expect(wrapper.emitted('update:optionPreferences')[0][0]).toEqual([
+      { fruit_id: 10, option_id: 101, preference: 'liked' },
+    ])
+
+    await wrapper.findAll('.fruit-option-edit')[1].trigger('click')
+    await wrapper.findAll('.fruit-option-quick-choice').at(-1).trigger('click')
+    await wrapper.findAll('.fruit-option-choice')[1].trigger('click')
+    await wrapper.find('.fruit-option-panel-actions .button--primary').trigger('click')
+    const latest = wrapper.emitted('update:optionPreferences').at(-1)[0]
+    expect(latest).toContainEqual({ fruit_id: 20, option_id: 201, preference: 'disliked' })
+  })
+
+  it('does not commit a cancelled quick choice', async () => {
+    const wrapper = mount(FruitPreferencePicker, {
+      props: { fruits: optionFruits, modelValue: selection() },
+    })
+    await wrapper.find('.button--small').trigger('click')
+    await wrapper.find('.fruit-option-edit').trigger('click')
+    await wrapper.findAll('.fruit-option-quick-choice')[1].trigger('click')
+    await wrapper.find('.fruit-option-panel-actions .button--ghost').trigger('click')
+    expect(wrapper.emitted('update:optionPreferences')).toBeUndefined()
   })
 
   it('enforces the five-fruit favorite limit in the picker', async () => {
     const sixFruits = [...fruits, { id: 4, name: '梨', taste: '清甜' }, { id: 5, name: '桃', taste: '柔软甜' }, { id: 6, name: '葡萄', taste: '甜多汁' }]
     const wrapper = mountPicker(selection({ favoriteIds: [1, 2, 3, 4, 5] }), sixFruits)
     await wrapper.findAll('.button--small')[0].trigger('click')
-    await wrapper.findAll('.fruit-picker-option')[5].trigger('click')
+    await wrapper.findAll('.fruit-picker-option-main')[5].trigger('click')
     expect(wrapper.text()).toContain('特别喜欢最多选择 5 种')
   })
 })
