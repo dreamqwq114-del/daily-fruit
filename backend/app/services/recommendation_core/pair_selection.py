@@ -101,7 +101,7 @@ def _sensory_category_diversity(
     first_resolved=None,
     second_resolved=None,
 ) -> float:
-    """用四个真实口感维度衡量组合的体验差异。
+    """用甜、酸、质地三个真实维度衡量组合的体验差异。
 
     ``sensory_category_diversity`` 是稳定的 API 字段名；内部不再读取
     ``category``/``display_group``，避免展示分组改变推荐结果。
@@ -109,29 +109,29 @@ def _sensory_category_diversity(
     first_values = (
         first_resolved.effective_sweet_score,
         first_resolved.effective_sour_score,
-        first_resolved.effective_soft_score,
-        first_resolved.effective_crisp_score,
+        first_resolved.effective_texture_score
+        if first_resolved.effective_texture_score is not None
+        else 0.5,
     ) if first_resolved is not None else (
         first.sweet_score,
         first.sour_score,
-        first.soft_score,
-        first.crisp_score,
+        first.texture_score if first.texture_score is not None else 0.5,
     )
     second_values = (
         second_resolved.effective_sweet_score,
         second_resolved.effective_sour_score,
-        second_resolved.effective_soft_score,
-        second_resolved.effective_crisp_score,
+        second_resolved.effective_texture_score
+        if second_resolved.effective_texture_score is not None
+        else 0.5,
     ) if second_resolved is not None else (
         second.sweet_score,
         second.sour_score,
-        second.soft_score,
-        second.crisp_score,
+        second.texture_score if second.texture_score is not None else 0.5,
     )
     taste_distance = sum(
         abs(left - right)
         for left, right in zip(first_values, second_values)
-    ) / 4
+    ) / 3
     return clamp_score(taste_distance)
 
 
@@ -352,4 +352,5 @@ def select_recommendation_pair(
         nutrition_pair_score=nutrition_pair,
         sensory_category_diversity=sensory,
         pair_novelty=novelty,
+        near_top_count=len(near_top),
     )

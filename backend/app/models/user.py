@@ -74,6 +74,10 @@ class User(TimestampMixin, Base):
             name="ck_users_crisp_preference_range",
         ),
         CheckConstraint(
+            "texture_preference IS NULL OR texture_preference BETWEEN 0 AND 1",
+            name="ck_users_texture_preference_range",
+        ),
+        CheckConstraint(
             "convenience_preference BETWEEN 0 AND 1",
             name="ck_users_convenience_preference_range",
         ),
@@ -92,6 +96,17 @@ class User(TimestampMixin, Base):
         CheckConstraint(
             "market_access_level BETWEEN 1 AND 3",
             name="ck_users_market_access_level_range",
+        ),
+        CheckConstraint(
+            "texture_preference_source IS NULL OR texture_preference_source IN "
+            "('explicit_new', 'migrated_consistent', 'migrated_from_soft', "
+            "'migrated_from_crisp', 'legacy_fallback', 'legacy_conflict', 'unset')",
+            name="ck_users_texture_preference_source_values",
+        ),
+        CheckConstraint(
+            "legacy_texture_sync_source IS NULL OR legacy_texture_sync_source IN "
+            "('derived_from_texture')",
+            name="ck_users_legacy_texture_sync_source_values",
         ),
     )
 
@@ -124,6 +139,16 @@ class User(TimestampMixin, Base):
     crisp_preference: Mapped[Decimal | None] = mapped_column(
         Numeric(4, 3),
         nullable=True,
+    )
+    texture_preference: Mapped[Decimal | None] = mapped_column(
+        Numeric(4, 3),
+        nullable=True,
+    )
+    texture_preference_source: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
+    )
+    legacy_texture_sync_source: Mapped[str | None] = mapped_column(
+        String(32), nullable=True
     )
     price_level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     convenience_preference: Mapped[Decimal] = mapped_column(

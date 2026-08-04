@@ -28,6 +28,16 @@ EXPECTED_TABLES = {
     "fruit_selection_options",
     "user_fruit_option_preferences",
 }
+INITIAL_TABLES = {
+    "users",
+    "fruits",
+    "fruit_nutritions",
+    "fruit_seasons",
+    "user_fruit_preferences",
+    "recommendations",
+    "recommendation_items",
+    "recommendation_feedback",
+}
 EXPECTED_INDEXES = {
     "fruit_facts": {"ix_fruit_facts_fruit_active"},
     "fruit_seasons": {"ix_fruit_seasons_region_fruit_id"},
@@ -61,13 +71,16 @@ EXPECTED_INDEXES = {
 }
 
 
-def run_alembic(*arguments: str, database_url: str) -> None:
+def invoke_alembic(
+    *arguments: str,
+    database_url: str,
+) -> subprocess.CompletedProcess[str]:
     environment = os.environ.copy()
     environment.update(
         ALEMBIC_DATABASE_PURPOSE="test",
         TEST_DATABASE_URL=database_url,
     )
-    result = subprocess.run(
+    return subprocess.run(
         [
             sys.executable,
             "-m",
@@ -83,6 +96,10 @@ def run_alembic(*arguments: str, database_url: str) -> None:
         timeout=30,
         check=False,
     )
+
+
+def run_alembic(*arguments: str, database_url: str) -> None:
+    result = invoke_alembic(*arguments, database_url=database_url)
     assert result.returncode == 0, result.stdout + result.stderr
 
 
@@ -158,16 +175,50 @@ def insert_fruit(connection: object, name: str) -> int:
         text(
             """
             INSERT INTO public.fruits (
-                name, category, taste, sweet_score, sour_score,
+                code, name, aliases, category, display_group, taste,
+                sweet_score, sour_score,
                 soft_score, crisp_score, convenience_score,
-                average_price_level, default_portion, description
+                average_price_level, default_portion, default_portion_grams,
+                direct_eating, consumption_mode, daily_recommendation_role,
+                preparation_difficulty, portability_score, messiness_score,
+                storage_difficulty, aroma_intensity, commonness_score,
+                novelty_level, data_quality, description,
+                texture_score, ripe_storage_score, typical_purchase_stage
             ) VALUES (
-                :name, 'test', 'sweet', 0.8, 0.2,
-                0.4, 0.7, 0.9, 2, '100 g', 'migration test'
+                :code, :name, ARRAY[]::VARCHAR(100)[], 'test', 'test', 'sweet',
+                0.8, 0.2, 0.4, 0.7, 0.9, 2, '100 g', 100,
+                true, 'direct', 'main', 0.5, 0.5, 0.5,
+                0.5, 0.5, 0.5, 1, 'low', 'migration test',
+                0.7, 0.5, 'ready_to_eat'
             ) RETURNING id
             """
         ),
-        {"name": name},
+        {"code": name, "name": name},
+    ).scalar_one()
+
+
+def insert_0012_fruit(connection: object, code: str, name: str) -> int:
+    return connection.execute(
+        text(
+            """
+            INSERT INTO public.fruits (
+                code, name, aliases, category, display_group, taste,
+                sweet_score, sour_score, soft_score, crisp_score,
+                convenience_score, average_price_level, default_portion,
+                default_portion_grams, direct_eating, consumption_mode,
+                daily_recommendation_role, preparation_difficulty,
+                portability_score, messiness_score, storage_difficulty,
+                aroma_intensity, commonness_score, novelty_level,
+                data_quality, description
+            ) VALUES (
+                :code, :name, ARRAY[]::VARCHAR(100)[], 'test', 'test', 'sweet',
+                0.8, 0.2, 0.4, 0.7, 0.9, 2, '100 g', 100,
+                true, 'direct', 'main', 0.5, 0.5, 0.5, 0.5,
+                0.5, 0.5, 1, 'low', '0012 migration fixture'
+            ) RETURNING id
+            """
+        ),
+        {"code": code, "name": name},
     ).scalar_one()
 
 
@@ -177,7 +228,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     engine, database_url = migrated_database
     with engine.connect() as connection:
         assert set(inspect(connection).get_table_names(schema="public")) == (
-            EXPECTED_TABLES | {"alembic_version"}
+            INITIAL_TABLES | {"alembic_version"}
         )
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
@@ -201,7 +252,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     with engine.connect() as connection:
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
-        ).scalar_one() == "0012"
+        ).scalar_one() == "0013"
         users_columns = {
             item["name"]
             for item in inspect(connection).get_columns(
@@ -212,10 +263,235 @@ def test_upgrade_downgrade_upgrade_round_trip(
         assert "auth_user_id" in users_columns
 
 
+def test_0013_preserves_legacy_scores_freezes_history_and_migrates_users(
+    migrated_database: tuple[Engine, str],
+) -> None:
+    engine, database_url = migrated_database
+    run_alembic("downgrade", "0012", database_url=database_url)
+    with engine.begin() as connection:
+        fruit_id = insert_0012_fruit(connection, "apple", "迁移苹果")
+        option_id = connection.execute(
+            text(
+                """
+                INSERT INTO public.fruit_selection_options (
+                    fruit_id, code, name, sweet_score, sour_score,
+                    soft_score, crisp_score, is_default, display_order
+                ) VALUES (
+                    :fruit_id, 'crisp', '旧清脆型', 0.61, 0.19,
+                    0.23, 0.91, true, 1
+                ) RETURNING id
+                """
+            ),
+            {"fruit_id": fruit_id},
+        ).scalar_one()
+        users: dict[str, int] = {}
+        for username, soft, crisp in (
+            ("consistent", 0.2, 0.8),
+            ("conflict", 0.1, 0.1),
+            ("soft-only", 0.3, None),
+            ("crisp-only", None, 0.7),
+        ):
+            users[username] = connection.execute(
+                text(
+                    """
+                    INSERT INTO public.users (
+                        username, city, region, sweet_preference,
+                        sour_preference, soft_preference, crisp_preference,
+                        price_level, convenience_preference
+                    ) VALUES (
+                        :username, 'Suzhou', '华东', 0.7, 0.3,
+                        :soft, :crisp, 2, 0.9
+                    ) RETURNING id
+                    """
+                ),
+                {"username": username, "soft": soft, "crisp": crisp},
+            ).scalar_one()
+        recommendation_id = connection.execute(
+            text(
+                """
+                INSERT INTO public.recommendations (
+                    user_id, recommendation_date, refresh_number,
+                    total_score, status
+                ) VALUES (:user_id, '2026-08-01', 0, 0.8, 'active')
+                RETURNING id
+                """
+            ),
+            {"user_id": users["consistent"]},
+        ).scalar_one()
+        item_id = connection.execute(
+            text(
+                """
+                INSERT INTO public.recommendation_items (
+                    recommendation_id, fruit_id, score, individual_score,
+                    pair_score, nutrition_pair_score, rank, reasons,
+                    selection_option_id
+                ) VALUES (
+                    :recommendation_id, :fruit_id, 0.8, 0.8,
+                    0.8, 0.5, 1, '[]', :option_id
+                ) RETURNING id
+                """
+            ),
+            {
+                "recommendation_id": recommendation_id,
+                "fruit_id": fruit_id,
+                "option_id": option_id,
+            },
+        ).scalar_one()
+
+    run_alembic("upgrade", "head", database_url=database_url)
+    with engine.connect() as connection:
+        option = connection.execute(
+            text(
+                """
+                SELECT sweet_score, sour_score, soft_score, crisp_score,
+                       texture_score, ripe_storage_score, convenience_score,
+                       legacy_score_snapshot
+                FROM public.fruit_selection_options WHERE id = :id
+                """
+            ),
+            {"id": option_id},
+        ).mappings().one()
+        assert all(
+            option[field] is None
+            for field in (
+                "sweet_score", "sour_score", "soft_score", "crisp_score",
+                "texture_score", "ripe_storage_score", "convenience_score",
+            )
+        )
+        assert option["legacy_score_snapshot"] == {
+            "sweet_score": 0.61,
+            "sour_score": 0.19,
+            "soft_score": 0.23,
+            "crisp_score": 0.91,
+        }
+        sources = {
+            row.username: row.texture_preference_source
+            for row in connection.execute(text(
+                "SELECT username, texture_preference_source FROM public.users"
+            ))
+        }
+        assert sources == {
+            "consistent": "migrated_consistent",
+            "conflict": "legacy_conflict",
+            "soft-only": "migrated_from_soft",
+            "crisp-only": "migrated_from_crisp",
+        }
+        snapshot = connection.execute(
+            text(
+                "SELECT fruit_snapshot FROM public.recommendation_items "
+                "WHERE id = :id"
+            ),
+            {"id": item_id},
+        ).scalar_one()
+        assert snapshot["code"] == "apple"
+        assert connection.execute(
+            text(
+                "SELECT scoring_model_version FROM public.recommendations "
+                "WHERE id = :id"
+            ),
+            {"id": recommendation_id},
+        ).scalar_one() == "taste-v1"
+        option_snapshots = connection.execute(
+            text(
+                "SELECT selection_option_code_snapshot, "
+                "selection_option_name_snapshot "
+                "FROM public.recommendation_items WHERE id = :id"
+            ),
+            {"id": item_id},
+        ).one()
+        assert tuple(option_snapshots) == ("crisp", "旧清脆型")
+
+    run_alembic("downgrade", "0012", database_url=database_url)
+    with engine.connect() as connection:
+        restored = connection.execute(
+            text(
+                "SELECT sweet_score, sour_score, soft_score, crisp_score "
+                "FROM public.fruit_selection_options WHERE id = :id"
+            ),
+            {"id": option_id},
+        ).one()
+        assert tuple(float(value) for value in restored) == (0.61, 0.19, 0.23, 0.91)
+        restored_soft = connection.execute(
+            text("SELECT soft_preference FROM public.users WHERE username='consistent'")
+        ).scalar_one()
+        assert float(restored_soft) == pytest.approx(0.2)
+
+    run_alembic("upgrade", "head", database_url=database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM public.recommendations WHERE id = :id"),
+            {"id": recommendation_id},
+        )
+        connection.execute(text("DELETE FROM public.users"))
+        connection.execute(
+            text("DELETE FROM public.fruit_selection_options WHERE fruit_id = :id"),
+            {"id": fruit_id},
+        )
+        connection.execute(
+            text("DELETE FROM public.fruits WHERE id = :id"),
+            {"id": fruit_id},
+        )
+
+
+def test_0013_unknown_fruit_fails_transactionally(
+    migrated_database: tuple[Engine, str],
+) -> None:
+    engine, database_url = migrated_database
+    run_alembic("downgrade", "0012", database_url=database_url)
+    with engine.begin() as connection:
+        fruit_id = insert_0012_fruit(connection, "unknown-fixture", "未知迁移水果")
+
+    result = invoke_alembic("upgrade", "head", database_url=database_url)
+    assert result.returncode != 0
+    assert "fruit profile backfill incomplete" in result.stdout + result.stderr
+    with engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0012"
+        assert "texture_score" not in {
+            column["name"]
+            for column in inspect(connection).get_columns("fruits", schema="public")
+        }
+        assert "texture_preference" not in {
+            column["name"]
+            for column in inspect(connection).get_columns("users", schema="public")
+        }
+        assert "legacy_score_snapshot" not in {
+            column["name"]
+            for column in inspect(connection).get_columns(
+                "fruit_selection_options", schema="public"
+            )
+        }
+        assert "scoring_model_version" not in {
+            column["name"]
+            for column in inspect(connection).get_columns(
+                "recommendations", schema="public"
+            )
+        }
+        preference_score = next(
+            column
+            for column in inspect(connection).get_columns(
+                "user_fruit_preferences", schema="public"
+            )
+            if column["name"] == "preference_score"
+        )
+        assert "0" in str(preference_score["default"])
+        assert connection.execute(
+            text("SELECT count(*) FROM public.fruits WHERE id = :id"),
+            {"id": fruit_id},
+        ).scalar_one() == 1
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM public.fruits WHERE id = :id"), {"id": fruit_id}
+        )
+    run_alembic("upgrade", "head", database_url=database_url)
+
+
 def test_actual_indexes_and_foreign_key_delete_rules(
     migrated_database: tuple[Engine, str],
 ) -> None:
-    engine, _ = migrated_database
+    engine, database_url = migrated_database
+    run_alembic("upgrade", "head", database_url=database_url)
     with engine.connect() as connection:
         inspector = inspect(connection)
         for table_name, expected_names in EXPECTED_INDEXES.items():
@@ -252,6 +528,10 @@ def test_actual_indexes_and_foreign_key_delete_rules(
         ("recommendation_feedback", "user_id"): "RESTRICT",
         ("users", "auth_user_id"): "SET NULL",
         ("product_feedback", "user_id"): "SET NULL",
+        ("fruit_selection_options", "fruit_id"): "RESTRICT",
+        ("recommendation_items", "selection_option_id"): "RESTRICT",
+        ("user_fruit_option_preferences", "fruit_id"): "RESTRICT",
+        ("user_fruit_option_preferences", "user_id"): "CASCADE",
     }
 
 
@@ -353,7 +633,8 @@ def test_product_feedback_constraints_and_user_deidentification(
 def test_database_constraints_and_cascades_are_enforced(
     migrated_database: tuple[Engine, str],
 ) -> None:
-    engine, _ = migrated_database
+    engine, database_url = migrated_database
+    run_alembic("upgrade", "head", database_url=database_url)
     connection = engine.connect()
     transaction = connection.begin()
     try:
@@ -414,8 +695,12 @@ def test_database_constraints_and_cascades_are_enforced(
                 """
                 INSERT INTO public.recommendations (
                     user_id, recommendation_date, refresh_number,
-                    total_score, status
-                ) VALUES (:user_id, '2026-07-31', 0, 0.8, 'active')
+                    total_score, status, scoring_model_version,
+                    fruit_profile_version
+                ) VALUES (
+                    :user_id, '2026-07-31', 0, 0.8, 'active',
+                    'taste-v1', 'migration-test-profile'
+                )
                 RETURNING id
                 """
             ),
@@ -429,9 +714,11 @@ def test_database_constraints_and_cascades_are_enforced(
                         """
                         INSERT INTO public.recommendations (
                             user_id, recommendation_date, refresh_number,
-                            total_score, status
+                            total_score, status, scoring_model_version,
+                            fruit_profile_version
                         ) VALUES (
-                            :user_id, '2026-07-31', 1, 0.7, 'active'
+                            :user_id, '2026-07-31', 1, 0.7, 'active',
+                            'taste-v1', 'migration-test-profile'
                         )
                         """
                     ),
@@ -442,10 +729,13 @@ def test_database_constraints_and_cascades_are_enforced(
             text(
                 """
                 INSERT INTO public.recommendation_items (
-                    recommendation_id, fruit_id, score, rank, reasons
+                    recommendation_id, fruit_id, score, individual_score,
+                    pair_score, nutrition_pair_score, rank, reasons,
+                    fruit_snapshot
                 ) VALUES (
-                    :recommendation_id, :fruit_id, 0.8, 1,
-                    '[{"code":"season","message":"in season"}]'
+                    :recommendation_id, :fruit_id, 0.8, 0.8,
+                    0.75, 0.6, 1,
+                    '[{"code":"season","message":"in season"}]', '{}'
                 ) RETURNING id
                 """
             ),
@@ -458,9 +748,12 @@ def test_database_constraints_and_cascades_are_enforced(
             text(
                 """
                 INSERT INTO public.recommendation_items (
-                    recommendation_id, fruit_id, score, rank, reasons
+                    recommendation_id, fruit_id, score, individual_score,
+                    pair_score, nutrition_pair_score, rank, reasons,
+                    fruit_snapshot
                 ) VALUES (
-                    :recommendation_id, :fruit_id, 0.7, 2, '[]'
+                    :recommendation_id, :fruit_id, 0.7, 0.7,
+                    0.75, 0.6, 2, '[]', '{}'
                 )
                 """
             ),
@@ -476,10 +769,12 @@ def test_database_constraints_and_cascades_are_enforced(
                     text(
                         """
                         INSERT INTO public.recommendation_items (
-                            recommendation_id, fruit_id, score,
-                            rank, reasons
+                            recommendation_id, fruit_id, score, individual_score,
+                            pair_score, nutrition_pair_score, rank, reasons,
+                            fruit_snapshot
                         ) VALUES (
-                            :recommendation_id, :fruit_id, 0.6, 2, '[]'
+                            :recommendation_id, :fruit_id, 0.6, 0.6,
+                            0.7, 0.5, 2, '[]', '{}'
                         )
                         """
                     ),

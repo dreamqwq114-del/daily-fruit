@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -17,11 +18,13 @@ from sqlalchemy.orm import Session
 from app.clock import current_app_date
 from app.errors import ResourceConflictError, ResourceNotFoundError
 from app.models import (
+    Fruit,
     Recommendation,
     RecommendationFeedback,
     RecommendationItem,
     User,
 )
+from app.schemas.fruit import FruitDetail, FruitFactRead
 from app.repositories import (
     fruit_repository,
     recommendation_repository,
@@ -33,6 +36,7 @@ from app.schemas.recommendation import (
     RecommendationFeedbackRead,
 )
 from app.services.api_mapper import recommendation_to_detail
+from app.services.fruit_fact_service import select_daily_fact
 from app.services.recommendation_mapper import (
     build_recommendation_context,
     fruit_to_recommendation_input,
@@ -43,6 +47,7 @@ from app.services.recommendation_service import (
     recommend_fruits,
 )
 from app.services.recommendation_types import RecommendationResult
+from app.services.texture_preference import FRUIT_PROFILE_VERSION, SCORING_MODEL_VERSION
 
 
 # 这些是数据库查询和短期冷却窗口，不是 recommendation_service 中历史/反馈
@@ -108,11 +113,13 @@ def get_today_recommendation(
         user_id,
         recommendation_date,
     )
+    fruits = fruit_repository.list_active_fruits(session)
     result = _calculate_recommendation(
         session,
         user,
         recommendation_date,
         refresh_number,
+        fruits=fruits,
     )
     recommendation = _persist_recommendation(
         session,
@@ -120,6 +127,7 @@ def get_today_recommendation(
         recommendation_date,
         refresh_number,
         result,
+        fruits=fruits,
     )
     # add_recommendation 只 flush 取得数据库 ID；commit 在这里统一完成。
     recommendation_id = recommendation.id
@@ -175,12 +183,14 @@ def refresh_recommendation(
         user_id,
         recommendation_date,
     )
+    fruits = fruit_repository.list_active_fruits(session)
     result = _calculate_recommendation(
         session,
         user,
         recommendation_date,
         refresh_number,
         previous_ids=previous_ids,
+        fruits=fruits,
     )
     recommendation = _persist_recommendation(
         session,
@@ -188,6 +198,17 @@ def refresh_recommendation(
         recommendation_date,
         refresh_number,
         result,
+        fruits=fruits,
+    )
+    refresh_event_item = min(active.items, key=lambda item: item.rank)
+    recommendation_repository.add_feedback(
+        session,
+        RecommendationFeedback(
+            recommendation_item_id=refresh_event_item.id,
+            user_id=user_id,
+            feedback_type="change_requested",
+            comment=None,
+        ),
     )
     recommendation_id = recommendation.id
     session.commit()
@@ -273,6 +294,7 @@ def _calculate_recommendation(
     refresh_number: int,
     *,
     previous_ids: set[int] | None = None,
+    fruits: Sequence[Fruit] | None = None,
 ) -> RecommendationResult:
     """把数据库快照组装成纯算法上下文，并转换领域错误为 API 冲突。
 
@@ -284,9 +306,9 @@ def _calculate_recommendation(
     加载 active 水果，购买条件字段不会被映射到 RecommendationUser。
     """
 
-    fruits = fruit_repository.list_active_fruits(session)
+    fruit_rows = list(fruits) if fruits is not None else fruit_repository.list_active_fruits(session)
     domain_fruits = [
-        fruit_to_recommendation_input(fruit) for fruit in fruits
+        fruit_to_recommendation_input(fruit) for fruit in fruit_rows
     ]
     domain_user = user_to_recommendation_input(user)
     # 查询窗口至少覆盖跨天水果冷却；通常由更长的 30 天历史窗口决定。
@@ -376,6 +398,8 @@ def _persist_recommendation(
     recommendation_date: date,
     refresh_number: int,
     result: RecommendationResult,
+    *,
+    fruits: Sequence[Fruit],
 ) -> Recommendation:
     """把算法结果和 JSONB reasons 映射为 ORM，等待外层事务提交。
 
@@ -384,12 +408,38 @@ def _persist_recommendation(
     成功或失败。字段 fallback 仅兼容旧算法结果，不能被用来隐藏缺失分数。
     """
 
+    fruit_by_id = {fruit.id: fruit for fruit in fruits}
+    missing_snapshot_ids = {
+        item.fruit.id for item in result.items if item.fruit.id not in fruit_by_id
+    }
+    if missing_snapshot_ids:
+        raise RecommendationInvariantError(
+            "推荐结果包含未加载快照上下文的水果: "
+            + ", ".join(str(value) for value in sorted(missing_snapshot_ids))
+        )
+    snapshot_by_id: dict[int, tuple[dict[str, object], dict[str, object] | None]] = {}
+    for fruit in fruit_by_id.values():
+        fruit_detail = FruitDetail.model_validate(fruit).model_dump(mode="json")
+        daily_fact = select_daily_fact(
+            fruit.facts,
+            fruit_code=fruit.code,
+            recommendation_date=recommendation_date,
+        )
+        daily_fact_snapshot = (
+            None
+            if daily_fact is None
+            else FruitFactRead.model_validate(daily_fact).model_dump(mode="json")
+        )
+        snapshot_by_id[fruit.id] = (fruit_detail, daily_fact_snapshot)
+
     recommendation = Recommendation(
         user_id=user_id,
         recommendation_date=recommendation_date,
         refresh_number=refresh_number,
         total_score=_score_decimal(result.total_score),
         status="active",
+        scoring_model_version=SCORING_MODEL_VERSION,
+        fruit_profile_version=FRUIT_PROFILE_VERSION,
         items=[
             RecommendationItem(
                 fruit_id=item.fruit.id,
@@ -414,6 +464,8 @@ def _persist_recommendation(
                     reason.model_dump(mode="json")
                     for reason in item.reasons
                 ],
+                fruit_snapshot=snapshot_by_id[item.fruit.id][0],
+                daily_fact_snapshot=snapshot_by_id[item.fruit.id][1],
                 selection_option_id=(
                     item.resolved_candidate.resolved_option_id
                     if item.resolved_candidate is not None
@@ -452,6 +504,24 @@ def _persist_recommendation(
                 effective_crisp_score_snapshot=(
                     _score_decimal(item.resolved_candidate.effective_crisp_score)
                     if item.resolved_candidate is not None
+                    else None
+                ),
+                effective_texture_score_snapshot=(
+                    _score_decimal(item.resolved_candidate.effective_texture_score)
+                    if item.resolved_candidate is not None
+                    and item.resolved_candidate.effective_texture_score is not None
+                    else None
+                ),
+                effective_convenience_score_snapshot=(
+                    _score_decimal(item.resolved_candidate.effective_convenience_score)
+                    if item.resolved_candidate is not None
+                    and item.resolved_candidate.effective_convenience_score is not None
+                    else None
+                ),
+                effective_ripe_storage_score_snapshot=(
+                    _score_decimal(item.resolved_candidate.effective_ripe_storage_score)
+                    if item.resolved_candidate is not None
+                    and item.resolved_candidate.effective_ripe_storage_score is not None
                     else None
                 ),
             )

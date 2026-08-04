@@ -30,6 +30,12 @@ SEVEN_PROFILES = (
 
 def load_seed_fruits() -> list[RecommendationFruit]:
     rows = json.loads((ROOT / "data" / "fruits_seed.json").read_text(encoding="utf-8"))
+    profiles = {
+        row["code"]: row
+        for row in json.loads(
+            (ROOT / "data" / "fruit_profile_seed.json").read_text(encoding="utf-8")
+        )
+    }
     nutrition = {
         row["fruit_name"]: row
         for row in csv.DictReader(
@@ -57,6 +63,7 @@ def load_seed_fruits() -> list[RecommendationFruit]:
         )
     result = []
     for fruit_id, row in enumerate(rows, start=1):
+        profile = profiles[row["code"]]
         values = nutrition[row["name"]]
         result.append(
             RecommendationFruit(
@@ -66,11 +73,11 @@ def load_seed_fruits() -> list[RecommendationFruit]:
                 aliases=tuple(row["aliases"]),
                 category=row["category"],
                 taste=row["taste"],
-                sweet_score=row["sweet_score"],
-                sour_score=row["sour_score"],
-                soft_score=row["soft_score"],
-                crisp_score=row["crisp_score"],
-                convenience_score=row["convenience_score"],
+                sweet_score=profile["sweet_score"],
+                sour_score=profile["sour_score"],
+                soft_score=1 - profile["texture_score"],
+                crisp_score=profile["texture_score"],
+                convenience_score=profile["convenience_score"],
                 average_price_level=row["average_price_level"],
                 default_portion_grams=row["default_portion_grams"],
                 direct_eating=row["direct_eating"],
@@ -99,6 +106,10 @@ def load_seed_fruits() -> list[RecommendationFruit]:
                     }
                 ),
                 seasons=tuple(seasons[row["name"]]),
+                texture_score=profile["texture_score"],
+                ripe_storage_score=profile["ripe_storage_score"],
+                typical_purchase_stage=profile["typical_purchase_stage"],
+                ripening_note=profile["ripening_note"],
             )
         )
     return result
@@ -108,10 +119,11 @@ def make_user(**changes: object) -> RecommendationUser:
     values: dict[str, object] = {
         "region": "华东",
         "city": "苏州",
-        "sweet_preference": 0.5,
-        "sour_preference": 0.5,
-        "soft_preference": 0.5,
-        "crisp_preference": 0.5,
+        "sweet_preference": None,
+        "sour_preference": None,
+        "soft_preference": None,
+        "crisp_preference": None,
+        "texture_preference": None,
         "price_level": 2,
         "convenience_preference": 0.5,
         "discovery_level": 1,
@@ -124,20 +136,18 @@ def make_user(**changes: object) -> RecommendationUser:
 def build_profiles() -> dict[str, RecommendationUser]:
     return {
         "low_budget": make_user(
-            price_level=1, crisp_preference=0.9, convenience_preference=0.9
+            price_level=1, texture_preference=0.9, convenience_preference=0.9
         ),
         "sour_sweet": make_user(
             sweet_preference=0.8,
             sour_preference=0.8,
-            soft_preference=0.3,
-            crisp_preference=0.7,
+            texture_preference=0.7,
             convenience_preference=0.3,
         ),
         "sweet_soft": make_user(
             sweet_preference=0.9,
             sour_preference=0.3,
-            soft_preference=0.9,
-            crisp_preference=0.3,
+            texture_preference=0.1,
             price_level=3,
         ),
         "mango_forbidden": make_user(
@@ -191,4 +201,3 @@ def test_seven_fixed_profiles_are_executable_and_explainable() -> None:
             assert 13 not in selected_ids
         if profile_name == "untried_avocado_durian":
             assert not {22, 24} <= selected_ids
-

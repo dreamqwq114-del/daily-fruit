@@ -14,7 +14,14 @@ describe('ProfileFields', () => {
     expect(wrapper.find('input[name="city"]').exists()).toBe(false)
     expect(wrapper.find('input[name="username"]').exists()).toBe(true)
     expect(wrapper.findAll('select[name="region"] option')).toHaveLength(8)
-    expect(wrapper.findAll('input[type="range"]')).toHaveLength(6)
+    expect(wrapper.findAll('input[type="range"]')).toHaveLength(5)
+    expect(wrapper.find('input[name="texture_preference"]').exists()).toBe(true)
+    expect(wrapper.find('input[name="texture_preference"]').attributes('aria-valuetext'))
+      .toBe('未设置')
+    expect(wrapper.findAll('.range-anchor-grid')).toHaveLength(3)
+    expect(wrapper.findAll('.range-anchor')).toHaveLength(15)
+    expect(wrapper.find('.range-anchor-grid').text()).toContain('0%')
+    expect(wrapper.find('.range-anchor-grid').text()).toContain('100%')
     expect(wrapper.find('input[name="convenience_preference"]').exists()).toBe(true)
     expect(wrapper.findAll('fieldset')).toHaveLength(2)
     expect(wrapper.findAll('legend').map((legend) => legend.text())).toEqual([
@@ -74,5 +81,32 @@ describe('ProfileFields', () => {
 
     const names = wrapper.findAll('[name]').map((element) => element.attributes('name'))
     expect(new Set(names).size).toBe(names.length)
+  })
+
+  it('allows an explicitly set sensory preference to be cleared back to null', async () => {
+    const model = { ...createDefaultProfile(), texture_preference: 0.8 }
+    const wrapper = mount(ProfileFields, { props: { modelValue: model } })
+
+    const clearButton = wrapper.find('button.range-clear')
+    expect(clearButton.element.closest('label')).toBeNull()
+    await clearButton.trigger('click')
+
+    expect(model.texture_preference).toBeNull()
+    expect(wrapper.find('button.range-clear').exists()).toBe(false)
+    expect(wrapper.find('input[name="texture_preference"]').attributes('aria-valuetext'))
+      .toBe('未设置')
+  })
+
+  it('announces an explicit sensory value instead of its visual fallback', async () => {
+    const model = createDefaultProfile()
+    const wrapper = mount(ProfileFields, { props: { modelValue: model } })
+    const slider = wrapper.find('input[name="sweet_preference"]')
+
+    expect(slider.element.value).toBe('0.5')
+    expect(slider.attributes('aria-valuetext')).toBe('未设置')
+    await slider.setValue('0.7')
+
+    expect(model.sweet_preference).toBe(0.7)
+    expect(slider.attributes('aria-valuetext')).toBe('70%')
   })
 })

@@ -2,6 +2,7 @@
 // 资料表单只维护父组件传入的 profile 对象；这里不复制 discovery_level、
 // consumption_horizon_days 等字段，保证保存和回显使用同一份状态。
 import { computed } from 'vue'
+import { SENSORY_ANCHORS } from '../utils/fruit-preferences.js'
 
 const model = defineModel({ type: Object, required: true })
 
@@ -62,10 +63,9 @@ const selectedMarketAccess = computed(() =>
 )
 
 const preferenceFields = [
-  { key: 'sweet_preference', label: '偏甜', low: '清淡', high: '喜欢甜味' },
-  { key: 'sour_preference', label: '偏酸', low: '不太酸', high: '喜欢酸味' },
-  { key: 'soft_preference', label: '偏软', low: '有嚼感', high: '柔软' },
-  { key: 'crisp_preference', label: '偏脆', low: '不强调', high: '清脆' },
+  { key: 'sweet_preference', label: '甜度偏好', low: '不偏甜', high: '喜欢甜味', sensory: true, clearable: true },
+  { key: 'sour_preference', label: '酸味偏好', low: '不偏酸', high: '喜欢酸味', sensory: true, clearable: true },
+  { key: 'texture_preference', label: '质地偏好', low: '绵软', high: '爽脆', sensory: true, clearable: true },
   {
     key: 'convenience_preference',
     label: '食用便利',
@@ -73,6 +73,33 @@ const preferenceFields = [
     high: '越方便越好',
   },
 ]
+
+function sliderValue(field) {
+  const value = model.value[field.key]
+  return value === null || value === undefined ? 0.5 : Number(value)
+}
+
+function sliderOutput(field) {
+  const value = model.value[field.key]
+  return value === null || value === undefined ? '未设置' : `${Math.round(Number(value) * 100)}%`
+}
+
+function markPreferenceChanged(field) {
+  if (!(model.value.__explicitlyChangedPreferences instanceof Set)) {
+    model.value.__explicitlyChangedPreferences = new Set()
+  }
+  model.value.__explicitlyChangedPreferences.add(field.key)
+}
+
+function updatePreference(field, event) {
+  model.value[field.key] = Number(event.target.value)
+  markPreferenceChanged(field)
+}
+
+function clearPreference(field) {
+  model.value[field.key] = null
+  markPreferenceChanged(field)
+}
 </script>
 
 <template>
@@ -145,23 +172,40 @@ const preferenceFields = [
   <fieldset class="form-section">
     <!-- 口感滑块参与推荐；食用时间只保存消费周期，当前不参与排序。 -->
     <legend>口感与食用偏好</legend>
-    <p class="section-help">食用时间表示你的消费周期，不代表水果实际保鲜时间，暂不参与推荐排序。</p>
+    <p class="section-help">三个口感滑块会参与推荐；水果仅作口感参照，刻度不代表精确评分，实际体验会因品种和成熟度而变化。食用时间表示消费周期，不代表水果实际保鲜时间，暂不参与推荐排序。</p>
     <div class="preference-sliders">
-      <label v-for="field in preferenceFields" :key="field.key" class="range-field">
-        <span class="range-heading">
-          <strong>{{ field.label }}</strong>
-          <output>{{ Math.round(Number(model[field.key]) * 100) }}%</output>
-        </span>
+      <div v-for="field in preferenceFields" :key="field.key" class="range-field">
+        <div class="range-heading">
+          <label :for="field.key"><strong>{{ field.label }}</strong></label>
+          <output :for="field.key">{{ sliderOutput(field) }}</output>
+          <button
+            v-if="field.clearable && model[field.key] !== null && model[field.key] !== undefined"
+            class="range-clear"
+            type="button"
+            @click="clearPreference(field)"
+          >
+            清除
+          </button>
+        </div>
         <input
-          v-model.number="model[field.key]"
+          :id="field.key"
+          :value="sliderValue(field)"
+          @input="updatePreference(field, $event)"
           :name="field.key"
+          :aria-valuetext="sliderOutput(field)"
           type="range"
           min="0"
           max="1"
           step="0.1"
         />
         <span class="range-hints"><small>{{ field.low }}</small><small>{{ field.high }}</small></span>
-      </label>
+        <span v-if="field.sensory" class="range-anchor-grid" aria-hidden="true">
+          <span v-for="anchor in SENSORY_ANCHORS[field.key]" :key="anchor.percent" class="range-anchor">
+            <small>{{ anchor.name }}</small>
+            <small>{{ anchor.percent }}</small>
+          </span>
+        </span>
+      </div>
       <div class="horizon-field range-field">
         <span class="range-heading">
           <strong>食用时间</strong>

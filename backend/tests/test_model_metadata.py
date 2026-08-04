@@ -177,7 +177,7 @@ def test_user_and_fruit_score_types_and_checks() -> None:
     assert users.c.accepts_online_purchase.nullable is False
     assert "ck_users_consumption_horizon_days_values" in check_sql(users)
     assert "ck_users_market_access_level_range" in check_sql(users)
-    assert len(check_sql(users)) == 9
+    assert len(check_sql(users)) == 12
 
     fruits = table("fruits")
     assert_numeric(
@@ -193,7 +193,7 @@ def test_user_and_fruit_score_types_and_checks() -> None:
         3,
     )
     assert unique_column_sets(fruits) == {("name",), ("code",)}
-    assert len(check_sql(fruits)) == 17
+    assert len(check_sql(fruits)) == 20
     assert fruits.c.is_active.server_default is not None
 
 
@@ -259,6 +259,14 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     assert preferences.c.has_tried.nullable is True
     assert preferences.c.willing_to_try.nullable is True
 
+    options = table("fruit_selection_options")
+    assert isinstance(options.c.legacy_score_snapshot.type, JSONB)
+    assert "ck_fruit_selection_options_ripe_storage_values" in check_sql(options)
+    assert (
+        "ck_fruit_selection_options_legacy_score_snapshot_object"
+        in check_sql(options)
+    )
+
     recommendations = table("recommendations")
     assert unique_column_sets(recommendations) == {
         ("user_id", "recommendation_date", "refresh_number")
@@ -282,6 +290,11 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     assert "ck_recommendation_items_nutrition_pair_score_range" in check_sql(items)
     assert "selection_option_id" in items.c
     assert "selection_option_name_snapshot" in items.c
+    assert isinstance(items.c.fruit_snapshot.type, JSONB)
+    assert items.c.fruit_snapshot.nullable is False
+    assert isinstance(items.c.daily_fact_snapshot.type, JSONB)
+    assert "ck_recommendation_items_fruit_snapshot_object" in check_sql(items)
+    assert "ck_recommendation_items_daily_fact_snapshot_object" in check_sql(items)
 
     feedback = table("recommendation_feedback")
     assert unique_column_sets(feedback) == {

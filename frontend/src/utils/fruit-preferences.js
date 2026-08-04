@@ -11,6 +11,37 @@ const REGION_VALUES = new Set([
   'UNKNOWN',
 ])
 
+// 仅作可理解的语义锚点，不参与取值、算法、seed 或 API 合同。
+export const SENSORY_ANCHORS = Object.freeze({
+  sweet_preference: Object.freeze([
+    Object.freeze({ name: '柠檬', percent: '0%' }),
+    Object.freeze({ name: '绿心猕猴桃', percent: '25%' }),
+    Object.freeze({ name: '草莓', percent: '50%' }),
+    Object.freeze({ name: '苹果', percent: '75%' }),
+    Object.freeze({ name: '荔枝', percent: '100%' }),
+  ]),
+  sour_preference: Object.freeze([
+    Object.freeze({ name: '香蕉', percent: '0%' }),
+    Object.freeze({ name: '苹果', percent: '25%' }),
+    Object.freeze({ name: '草莓', percent: '50%' }),
+    Object.freeze({ name: '绿心猕猴桃', percent: '75%' }),
+    Object.freeze({ name: '柠檬', percent: '100%' }),
+  ]),
+  texture_preference: Object.freeze([
+    Object.freeze({ name: '榴莲', percent: '0%' }),
+    Object.freeze({ name: '软桃', percent: '25%' }),
+    Object.freeze({ name: '火龙果', percent: '50%' }),
+    Object.freeze({ name: '梨', percent: '75%' }),
+    Object.freeze({ name: '清脆苹果', percent: '100%' }),
+  ]),
+})
+
+const CLEARABLE_PREFERENCE_KEYS = new Set([
+  'sweet_preference',
+  'sour_preference',
+  'texture_preference',
+])
+
 export function createDefaultFruitPreferenceSelection() {
   // 三类 ID 是展示状态；真正的数字 payload 在 selectionToPreferences 中生成。
   return {
@@ -109,16 +140,17 @@ export function createDefaultProfile() {
   return {
     username: '',
     region: 'UNKNOWN',
-    sweet_preference: 0.5,
-    sour_preference: 0.5,
-    soft_preference: 0.5,
-    crisp_preference: 0.5,
+    sweet_preference: null,
+    sour_preference: null,
+    texture_preference: null,
     price_level: 2,
     convenience_preference: 0.5,
     discovery_level: 1,
     consumption_horizon_days: 4,
     market_access_level: 2,
     accepts_online_purchase: false,
+    // UI-only dirty state; it is removed before building an API payload.
+    __explicitlyChangedPreferences: new Set(),
   }
 }
 
@@ -127,7 +159,24 @@ export function profileFromUser(user) {
   const profile = createDefaultProfile()
 
   for (const key of Object.keys(profile)) {
-    if (user?.[key] !== undefined && user[key] !== null) profile[key] = user[key]
+    if (user?.[key] !== undefined) profile[key] = user[key]
+  }
+
+  // 仅在旧服务尚未提供 texture_preference 时读取兼容字段；冲突不填成
+  // 0.5，避免前端把未知/矛盾状态伪装成中性偏好。
+  if (user?.texture_preference === undefined && profile.texture_preference === null) {
+    const soft = user?.soft_preference
+    const crisp = user?.crisp_preference
+    if (crisp !== null && crisp !== undefined && (soft === null || soft === undefined)) {
+      profile.texture_preference = Number(crisp)
+    } else if (soft !== null && soft !== undefined && (crisp === null || crisp === undefined)) {
+      profile.texture_preference = 1 - Number(soft)
+    } else if (soft !== null && soft !== undefined && crisp !== null && crisp !== undefined) {
+      const converted = 1 - Number(soft)
+      if (Math.abs(Number(crisp) - converted) <= 0.2) {
+        profile.texture_preference = (Number(crisp) + converted) / 2
+      }
+    }
   }
 
   // Existing V1 profiles used “全国” as a UI fallback. It is now represented
@@ -136,4 +185,15 @@ export function profileFromUser(user) {
     profile.region = 'UNKNOWN'
   }
   return profile
+}
+
+export function profileToApiPayload(profile) {
+  const { __explicitlyChangedPreferences, ...payload } = profile
+  const changed = __explicitlyChangedPreferences instanceof Set
+    ? __explicitlyChangedPreferences
+    : new Set()
+  for (const key of CLEARABLE_PREFERENCE_KEYS) {
+    if (!changed.has(key)) delete payload[key]
+  }
+  return payload
 }

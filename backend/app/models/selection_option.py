@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from decimal import Decimal
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import (
     BigInteger,
@@ -28,6 +28,7 @@ from sqlalchemy import (
     true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.models.base import Base, TimestampMixin
 
@@ -61,6 +62,34 @@ class FruitSelectionOption(TimestampMixin, Base):
             name="ck_fruit_selection_options_crisp_range",
         ),
         CheckConstraint(
+            "texture_score IS NULL OR texture_score BETWEEN 0 AND 1",
+            name="ck_fruit_selection_options_texture_range",
+        ),
+        CheckConstraint(
+            "ripe_storage_score IS NULL OR ripe_storage_score BETWEEN 0 AND 1",
+            name="ck_fruit_selection_options_ripe_range",
+        ),
+        CheckConstraint(
+            "convenience_score IS NULL OR convenience_score BETWEEN 0 AND 1",
+            name="ck_fruit_selection_options_convenience_range",
+        ),
+        CheckConstraint(
+            "ripe_storage_score IS NULL OR ripe_storage_score IN "
+            "(0.10, 0.30, 0.50, 0.70, 0.90)",
+            name="ck_fruit_selection_options_ripe_storage_values",
+        ),
+        CheckConstraint(
+            "legacy_score_snapshot IS NULL OR "
+            "jsonb_typeof(legacy_score_snapshot) = 'object'",
+            name="ck_fruit_selection_options_legacy_score_snapshot_object",
+        ),
+        CheckConstraint(
+            "is_default = false OR (sweet_score IS NULL AND sour_score IS NULL "
+            "AND soft_score IS NULL AND crisp_score IS NULL AND texture_score IS NULL "
+            "AND ripe_storage_score IS NULL AND convenience_score IS NULL)",
+            name="ck_fruit_selection_options_default_overrides_null",
+        ),
+        CheckConstraint(
             "is_default = false OR is_active = true",
             name="ck_fruit_selection_options_default_active",
         ),
@@ -92,6 +121,12 @@ class FruitSelectionOption(TimestampMixin, Base):
     sour_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
     soft_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
     crisp_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    texture_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    ripe_storage_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    convenience_score: Mapped[Decimal | None] = mapped_column(Numeric(4, 3), nullable=True)
+    legacy_score_snapshot: Mapped[dict[str, Any] | None] = mapped_column(
+        JSONB, nullable=True
+    )
     is_default: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )

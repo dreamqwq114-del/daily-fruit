@@ -47,12 +47,19 @@ describe('OnboardingView', () => {
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(userApi.createUser).toHaveBeenCalledTimes(1)
+    const untouchedPayload = userApi.createUser.mock.calls[0][0]
+    expect(untouchedPayload).not.toHaveProperty('sweet_preference')
+    expect(untouchedPayload).not.toHaveProperty('sour_preference')
+    expect(untouchedPayload).not.toHaveProperty('texture_preference')
     expect(wrapper.text()).toContain('基本信息已保存，但水果偏好暂未保存')
 
     await wrapper.find('form').trigger('submit')
     await flushPromises()
     expect(userApi.createUser).toHaveBeenCalledTimes(1)
     expect(userApi.updateUser).toHaveBeenCalledTimes(1)
+    expect(userApi.updateUser).toHaveBeenCalledWith(
+      userApi.createUser.mock.calls[0][0],
+    )
   })
 
   it('recovers when the profile was created by an earlier request', async () => {
@@ -74,6 +81,17 @@ describe('OnboardingView', () => {
     await flushPromises()
 
     expect(userApi.updateUser).toHaveBeenCalledTimes(1)
+    const createPayload = userApi.createUser.mock.calls[0][0]
+    const updatePayload = userApi.updateUser.mock.calls[0][0]
+    expect(updatePayload).toEqual(createPayload)
+    for (const field of [
+      'sweet_preference',
+      'sour_preference',
+      'texture_preference',
+    ]) {
+      expect(createPayload).not.toHaveProperty(field)
+      expect(updatePayload).not.toHaveProperty(field)
+    }
     expect(routerApi.replace).toHaveBeenCalledWith('/')
     expect(wrapper.text()).not.toContain('当前账号已经创建用户资料')
   })
@@ -92,6 +110,7 @@ describe('OnboardingView', () => {
     await wrapper.find('select[name="market_access_level"]').setValue('1')
     await wrapper.find('input[name="accepts_online_purchase"]').setValue(true)
     await wrapper.find('input[name="consumption_horizon_days"]').setValue('0')
+    await wrapper.find('input[name="sweet_preference"]').setValue('0.7')
     await wrapper.find('form').trigger('submit')
     await flushPromises()
 
@@ -101,6 +120,7 @@ describe('OnboardingView', () => {
         consumption_horizon_days: 2,
         market_access_level: 1,
         accepts_online_purchase: true,
+        sweet_preference: 0.7,
       }),
     )
     expect(userApi.replaceFruitPreferences).toHaveBeenCalledWith([])

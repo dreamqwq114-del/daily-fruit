@@ -93,6 +93,9 @@ class SelectionOption:
     display_order: int = 1
     data_quality: str = "low"
     data_source_note: str | None = None
+    texture_score: float | None = None
+    ripe_storage_score: float | None = None
+    convenience_score: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +183,10 @@ class RecommendationFruit:
     nutrition: NutritionProfile | None = None
     seasons: tuple[SeasonWindow, ...] = ()
     selection_options: tuple[SelectionOption, ...] = ()
+    texture_score: float | None = None
+    ripe_storage_score: float | None = None
+    typical_purchase_stage: str | None = None
+    ripening_note: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,6 +215,7 @@ class RecommendationUser:
     option_preferences: Mapping[int, tuple[SelectionOptionPreference, ...]] = field(
         default_factory=dict
     )
+    texture_preference: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -281,6 +289,9 @@ class ScoreBreakdown:
     familiarity_score: float = 0.5
     known_nutrition_ratio: float = 0.0
     preference_score: float = 0.0
+    configured_dimension_count: int = 0
+    configured_weight_sum: float = 0.0
+    configured_dimensions: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -305,8 +316,8 @@ class ResolvedFruitCandidate:
     fruit: RecommendationFruit
     effective_sweet_score: float
     effective_sour_score: float
-    effective_soft_score: float
-    effective_crisp_score: float
+    effective_soft_score: float | None
+    effective_crisp_score: float | None
     resolved_option_id: int | None = None
     resolved_option_code: str | None = None
     resolved_option_name: str | None = None
@@ -315,6 +326,9 @@ class ResolvedFruitCandidate:
     resolution_source: str = "not_applicable"
     effective_explicit_preference: float = 0.0
     option_explicitly_liked: bool = False
+    effective_texture_score: float | None = None
+    effective_convenience_score: float | None = None
+    effective_ripe_storage_score: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -335,6 +349,7 @@ class PairSelection:
     nutrition_pair_score: float = 0.0
     sensory_category_diversity: float = 0.0
     pair_novelty: float = 1.0
+    near_top_count: int = 1
 
 
 @dataclass(frozen=True, slots=True)

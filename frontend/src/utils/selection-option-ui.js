@@ -7,15 +7,15 @@ function activeOptions(fruit) {
 
 function optionMode(fruit) {
   const options = activeOptions(fruit)
-  const hasSoftCrisp = options.some(
-    (option) => option.soft_score != null || option.crisp_score != null,
+  const hasTexture = options.some(
+    (option) => option.texture_score != null || option.soft_score != null || option.crisp_score != null,
   )
   const hasSweetSour = options.some(
     (option) => option.sweet_score != null || option.sour_score != null,
   )
 
-  if (hasSoftCrisp && !hasSweetSour) return 'soft-crisp'
-  if (hasSweetSour && !hasSoftCrisp) return 'sweet-sour'
+  if (hasTexture && !hasSweetSour) return 'texture'
+  if (hasSweetSour && !hasTexture) return 'sweet-sour'
   return 'explicit-only'
 }
 
@@ -39,7 +39,7 @@ export function optionPreferenceSummary(fruit, preferences) {
   if (liked.length === 1 && disliked.length === 0) {
     const option = activeOptions(fruit).find((item) => Number(item.id) === Number(liked[0].option_id))
     if (option) {
-      return optionMode(fruit) === 'soft-crisp'
+      return optionMode(fruit) === 'texture'
         ? `优先${displayOptionName(option)}`
         : `只推荐${displayOptionName(option)}`
     }
@@ -70,7 +70,7 @@ export function optionQuickChoices(fruit, preferences) {
       ? '不设置类型偏好'
       : isTasteMatched
         ? '根据我的甜酸偏好自动选择'
-        : '根据我的软脆偏好自动选择',
+        : '根据我的质地偏好自动选择',
     optionId: null,
   }]
 
@@ -104,7 +104,7 @@ export function optionQuickChoices(fruit, preferences) {
 
 export function selectionOptionHint(fruit) {
   return optionMode(fruit) === 'explicit-only'
-    ? '仅用于明确喜欢/避开、过滤和推荐文案，不改变甜酸软脆评分。'
+    ? '仅用于明确喜欢/避开、过滤和推荐文案，不改变甜酸质地评分。'
     : ''
 }
 

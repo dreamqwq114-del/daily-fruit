@@ -26,6 +26,7 @@ import {
   profileFromUser,
   selectionToPreferences,
   optionPreferencesToSelection,
+  profileToApiPayload,
 } from '../utils/fruit-preferences.js'
 
 const router = useRouter()
@@ -102,18 +103,19 @@ async function saveOnboarding() {
   try {
     let user
     if (existingUser.value) {
-      user = await updateUser({ ...profile })
+      user = await updateUser(profileToApiPayload(profile))
     } else {
       try {
-        user = await createUser({ ...profile })
+        user = await createUser(profileToApiPayload(profile))
       } catch (error) {
         if (!(error instanceof ApiError && error.status === 409)) throw error
         existingUser.value = true
-        user = await updateUser({ ...profile })
+        user = await updateUser(profileToApiPayload(profile))
       }
     }
 
     existingUser.value = true
+    profile.__explicitlyChangedPreferences.clear()
 
     try {
       // 用户资料成功后再保存偏好；偏好失败会保留资料成功提示，便于重试。

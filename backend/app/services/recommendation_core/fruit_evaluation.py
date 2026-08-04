@@ -32,10 +32,12 @@ from app.services.recommendation_types import (
 from .common import (
     InvalidRecommendationInputError,
     NoRecommendationCandidatesError,
+    TASTE_DIMENSION_WEIGHTS,
     _validate_unit_scores,
     clamp_score,
 )
 from .selection_options import resolve_fruit_candidate
+from app.services.texture_preference import convert_legacy_texture_preference
 
 MISSING_SEASON_SCORE = 0.35
 
@@ -452,41 +454,58 @@ def _nutrition_values(
             values.append(float(value))
     return values
 
+def _taste_match_details(
+    fruit: RecommendationFruit,
+    user: RecommendationUser,
+    resolved: ResolvedFruitCandidate | None = None,
+) -> tuple[float, int, float, tuple[str, ...]]:
+    if resolved is not None:
+        sweet = resolved.effective_sweet_score
+        sour = resolved.effective_sour_score
+        texture = resolved.effective_texture_score
+    else:
+        sweet = fruit.sweet_score
+        sour = fruit.sour_score
+        texture = fruit.texture_score
+    texture_target = user.texture_preference
+    if texture_target is None:
+        texture_target, _ = convert_legacy_texture_preference(
+            user.soft_preference, user.crisp_preference
+        )
+    dimensions = (
+        (
+            "sweet_score", sweet, user.sweet_preference,
+            TASTE_DIMENSION_WEIGHTS["sweet_score"],
+        ),
+        (
+            "sour_score", sour, user.sour_preference,
+            TASTE_DIMENSION_WEIGHTS["sour_score"],
+        ),
+        (
+            "texture_score", texture, texture_target,
+            TASTE_DIMENSION_WEIGHTS["texture_score"],
+        ),
+    )
+    configured = [
+        (name, 1 - abs(float(value) - float(target)), weight)
+        for name, value, target, weight in dimensions
+        if value is not None and target is not None
+    ]
+    if not configured:
+        return 0.5, 0, 0.0, ()
+    weight_sum = sum(weight for _, _, weight in configured)
+    score = sum(match * weight for _, match, weight in configured) / weight_sum
+    return clamp_score(score), len(configured), weight_sum, tuple(
+        name for name, _, _ in configured
+    )
+
+
 def _taste_match(
     fruit: RecommendationFruit,
     user: RecommendationUser,
     resolved: ResolvedFruitCandidate | None = None,
 ) -> float:
-    if resolved is not None:
-        values = (
-            resolved.effective_sweet_score,
-            resolved.effective_sour_score,
-            resolved.effective_soft_score,
-            resolved.effective_crisp_score,
-        )
-    else:
-        values = (
-            fruit.sweet_score,
-            fruit.sour_score,
-            fruit.soft_score,
-            fruit.crisp_score,
-        )
-    dimensions = (
-        (values[0], user.sweet_preference),
-        (values[1], user.sour_preference),
-        (values[2], user.soft_preference),
-        (values[3], user.crisp_preference),
-    )
-    # The sliders describe how much the user likes a dimension, not a target
-    # fruit value: low preference therefore rewards a low fruit value.
-    configured = [
-        target * value + (1 - target) * (1 - value)
-        for value, target in dimensions
-        if target is not None
-    ]
-    if not configured:
-        return 0.5
-    return clamp_score(sum(configured) / len(configured))
+    return _taste_match_details(fruit, user, resolved)[0]
 
 
 def _explicit_preference_score(
@@ -645,8 +664,14 @@ def _score_fruit(
     )
     feedback_adjustment = _feedback_adjustment(fruit.id, context)
     explicit = clamp_score(_explicit_preference_score(fruit, user, resolved))
-    taste = _taste_match(fruit, user, resolved)
-    convenience = _derived_convenience(fruit)
+    taste, configured_count, configured_weight_sum, configured_dimensions = (
+        _taste_match_details(fruit, user, resolved)
+    )
+    convenience = (
+        resolved.effective_convenience_score
+        if resolved.effective_convenience_score is not None
+        else _derived_convenience(fruit)
+    )
     scores = ScoreBreakdown(
         explicit_preference=explicit,
         taste_match=taste,
@@ -674,6 +699,9 @@ availability_score=season.availability_score,
         preference_score=clamp_score(
             0.55 * explicit + 0.45 * taste
         ),
+        configured_dimension_count=configured_count,
+        configured_weight_sum=configured_weight_sum,
+        configured_dimensions=configured_dimensions,
     )
     return ScoredFruit(
         fruit=fruit,
@@ -712,6 +740,7 @@ def _validate_inputs(
                 "sour_preference": user.sour_preference,
                 "soft_preference": user.soft_preference,
                 "crisp_preference": user.crisp_preference,
+                "texture_preference": user.texture_preference,
                 "convenience_preference": user.convenience_preference,
             }.items()
             if value is not None
@@ -733,6 +762,7 @@ def _validate_inputs(
                 "sour_score": fruit.sour_score,
                 "soft_score": fruit.soft_score,
                 "crisp_score": fruit.crisp_score,
+                "texture_score": fruit.texture_score,
                 "convenience_score": fruit.convenience_score,
                 "preparation_difficulty": fruit.preparation_difficulty,
                 "portability_score": fruit.portability_score,

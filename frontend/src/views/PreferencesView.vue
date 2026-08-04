@@ -23,6 +23,7 @@ import {
   profileFromUser,
   selectionToPreferences,
   optionPreferencesToSelection,
+  profileToApiPayload,
 } from '../utils/fruit-preferences.js'
 
 const router = useRouter()
@@ -100,7 +101,8 @@ async function savePreferences() {
   successMessage.value = ''
 
   try {
-    await updateUser({ ...profile })
+    await updateUser(profileToApiPayload(profile))
+    profile.__explicitlyChangedPreferences.clear()
 
     try {
       // 后端偏好接口是 merge，不会删除熟悉度字段。
