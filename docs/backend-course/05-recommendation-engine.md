@@ -14,6 +14,7 @@
 - `fruit_evaluation.py`：季节、营养、候选过滤、单水果评分、历史反馈衰减；
 - `pair_selection.py`：营养互补、组合合法性、冷却阶段和 pair 选择；
 - `reasons.py`：依据真实贡献生成 2～4 条理由。
+- `selection_options.py`：依据后端声明的模式解析父水果内类型，不让前端字段猜测算法语义。
 
 核心模块不访问 Repository、Session、FastAPI 或 SQLAlchemy。
 
@@ -49,6 +50,11 @@ flowchart TD
 不会直接禁止水果，而是改变排序：季节、口味、显式偏好、便利性、价格、历史和反馈。
 
 `has_tried=None` 是未知，不能当作 `False`；`has_tried=False` 才表示明确没吃过。
+`preference_score` 只允许 `-1/0/1/2` 或 `None`；特别喜欢 `2` 的最终状态必须是
+`has_tried=True`，而 `willing_to_try` 只在明确没吃过时保留。
+这里有三层责任：Schema 拒绝显式的 `2 + has_tried=False`；Repository 合并更新时把
+favorite 推导为已吃过；`0014` 数据库只检查离散分数与 willingness 状态，没有单独的
+favorite → tried CHECK。
 购买条件 `market_access_level`、`accepts_online_purchase` 和
 `consumption_horizon_days` 目前由保存链路保留，但 `recommendation_mapper` 不把它们
 放入 `RecommendationUser`，所以当前不参与推荐。
@@ -95,6 +101,28 @@ pair = 0.70 * mean(first.base_score, second.base_score)
 保留正向反馈理由，并在不足时补足至少两条。理由是解释当前启发式分数的 UI 文本，
 不是医疗诊断、营养缺乏判断或治疗承诺。
 
+## 水果子类型策略
+
+后端 `selection_option_policy.py` 是匹配合同的单一来源。当前模式包括：
+
+- `texture`：苹果、桃、葡萄按质地偏好解析类型；
+- `sweet-sour`：猕猴桃按甜酸维度解析；
+- `explicit-only`：石榴与火龙果必须有明确类型态度才选子类型。
+
+分数作用与匹配模式分开：石榴是 `filter-only`，明确类型只过滤，不改父水果分；
+火龙果是 `profile-override`，明确白心/红心后使用对应档案参与评分。API 返回
+`selection_matching_mode` 与 `selection_option_score_effect`，历史快照保存当时值，
+因此新快照会冻结当时策略值；0013 及更早、缺少这些字段的旧快照则按水果 `code`
+使用当前策略做兼容推导，不能把这种兼容结果误当成历史时点的原始值。
+
+## 固定画像审计边界
+
+`texture_baseline_replay.py` 从 Git revision 解包并运行切换前算法，
+`texture_profile_report.py` 再用同一日期、月份、seed 和 19 个画像比较当前版本。
+硬过滤、低预算、重便利、近期重复和负反馈均有方向性断言。当前 V2 在 19 个画像中
+有 16 个返回相同有序组合，报告明确标记为需要业务审阅；这不是自动调权授权，也不能
+把单元测试通过解释为推荐质量通过。
+
 ## 容易混淆的地方
 
 - `previous_pairs` 是历史新颖度输入，`cooldown_pairs` 是短期硬冷却输入；
@@ -117,8 +145,9 @@ pair = 0.70 * mean(first.base_score, second.base_score)
 | 领域对象字段 | `backend/app/services/recommendation_types.py` | dataclass definitions | 代码事实 |
 | 理由贡献 | `backend/app/services/recommendation_core/reasons.py` | `_build_reasons` | 代码事实 |
 | 规则回归 | `backend/tests/services/` | filtering/pair/reasons tests | 测试事实 |
+| 旧版真实重放 | `backend/app/services/texture_baseline_replay.py` | `replay_v1_source_revision` | 代码/测试事实 |
 
 ## 本章总结
 
 这是一个白盒规则系统，不是训练完成的机器学习模型。学习重点是把输入语义、硬
-约束、可解释评分和组合选择连接起来，并能指出哪些字段目前还没有进入算法。`n
+约束、可解释评分和组合选择连接起来，并能指出哪些字段目前还没有进入算法。

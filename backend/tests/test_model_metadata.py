@@ -255,6 +255,18 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     preferences = table("user_fruit_preferences")
     assert unique_column_sets(preferences) == {("user_id", "fruit_id")}
     assert "ck_user_fruit_preferences_score_range" in check_sql(preferences)
+    score_constraint = next(
+        constraint.sqltext.text
+        for constraint in preferences.constraints
+        if constraint.name == "ck_user_fruit_preferences_score_range"
+    )
+    assert "IN (-1, 0, 1, 2)" in score_constraint
+    willingness_constraint = next(
+        constraint.sqltext.text
+        for constraint in preferences.constraints
+        if constraint.name == "ck_user_fruit_preferences_willingness_state"
+    )
+    assert "willing_to_try IS NULL OR has_tried IS FALSE" in willingness_constraint
     assert preferences.c.preference_score.nullable is True
     assert preferences.c.has_tried.nullable is True
     assert preferences.c.willing_to_try.nullable is True

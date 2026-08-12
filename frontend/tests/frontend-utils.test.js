@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { afterEach, test } from 'node:test'
 
 import {
@@ -9,6 +10,10 @@ import {
   SENSORY_ANCHORS,
   selectionToPreferences,
 } from '../src/utils/fruit-preferences.js'
+import {
+  optionQuickChoices,
+  selectionOptionHint,
+} from '../src/utils/selection-option-ui.js'
 globalThis.window = {
   setTimeout: globalThis.setTimeout,
   clearTimeout: globalThis.clearTimeout,
@@ -44,7 +49,7 @@ test('fruit preference mapping uses favorite, dislike and forbidden selections',
   assert.deepEqual(
     selectionToPreferences(selection),
     [
-      { fruit_id: 1, preference_score: 2, is_forbidden: false },
+      { fruit_id: 1, preference_score: 2, is_forbidden: false, has_tried: true },
       { fruit_id: 2, preference_score: -1, is_forbidden: false },
       { fruit_id: 3, preference_score: null, is_forbidden: true },
     ],
@@ -58,8 +63,59 @@ test('unselected fruits are not submitted as neutral preferences', () => {
       dislikeIds: [],
       forbiddenIds: [],
     }),
-    [{ fruit_id: 2, preference_score: 2, is_forbidden: false }],
+    [{ fruit_id: 2, preference_score: 2, is_forbidden: false, has_tried: true }],
   )
+})
+
+test('real selection-option seed respects the supplied matching policy', () => {
+  const seedRows = JSON.parse(
+    readFileSync(
+      new URL('../../data/fruit_selection_options_seed.json', import.meta.url),
+      'utf8',
+    ),
+  )
+  const expectedLabels = {
+    apple: '根据我的质地偏好自动选择',
+    peach: '根据我的质地偏好自动选择',
+    grape: '根据我的质地偏好自动选择',
+    kiwifruit: '根据我的甜酸偏好自动选择',
+    pomegranate: '不设置类型偏好',
+    dragon_fruit: '不设置类型偏好',
+  }
+
+  let fruitId = 1
+  for (const [code, expectedLabel] of Object.entries(expectedLabels)) {
+    const selectionOptions = seedRows
+      .filter((row) => row.fruit_code === code)
+      .map((row, optionIndex) => ({
+        ...row,
+        id: fruitId * 100 + optionIndex,
+        fruit_id: fruitId,
+      }))
+    const selectionMatchingMode =
+      code === 'kiwifruit'
+        ? 'sweet-sour'
+        : code === 'pomegranate' || code === 'dragon_fruit'
+          ? 'explicit-only'
+          : 'texture'
+    const fruit = {
+      id: fruitId,
+      code,
+      selection_matching_mode: selectionMatchingMode,
+      selection_option_score_effect:
+        code === 'pomegranate' ? 'filter-only' : 'profile-override',
+      selection_options: selectionOptions,
+    }
+
+    assert.equal(optionQuickChoices(fruit, [])[0].label, expectedLabel)
+    if (code === 'pomegranate') {
+      assert.match(selectionOptionHint(fruit), /不改变甜酸质地评分/)
+    }
+    if (code === 'dragon_fruit') {
+      assert.match(selectionOptionHint(fruit), /参与评分/)
+    }
+    fruitId += 1
+  }
 })
 
 test('profile defaults omit city and use the new region and horizon defaults', () => {

@@ -28,6 +28,11 @@ near-top 选择的确定性；`test_excluded_pair_is_never_restored_during_relax
 `test_normalization.py` 验证 0～1 演示营养指数、P05/P95、缺失值和相同值 0.5；
 `test_reasons.py` 验证理由数量、文本条件、贡献与结果一致。
 
+`test_texture_profile_report.py` 还会调用 `texture_baseline_replay.py`：它使用
+`git archive` 解包固定 revision，在临时目录中执行旧推荐模块，再与规范化 JSON 基线
+逐字比较。19 个画像的日期、月份和 seed 固定；检查键也固定，避免删除反例后空集通过。
+分布集中度只报告，不由测试自行宣称业务质量合格。
+
 ## monkeypatch 与 lookup 位置
 
 测试必须 patch “被测试模块查找的名字”，不是定义函数的原始模块。例如应用层
@@ -62,6 +67,7 @@ near-top 选择的确定性；`test_excluded_pair_is_never_restored_during_relax
 - 用真实 Supabase 作为测试库；
 - 把“没有异常”误认为事务已提交；
 - patch 了定义处，却没有 patch 被测模块实际读取的名称。
+- 只在 JSON 写入 `source_revision`，却没有实际执行那个 revision。
 
 ## 小练习
 
@@ -77,8 +83,9 @@ API 测试，说明它为什么不能只用纯算法 fixture 替代。
 | 应用层不重试 | `backend/tests/test_recommendation_application_invariants.py` | named test | 测试事实 |
 | mapper 合同 | `backend/tests/test_recommendation_mapper.py` | mapper tests | 测试事实 |
 | 数据库隔离 | `backend/tests/test_database_config.py` | URL validation tests | 测试事实 |
+| V1 真实重放 | `backend/tests/services/test_texture_profile_report.py` | baseline replay test | 测试事实 |
 
 ## 本章总结
 
 测试是分层合同：服务测试保护规则，mapper 测试保护对象转换，应用测试保护事务，
-API 测试保护身份和资源边界，集成测试才验证真实数据库行为。调试时先判断失败属于哪一层。`n
+API 测试保护身份和资源边界，集成测试才验证真实数据库行为。调试时先判断失败属于哪一层。

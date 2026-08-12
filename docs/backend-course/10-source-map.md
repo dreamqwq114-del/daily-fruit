@@ -27,6 +27,12 @@
 | V2 字段 | 水果身份、熟悉度、分数等 | `backend/alembic/versions/0005_recommendation_v2_data_model.py` | `upgrade/downgrade` | migration 事实 | 02、06 |
 | 消费周期 | 2/4/7 且当前只保存 | `backend/alembic/versions/0006_user_consumption_horizon.py` | `upgrade` | migration 事实 | 02、06 |
 | 购买条件 | market access 与 online purchase 只保存 | `backend/alembic/versions/0007_user_market_access.py` | `upgrade` | migration 事实 | 02、06 |
+| 消费子类型 | 类型是父水果内档案，不扩张顶层候选 | `backend/alembic/versions/0012_fruit_selection_options.py` | `upgrade` | migration 事实 | 02、05、06 |
+| 质地与历史快照 | 统一 texture 字段并冻结历史展示 | `backend/alembic/versions/0013_texture_preference_and_fruit_profile.py` | `upgrade` | migration 事实 | 02、05、06 |
+| 离散偏好 | 分数仅 `-1/0/1/2/NULL`，意愿仅用于明确没吃过 | `backend/alembic/versions/0014_enforce_discrete_fruit_preferences.py` | precheck、CHECK | migration 事实 | 02、06 |
+| 类型策略 | matching mode 与 score effect 由后端声明 | `backend/app/selection_option_policy.py` | `selection_matching_mode_for_code`、`selection_option_score_effect_for_code` | 代码事实 | 05 |
+| 旧算法重放 | 从固定 Git revision 解包并执行旧核心 | `backend/app/services/texture_baseline_replay.py` | `replay_v1_source_revision` | 代码/测试事实 | 05、07 |
+| 19 画像审计 | 反例、公式、排序变化与分布集中度 | `backend/app/services/texture_profile_report.py` | `build_audit_report` | 代码/测试事实 | 05、07 |
 | Mapper 回归 | ORM graph 转换保留零值和可变输入 | `backend/tests/test_recommendation_mapper.py` | mapper tests | 测试事实 | 07 |
 | 推荐规则回归 | 季节/过滤/评分/配对/理由 | `backend/tests/services/` | `test_*` | 测试事实 | 05、07 |
 | 应用不变量 | 不二次重算、旧组合排除 | `backend/tests/test_recommendation_application_invariants.py` | named tests | 测试事实 | 04、07 |
@@ -36,4 +42,4 @@
 ## 使用方式
 
 如果某个结论无法在表中找到源文件和符号，不应直接写进其他章节。先重新搜索当前
-工作区；如果代码已变化，标记教材失效并更新对应章节。`n
+工作区；如果代码已变化，标记教材失效并更新对应章节。

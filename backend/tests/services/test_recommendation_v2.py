@@ -83,7 +83,7 @@ def test_filtering_keeps_out_of_season_but_removes_unavailable_and_supporting() 
 def test_unwilling_and_untried_discovery_zero_are_hard_exclusions() -> None:
     fruits = [fruit(1), fruit(2), fruit(3)]
     preferences = {
-        1: FruitPreference(willing_to_try=False),
+        1: FruitPreference(has_tried=False, willing_to_try=False),
         2: FruitPreference(has_tried=False, willing_to_try=True),
     }
     eligible = filter_eligible_fruits(

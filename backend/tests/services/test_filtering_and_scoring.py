@@ -2,6 +2,7 @@ import pytest
 
 from app.services import (
     FruitPreference,
+    InvalidRecommendationInputError,
     NoRecommendationCandidatesError,
     NutritionProfile,
     RecommendationContext,
@@ -96,6 +97,37 @@ def test_dislike_can_be_scored_when_strict_exclusion_is_disabled() -> None:
     )
 
     assert [fruit.id for fruit in eligible] == [1, 2]
+
+
+@pytest.mark.parametrize("score", [-0.99, -0.5, 0.5, 1.5])
+def test_non_discrete_preference_score_is_rejected_before_scoring(score: float) -> None:
+    fruits = [make_fruit(1), make_fruit(2)]
+    invalid_user = make_user(
+        fruit_preferences={1: FruitPreference(preference_score=score)}
+    )
+
+    with pytest.raises(InvalidRecommendationInputError, match="-1、0、1 或 2"):
+        score_candidates(fruits, invalid_user, RecommendationContext(month=7))
+
+
+@pytest.mark.parametrize("has_tried", [None, True])
+@pytest.mark.parametrize("willing_to_try", [False, True])
+def test_willingness_without_explicit_untried_state_is_rejected(
+    has_tried: bool | None,
+    willing_to_try: bool,
+) -> None:
+    fruits = [make_fruit(1), make_fruit(2)]
+    invalid_user = make_user(
+        fruit_preferences={
+            1: FruitPreference(
+                has_tried=has_tried,
+                willing_to_try=willing_to_try,
+            )
+        }
+    )
+
+    with pytest.raises(InvalidRecommendationInputError, match="尝试意愿"):
+        score_candidates(fruits, invalid_user, RecommendationContext(month=7))
 
 
 def test_known_out_of_season_is_kept_with_a_score_penalty() -> None:

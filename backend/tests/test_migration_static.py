@@ -102,6 +102,7 @@ V2_CONSTRAINTS = {
     "ck_recommendation_items_pair_score_range",
     "ck_recommendation_items_nutrition_pair_score_range",
     "ck_user_fruit_preferences_score_range",
+    "ck_user_fruit_preferences_willingness_state",
     "ck_users_sweet_preference_range",
     "ck_users_sour_preference_range",
     "ck_users_soft_preference_range",

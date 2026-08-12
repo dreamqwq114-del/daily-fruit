@@ -781,8 +781,17 @@ def _validate_inputs(
             raise InvalidRecommendationInputError("偏好水果 ID 必须为正整数")
         if preference.preference_score is not None:
             value = float(preference.preference_score)
-            if not math.isfinite(value) or not -1 <= value <= 2:
-                raise InvalidRecommendationInputError("水果偏好分必须在 -1 到 2 之间")
+            if not math.isfinite(value) or value not in {-1.0, 0.0, 1.0, 2.0}:
+                raise InvalidRecommendationInputError(
+                    "水果偏好分必须为 -1、0、1 或 2"
+                )
+        if (
+            preference.willing_to_try is not None
+            and preference.has_tried is not False
+        ):
+            raise InvalidRecommendationInputError(
+                "水果尝试意愿只适用于明确没吃过的水果"
+            )
     for event in context.history_events:
         if (
             event.fruit_id <= 0

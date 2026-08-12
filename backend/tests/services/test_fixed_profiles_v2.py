@@ -10,6 +10,7 @@ from app.services import (
     RecommendationContext,
     RecommendationFruit,
     RecommendationUser,
+    SelectionOption,
     SeasonWindow,
     recommend_fruits,
     score_candidates,
@@ -30,6 +31,35 @@ SEVEN_PROFILES = (
 
 def load_seed_fruits() -> list[RecommendationFruit]:
     rows = json.loads((ROOT / "data" / "fruits_seed.json").read_text(encoding="utf-8"))
+    option_rows = json.loads(
+        (ROOT / "data" / "fruit_selection_options_seed.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    options_by_code: dict[str, list[SelectionOption]] = {}
+    fruit_ids_by_code = {
+        row["code"]: fruit_id for fruit_id, row in enumerate(rows, start=1)
+    }
+    for option_id, option in enumerate(option_rows, start=1):
+        fruit_code = option["fruit_code"]
+        options_by_code.setdefault(fruit_code, []).append(
+            SelectionOption(
+                id=option_id,
+                fruit_id=fruit_ids_by_code[fruit_code],
+                code=option["code"],
+                name=option["name"],
+                sweet_score=option.get("sweet_score"),
+                sour_score=option.get("sour_score"),
+                texture_score=option.get("texture_score"),
+                ripe_storage_score=option.get("ripe_storage_score"),
+                convenience_score=option.get("convenience_score"),
+                is_default=option["is_default"],
+                is_active=option["is_active"],
+                display_order=option["display_order"],
+                data_quality=option["data_quality"],
+                data_source_note=option.get("data_source_note"),
+            )
+        )
     profiles = {
         row["code"]: row
         for row in json.loads(
@@ -106,6 +136,7 @@ def load_seed_fruits() -> list[RecommendationFruit]:
                     }
                 ),
                 seasons=tuple(seasons[row["name"]]),
+                selection_options=tuple(options_by_code.get(row["code"], ())),
                 texture_score=profile["texture_score"],
                 ripe_storage_score=profile["ripe_storage_score"],
                 typical_purchase_stage=profile["typical_purchase_stage"],

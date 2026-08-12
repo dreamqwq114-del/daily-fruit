@@ -1,3 +1,4 @@
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -102,13 +103,12 @@ def test_preferences_merge_managed_fields_and_preserve_familiarity(
                     "preference_score": 2,
                     "is_forbidden": False,
                     "has_tried": True,
-                    "willing_to_try": True,
                 },
                 {
                     "fruit_id": fruit_ids[1],
                     "preference_score": -1,
                     "is_forbidden": True,
-                    "has_tried": True,
+                    "has_tried": False,
                     "willing_to_try": False,
                 },
             ]
@@ -117,6 +117,7 @@ def test_preferences_merge_managed_fields_and_preserve_familiarity(
     assert first.status_code == 200
     assert len(first.json()) == 2
     assert first.json()[0]["has_tried"] is True
+    assert first.json()[0]["willing_to_try"] is None
     assert first.json()[1]["willing_to_try"] is False
 
     replaced = client.put(
@@ -138,7 +139,7 @@ def test_preferences_merge_managed_fields_and_preserve_familiarity(
     assert by_fruit[fruit_ids[0]]["has_tried"] is True
     assert by_fruit[fruit_ids[1]]["preference_score"] is None
     assert by_fruit[fruit_ids[1]]["is_forbidden"] is False
-    assert by_fruit[fruit_ids[1]]["has_tried"] is True
+    assert by_fruit[fruit_ids[1]]["has_tried"] is False
     assert by_fruit[fruit_ids[1]]["willing_to_try"] is False
 
     missing = client.put(
@@ -164,7 +165,8 @@ def test_preferences_merge_managed_fields_and_preserve_familiarity(
         item["is_forbidden"] is False
         for item in cleared_by_fruit.values()
     )
-    assert all(item["has_tried"] is True for item in cleared_by_fruit.values())
+    assert cleared_by_fruit[fruit_ids[0]]["has_tried"] is True
+    assert cleared_by_fruit[fruit_ids[1]]["has_tried"] is False
 
 
 def test_preferences_reject_too_many_favorites_and_conflicts(
@@ -198,6 +200,109 @@ def test_preferences_reject_too_many_favorites_and_conflicts(
     assert conflict.status_code == 422
 
 
+def test_favorite_transition_sets_tried_and_clears_stale_willingness(
+    client: TestClient,
+    api_session: Session,
+) -> None:
+    create_user(client)
+    fruit_id = api_session.execute(
+        text("SELECT id FROM public.fruits ORDER BY id LIMIT 1")
+    ).scalar_one()
+
+    initial = client.put(
+        "/api/me/fruit-preferences",
+        json={
+            "preferences": [
+                {
+                    "fruit_id": fruit_id,
+                    "preference_score": None,
+                    "has_tried": False,
+                    "willing_to_try": False,
+                }
+            ]
+        },
+    )
+    assert initial.status_code == 200
+
+    favorite = client.put(
+        "/api/me/fruit-preferences",
+        json={
+            "preferences": [
+                {"fruit_id": fruit_id, "preference_score": 2}
+            ]
+        },
+    )
+    assert favorite.status_code == 200
+    assert favorite.json()[0]["has_tried"] is True
+    assert favorite.json()[0]["willing_to_try"] is None
+    persisted = client.get("/api/me/fruit-preferences")
+    assert persisted.status_code == 200
+    assert persisted.json()[0]["has_tried"] is True
+    assert persisted.json()[0]["willing_to_try"] is None
+
+
+@pytest.mark.parametrize("has_tried", [True, None])
+@pytest.mark.parametrize("willing_to_try", [True, False])
+def test_willingness_requires_explicitly_untried_state(
+    client: TestClient,
+    api_session: Session,
+    has_tried: bool | None,
+    willing_to_try: bool,
+) -> None:
+    create_user(client)
+    fruit_id = api_session.execute(
+        text("SELECT id FROM public.fruits ORDER BY id LIMIT 1")
+    ).scalar_one()
+
+    response = client.put(
+        "/api/me/fruit-preferences",
+        json={
+            "preferences": [
+                {
+                    "fruit_id": fruit_id,
+                    "preference_score": 1,
+                    "has_tried": has_tried,
+                    "willing_to_try": willing_to_try,
+                }
+            ]
+        },
+    )
+    assert response.status_code == 422
+
+
+def test_setting_tried_clears_legacy_willingness(
+    client: TestClient,
+    api_session: Session,
+) -> None:
+    create_user(client)
+    fruit_id = api_session.execute(
+        text("SELECT id FROM public.fruits ORDER BY id LIMIT 1")
+    ).scalar_one()
+    assert client.put(
+        "/api/me/fruit-preferences",
+        json={
+            "preferences": [{
+                "fruit_id": fruit_id,
+                "has_tried": False,
+                "willing_to_try": True,
+            }]
+        },
+    ).status_code == 200
+
+    updated = client.put(
+        "/api/me/fruit-preferences",
+        json={
+            "preferences": [{
+                "fruit_id": fruit_id,
+                "has_tried": True,
+            }]
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()[0]["has_tried"] is True
+    assert updated.json()[0]["willing_to_try"] is None
+
+
 def test_fruit_list_and_detail_hide_inactive(
     client: TestClient,
     api_session: Session,
@@ -207,6 +312,23 @@ def test_fruit_list_and_detail_hide_inactive(
     fruits = response.json()
     assert len(fruits) == 24
     assert all(item["is_active"] for item in fruits)
+    modes_by_code = {
+        item["code"]: item["selection_matching_mode"]
+        for item in fruits
+    }
+    assert modes_by_code["apple"] == "texture"
+    assert modes_by_code["peach"] == "texture"
+    assert modes_by_code["grape"] == "texture"
+    assert modes_by_code["kiwifruit"] == "sweet-sour"
+    assert modes_by_code["pomegranate"] == "explicit-only"
+    assert modes_by_code["dragon_fruit"] == "explicit-only"
+    effects_by_code = {
+        item["code"]: item["selection_option_score_effect"]
+        for item in fruits
+    }
+    assert effects_by_code["pomegranate"] == "filter-only"
+    assert effects_by_code["dragon_fruit"] == "profile-override"
+    assert effects_by_code["apple"] == "profile-override"
 
     detail = client.get(f"/api/fruits/{fruits[0]['id']}")
     assert detail.status_code == 200

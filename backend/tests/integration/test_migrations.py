@@ -226,6 +226,10 @@ def test_upgrade_downgrade_upgrade_round_trip(
     migrated_database: tuple[Engine, str],
 ) -> None:
     engine, database_url = migrated_database
+    # Keep this test independent from whichever migration state a previous
+    # module test left behind.
+    run_alembic("downgrade", "base", database_url=database_url)
+    run_alembic("upgrade", "0001", database_url=database_url)
     with engine.connect() as connection:
         assert set(inspect(connection).get_table_names(schema="public")) == (
             INITIAL_TABLES | {"alembic_version"}
@@ -252,7 +256,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     with engine.connect() as connection:
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
-        ).scalar_one() == "0013"
+        ).scalar_one() == "0014"
         users_columns = {
             item["name"]
             for item in inspect(connection).get_columns(
@@ -487,6 +491,87 @@ def test_0013_unknown_fruit_fails_transactionally(
     run_alembic("upgrade", "head", database_url=database_url)
 
 
+def test_0014_refuses_invalid_history_without_rewriting_rows(
+    migrated_database: tuple[Engine, str],
+) -> None:
+    engine, database_url = migrated_database
+    run_alembic("upgrade", "head", database_url=database_url)
+    run_alembic("downgrade", "0013", database_url=database_url)
+    with engine.begin() as connection:
+        user_id = insert_user(connection)
+        fruit_id = insert_fruit(connection, "0014-invalid-history")
+        connection.execute(
+            text(
+                """
+                INSERT INTO public.user_fruit_preferences (
+                    user_id, fruit_id, preference_score, is_forbidden
+                ) VALUES (:user_id, :fruit_id, -0.50, false)
+                """
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        )
+
+    fractional = invoke_alembic("upgrade", "head", database_url=database_url)
+    assert fractional.returncode != 0
+    assert "non-discrete rows require an explicit data decision" in (
+        fractional.stdout + fractional.stderr
+    )
+    with engine.begin() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0013"
+        assert connection.execute(
+            text(
+                "SELECT preference_score FROM public.user_fruit_preferences "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        ).scalar_one() == pytest.approx(-0.5)
+        connection.execute(
+            text(
+                "UPDATE public.user_fruit_preferences "
+                "SET preference_score=0, has_tried=true, willing_to_try=false "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        )
+
+    willingness = invoke_alembic("upgrade", "head", database_url=database_url)
+    assert willingness.returncode != 0
+    assert "contradictory rows require an explicit data decision" in (
+        willingness.stdout + willingness.stderr
+    )
+    with engine.begin() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0013"
+        assert connection.execute(
+            text(
+                "SELECT willing_to_try FROM public.user_fruit_preferences "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        ).scalar_one() is False
+        connection.execute(
+            text(
+                "UPDATE public.user_fruit_preferences SET willing_to_try=NULL "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        )
+
+    run_alembic("upgrade", "head", database_url=database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM public.users WHERE id=:user_id"),
+            {"user_id": user_id},
+        )
+        connection.execute(
+            text("DELETE FROM public.fruits WHERE id=:fruit_id"),
+            {"fruit_id": fruit_id},
+        )
+
+
 def test_actual_indexes_and_foreign_key_delete_rules(
     migrated_database: tuple[Engine, str],
 ) -> None:
@@ -690,6 +775,31 @@ def test_database_constraints_and_cascades_are_enforced(
             ),
             {"user_id": user_id, "fruit_id": fruit_id},
         )
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO public.user_fruit_preferences (
+                            user_id, fruit_id, preference_score, is_forbidden
+                        ) VALUES (:user_id, :fruit_id, -0.50, false)
+                        """
+                    ),
+                    {"user_id": user_id, "fruit_id": second_fruit_id},
+                )
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO public.user_fruit_preferences (
+                            user_id, fruit_id, preference_score, is_forbidden,
+                            has_tried, willing_to_try
+                        ) VALUES (:user_id, :fruit_id, 0, false, true, false)
+                        """
+                    ),
+                    {"user_id": user_id, "fruit_id": second_fruit_id},
+                )
         recommendation_id = connection.execute(
             text(
                 """

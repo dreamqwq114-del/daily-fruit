@@ -6,17 +6,10 @@ function activeOptions(fruit) {
 }
 
 function optionMode(fruit) {
-  const options = activeOptions(fruit)
-  const hasTexture = options.some(
-    (option) => option.texture_score != null || option.soft_score != null || option.crisp_score != null,
-  )
-  const hasSweetSour = options.some(
-    (option) => option.sweet_score != null || option.sour_score != null,
-  )
-
-  if (hasTexture && !hasSweetSour) return 'texture'
-  if (hasSweetSour && !hasTexture) return 'sweet-sour'
-  return 'explicit-only'
+  const declaredMode = fruit?.selection_matching_mode
+  return declaredMode === 'texture' || declaredMode === 'sweet-sour'
+    ? declaredMode
+    : 'explicit-only'
 }
 
 function fruitPreferenceRows(fruit, preferences) {
@@ -103,9 +96,14 @@ export function optionQuickChoices(fruit, preferences) {
 }
 
 export function selectionOptionHint(fruit) {
-  return optionMode(fruit) === 'explicit-only'
-    ? '仅用于明确喜欢/避开、过滤和推荐文案，不改变甜酸质地评分。'
-    : ''
+  if (optionMode(fruit) !== 'explicit-only') return ''
+  if (fruit?.selection_option_score_effect === 'filter-only') {
+    return '仅用于明确喜欢/避开、过滤和推荐文案，不改变甜酸质地评分。'
+  }
+  if (fruit?.selection_option_score_effect === 'profile-override') {
+    return '仅在你明确选择后生效；所选类型会使用对应口感与食用档案参与评分。'
+  }
+  return '仅在你明确选择后生效。'
 }
 
 export function optionRowsForFruit(fruit, preferences) {
