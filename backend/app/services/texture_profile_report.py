@@ -133,16 +133,26 @@ def _fruits() -> list[RecommendationFruit]:
     }
     seasons: dict[str, list[SeasonWindow]] = {}
     for row in dataset.seasons:
-        seasons.setdefault(row.fruit_name, []).append(
-            SeasonWindow(
-                region=row.region,
-                start_month=row.start_month,
-                end_month=row.end_month,
-                season_score=float(row.season_score),
-                region_level=row.region_level,
-                availability_score=float(row.availability_score),
-                supply_status=row.supply_status,
+        season_kwargs = {
+            "region": row.region,
+            "start_month": row.start_month,
+            "end_month": row.end_month,
+            "season_score": float(row.season_score),
+            "region_level": row.region_level,
+            "availability_score": float(row.availability_score),
+            "supply_status": row.supply_status,
+        }
+        if "data_scope" in SeasonWindow.__dataclass_fields__:
+            season_kwargs.update(
+                data_scope=getattr(row, "data_scope", "legacy"),
+                data_quality=getattr(row, "data_quality", "unverified"),
+                cultivation_type=getattr(row, "cultivation_type", "unknown"),
+                source_note=getattr(row, "source_note", None),
+                source_year=getattr(row, "source_year", None),
+                is_scoring_enabled=getattr(row, "is_scoring_enabled", False),
             )
+        seasons.setdefault(row.fruit_name, []).append(
+            SeasonWindow(**season_kwargs)
         )
     fruits = []
     for row in rows:
@@ -309,12 +319,32 @@ def _fruits_for_profile(
 
     if profile_name != "unavailable_mango":
         return fruits
+    supports_scopes = "data_scope" in SeasonWindow.__dataclass_fields__
     return [
         replace(
             fruit,
-            seasons=tuple(
-                replace(window, supply_status="unavailable")
-                for window in fruit.seasons
+            seasons=(
+                fruit.seasons
+                + (
+                    SeasonWindow(
+                        region="全国",
+                        start_month=1,
+                        end_month=12,
+                        season_score=0.35,
+                        availability_score=0.0,
+                        supply_status="unavailable",
+                        data_scope="market",
+                        data_quality="high",
+                        source_note="fixed unavailable counterexample",
+                        source_year=2026,
+                        is_scoring_enabled=True,
+                    ),
+                )
+                if supports_scopes
+                else tuple(
+                    replace(window, supply_status="unavailable")
+                    for window in fruit.seasons
+                )
             ),
         )
         if fruit.code == "mango"

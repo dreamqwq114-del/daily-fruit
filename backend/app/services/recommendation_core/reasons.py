@@ -146,9 +146,23 @@ def _build_reasons(
             ReasonComponent.TASTE_MATCH,
         )
 
-    if scores.availability_and_season >= 0.65:
+    if scored.season.season_reason_eligible and scores.season_score >= 0.65:
         add(
-            BASE_SCORE_WEIGHTS["availability_and_season"] * scores.availability_and_season,
+            BASE_SCORE_WEIGHTS["availability_and_season"]
+            * 0.45
+            * scores.season_score,
+            ReasonCode.IN_SEASON,
+            "当前处于这种水果的常见采收上市期",
+            ReasonComponent.SEASON_SCORE,
+        )
+    if (
+        scored.season.market_reason_eligible
+        and scores.availability_score >= 0.65
+    ):
+        add(
+            BASE_SCORE_WEIGHTS["availability_and_season"]
+            * 0.55
+            * scores.availability_score,
             ReasonCode.AVAILABILITY,
             "当前月份在你所在地区较容易购买",
             ReasonComponent.AVAILABILITY_SCORE,

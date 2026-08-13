@@ -23,6 +23,14 @@ from app.services.recommendation_core.selection_options import (
 from app.services.recommendation_core.common import InvalidRecommendationInputError
 
 
+TEST_HARVEST_EVIDENCE = {
+    "data_quality": "high",
+    "source_note": "test harvest evidence",
+    "source_year": 2026,
+    "is_scoring_enabled": True,
+}
+
+
 def make_user(**changes: object) -> RecommendationUser:
     values: dict[str, object] = {
         "region": "华东",
@@ -50,7 +58,9 @@ def make_peach() -> RecommendationFruit:
         convenience_score=0.6,
         average_price_level=2,
         texture_score=0.8,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
         selection_options=(
             SelectionOption(
                 id=101,
@@ -89,7 +99,9 @@ def make_kiwifruit() -> RecommendationFruit:
         convenience_score=0.6,
         average_price_level=2,
         texture_score=0.25,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
         selection_options=(
             SelectionOption(
                 id=201,
@@ -133,7 +145,9 @@ def make_dragon_fruit() -> RecommendationFruit:
         texture_score=0.28,
         convenience_score=0.8,
         average_price_level=2,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
         selection_options=(
             SelectionOption(
                 id=401,
@@ -195,7 +209,9 @@ def make_pomegranate() -> RecommendationFruit:
         convenience_score=0.6,
         average_price_level=2,
         texture_score=0.35,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
         selection_options=(
             SelectionOption(
                 id=301,

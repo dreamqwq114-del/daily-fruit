@@ -131,7 +131,7 @@ def test_audit_summary_reports_order_sensitive_synthetic_profile_change_rate() -
     assert audit["v1_distribution"]["candidate_count_min"] >= 2
     assert audit["v2_distribution"]["candidate_count_min"] >= 2
     assert audit["v2_distribution"]["largest_ordered_pair_share"] == round(
-        16 / 19,
+        15 / 19,
         6,
     )
     assert audit["business_quality_decision"].startswith("requires_review")

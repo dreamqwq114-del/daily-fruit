@@ -71,8 +71,14 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
             region="华东",
             start_month=8,
             end_month=12,
-            season_score=Decimal("0.95"),
+            season_score=Decimal("0.35"),
             availability_score=Decimal("0"),
+            supply_status="unavailable",
+            data_scope="market",
+            data_quality="medium",
+            source_note="mapper test evidence",
+            source_year=2026,
+            is_scoring_enabled=True,
         )
     ]
     fruit.selection_options = [
@@ -101,8 +107,12 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
     assert mapped_user.texture_preference == 0.85
     assert mapped_fruit.nutrition is not None
     assert mapped_fruit.nutrition.folate == 0.6
-    assert mapped_fruit.seasons[0].season_score == 0.95
+    assert mapped_fruit.seasons[0].season_score == 0.35
     assert mapped_fruit.seasons[0].availability_score == 0
+    assert mapped_fruit.seasons[0].data_scope == "market"
+    assert mapped_fruit.seasons[0].data_quality == "medium"
+    assert mapped_fruit.seasons[0].source_year == 2026
+    assert mapped_fruit.seasons[0].is_scoring_enabled is True
     assert mapped_fruit.texture_score == 0.85
     assert mapped_fruit.ripe_storage_score == 0.3
     assert mapped_fruit.typical_purchase_stage == "ready_to_eat"

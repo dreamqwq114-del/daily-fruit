@@ -139,7 +139,7 @@ onMounted(loadToday)
         <div>
           <p class="eyebrow">{{ formattedDate }} · {{ user.region }}</p>
           <h1>{{ user.username }}，今天吃这两种</h1>
-          <p>结合 {{ user.region }} 的季节、你的口味与最近推荐记录。</p>
+          <p>结合常见采收季节、你的口味与最近推荐记录。</p>
         </div>
         <span class="refresh-count">第 {{ recommendation.refresh_number + 1 }} 组</span>
       </header>

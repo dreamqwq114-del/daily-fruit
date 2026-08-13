@@ -14,6 +14,14 @@ from app.services import (
 )
 
 
+TEST_HARVEST_EVIDENCE = {
+    "data_quality": "high",
+    "source_note": "test harvest evidence",
+    "source_year": 2026,
+    "is_scoring_enabled": True,
+}
+
+
 def make_user(**changes: object) -> RecommendationUser:
     values: dict[str, object] = {
         "region": "华东",
@@ -39,7 +47,9 @@ def make_fruit(fruit_id: int, **changes: object) -> RecommendationFruit:
         "convenience_score": 0.8,
         "average_price_level": 2,
         "nutrition": NutritionProfile(0.5, 0.5, 0.5, 0.5, 0.5, 0.5),
-        "seasons": (SeasonWindow("全国", 1, 12, 0.8),),
+        "seasons": (
+            SeasonWindow("全国", 1, 12, 0.8, **TEST_HARVEST_EVIDENCE),
+        ),
     }
     values.update(changes)
     return RecommendationFruit(**values)
@@ -132,10 +142,25 @@ def test_willingness_without_explicit_untried_state_is_rejected(
 
 def test_known_out_of_season_is_kept_with_a_score_penalty() -> None:
     fruits = [
-        make_fruit(1, seasons=(SeasonWindow("全国", 1, 3, 0.9),)),
+        make_fruit(
+            1,
+            seasons=(
+                SeasonWindow("全国", 1, 3, 0.9, **TEST_HARVEST_EVIDENCE),
+            ),
+        ),
         make_fruit(
             2,
-            seasons=(SeasonWindow("华南", 1, 12, 0.9, region_level="area"),),
+            seasons=(
+                SeasonWindow(
+                    "华南",
+                    1,
+                    12,
+                    0.9,
+                    region_level="area",
+                    data_quality="unverified",
+                    is_scoring_enabled=False,
+                ),
+            ),
         ),
         make_fruit(3),
     ]
@@ -204,10 +229,26 @@ def test_base_score_uses_approved_weight_formula() -> None:
 def test_in_season_fruit_scores_higher_when_other_factors_match() -> None:
     scores = score_by_id(
         [
-            make_fruit(1, seasons=(SeasonWindow("全国", 1, 12, 1.0),)),
+            make_fruit(
+                1,
+                seasons=(
+                    SeasonWindow(
+                        "全国", 1, 12, 1.0, **TEST_HARVEST_EVIDENCE
+                    ),
+                ),
+            ),
             make_fruit(
                 2,
-                seasons=(SeasonWindow("华南", 1, 12, 1.0, region_level="area"),),
+                seasons=(
+                    SeasonWindow(
+                        "华南",
+                        1,
+                        3,
+                        1.0,
+                        region_level="area",
+                        **TEST_HARVEST_EVIDENCE,
+                    ),
+                ),
             ),
         ]
     )

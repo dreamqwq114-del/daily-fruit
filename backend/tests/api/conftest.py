@@ -22,15 +22,17 @@ def api_engine() -> Engine:
         pytest.skip("TEST_DATABASE_URL is not configured")
     settings = Settings(_env_file=None, TEST_DATABASE_URL=database_url)
     parsed = urlsplit(settings.test_database_url or "")
-    assert parsed.hostname in {"127.0.0.1", "localhost"}
-    assert parsed.path.strip("/") == "daily_fruit_test"
+    if parsed.hostname not in {"127.0.0.1", "localhost"}:
+        raise RuntimeError("API integration tests require localhost")
+    if parsed.path.strip("/") != "daily_fruit_test":
+        raise RuntimeError("API integration tests require daily_fruit_test")
 
     engine = create_engine(database_url)
     with engine.connect() as connection:
         version = connection.execute(
             text("SELECT version_num FROM public.alembic_version")
         ).scalar_one()
-    assert version == "0014"
+    assert version == "0015"
     seed_database(engine, load_seed_dataset())
     try:
         yield engine

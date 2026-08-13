@@ -20,6 +20,14 @@ from app.services import (
 from app.services.recommendation_service import InvalidRecommendationInputError
 
 
+TEST_HARVEST_EVIDENCE = {
+    "data_quality": "high",
+    "source_note": "test harvest evidence",
+    "source_year": 2026,
+    "is_scoring_enabled": True,
+}
+
+
 def user(**changes: object) -> RecommendationUser:
     values: dict[str, object] = {
         "region": "华东",
@@ -71,8 +79,30 @@ def fruit(
 
 def test_filtering_keeps_out_of_season_but_removes_unavailable_and_supporting() -> None:
     fruits = [
-        fruit(1, seasons=(SeasonWindow("全国", 1, 3, 0.9),)),
-        fruit(2, seasons=(SeasonWindow("全国", 1, 12, 0.9, supply_status="unavailable"),)),
+        fruit(
+            1,
+            seasons=(
+                SeasonWindow("全国", 1, 3, 0.9, **TEST_HARVEST_EVIDENCE),
+            ),
+        ),
+        fruit(
+            2,
+            seasons=(
+                SeasonWindow(
+                    "全国",
+                    1,
+                    12,
+                    0.35,
+                    availability_score=0.0,
+                    supply_status="unavailable",
+                        data_scope="market",
+                        data_quality="medium",
+                        source_note="test market evidence",
+                        source_year=2026,
+                        is_scoring_enabled=True,
+                ),
+            ),
+        ),
         fruit(3, role="supporting"),
         fruit(4),
     ]

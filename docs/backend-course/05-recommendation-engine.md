@@ -71,10 +71,18 @@ base = 0.30 * explicit_preference
       + 0.10 * convenience_score
       + 0.05 * history_diversity_score
       + feedback_adjustment
+
+availability_and_season = 0.45 * harvest_season_score
+                        + 0.55 * market_availability_score
 ```
 
 结果通过 `clamp_score` 限制在 0～1。反馈和历史分别使用当前代码中的事件类型、
 衰减天数和指数参数；它们是人工启发式参数，不是概率、准确率或行业标准。
+
+这里必须区分两个事实来源：`harvest` 描述国内产地采收窗口，不按用户地区加分；
+`market` 才描述消费者地区可得性，并按城市、区域、全国逐级回退。没有市场证据时
+使用 `0.45` 中性值，不能写成 `available`，也不能生成“你所在地区较容易购买”理由。
+`legacy` 行在 migration 后保留但停用，避免旧演示数据继续混合两种语义。
 
 营养数据是 0～1 的无物理单位演示指数，使用完整 active 水果库的 P05/P95 归一化；
 `default_portion_grams` 当前不参与营养计算。

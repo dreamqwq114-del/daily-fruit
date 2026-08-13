@@ -27,6 +27,7 @@ flowchart LR
     m11 --> m12[0012 消费子类型]
     m12 --> m13[0013 质地与快照]
     m13 --> m14[0014 离散偏好状态]
+    m14 --> m15[0015 季节与市场证据分离]
 ```
 
 这里的编号是仓库当前事实，不应写成未来永久规则。检查 head 时应读取
@@ -46,6 +47,8 @@ flowchart LR
    兼容和历史语义变化，不能只看新增列。
 5. `0014_enforce_discrete_fruit_preferences.py` 先只读统计不合法历史行；若发现分数不在
    `-1/0/1/2`，或意愿出现在非“明确没吃过”记录上，就在 DDL 前停止，不猜测如何改数据。
+6. `0015_season_availability_evidence.py` 保留旧行但标记为停用 `legacy`，新增证据范围、
+   质量、来源年份与评分开关；downgrade 在不同 scope 会合并成同一旧自然键时主动停止。
 
 `0002` 和 `0004` 主要是安全/权限操作，不应被误画成普通字段 migration。
 
@@ -76,18 +79,20 @@ flowchart LR
 
 ## 小练习
 
-用文本读取 `0011`～`0014` 的 `down_revision`，画出偏好、类型、质地与历史快照的变化。
-指出 `0014` 为什么先 precheck 再改 CHECK。不要执行 `upgrade`。
+用文本读取 `0011`～`0015` 的 `down_revision`，画出偏好、类型、质地、历史快照与季节
+证据合同的变化。指出 `0014` 为什么先 precheck 再改 CHECK，以及 `0015` 为什么不能
+把 harvest 当成用户所在地区的市场库存。不要执行 `upgrade`。
 
 ## 本章事实来源
 
 | 教学结论 | 源文件 | 符号/文件 | 事实类型 |
 | --- | --- | --- | --- |
-| revision 链 | `backend/alembic/versions/0001...0014` | `revision`、`down_revision` | migration 事实 |
+| revision 链 | `backend/alembic/versions/0001...0015` | `revision`、`down_revision` | migration 事实 |
 | 基础 schema | `0001_create_daily_fruit_tables.py` | `upgrade` | migration 事实 |
 | RLS 与权限 | `0002_secure_daily_fruit_tables.py` | `upgrade/downgrade` | migration 事实 |
 | 可丢失数据保护 | `0005_recommendation_v2_data_model.py` | `downgrade` | migration 事实 |
 | 当前偏好约束 | `0014_enforce_discrete_fruit_preferences.py` | `_count_invalid_rows`、`upgrade` | migration 事实 |
+| 季节与市场证据 | `0015_season_availability_evidence.py` | `upgrade`、`downgrade` | migration 事实 |
 | 静态一致性测试 | `backend/tests/test_migration_static.py` | test functions | 测试事实 |
 
 ## 本章总结

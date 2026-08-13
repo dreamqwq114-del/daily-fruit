@@ -16,10 +16,20 @@ import json
 import os
 from pathlib import Path
 from typing import Callable, Sequence
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from sqlalchemy import Engine, String, cast, column, func, select, text, values
+from sqlalchemy import (
+    Engine,
+    String,
+    cast,
+    column,
+    func,
+    select,
+    text,
+    update,
+    values,
+)
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.exc import SQLAlchemyError
@@ -39,7 +49,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[3]
 DATA_ROOT = PROJECT_ROOT / "data"
 # 写入前的 schema 保护；该值必须与当前可写目标数据库的 alembic_version
 # 同步，否则脚本应拒绝写入而不是猜测数据库状态。
-EXPECTED_ALEMBIC_VERSION = "0014"
+EXPECTED_ALEMBIC_VERSION = "0015"
+SEASON_SEED_SOURCE_PREFIX = "[daily-fruit-seed] "
 
 DISPLAY_GROUP_BY_CATEGORY = {
     "仁果": "苹果梨类",
@@ -51,6 +62,20 @@ DISPLAY_GROUP_BY_CATEGORY = {
 }
 
 EXPLICIT_ONLY_OPTION_FRUITS = frozenset({"pomegranate"})
+
+SEASON_LEVEL_SCORES = {
+    "peak": Decimal("0.90"),
+    "regular": Decimal("0.70"),
+    "limited": Decimal("0.50"),
+    "unknown": Decimal("0.35"),
+}
+AVAILABILITY_LEVELS = {
+    "peak": (Decimal("0.90"), "available"),
+    "regular": (Decimal("0.70"), "available"),
+    "limited": (Decimal("0.35"), "unknown"),
+    "unavailable": (Decimal("0.00"), "unavailable"),
+    "unknown": (Decimal("0.45"), "unknown"),
+}
 
 
 class FruitSeed(BaseModel):
@@ -122,7 +147,7 @@ class NutritionSeed(BaseModel):
 
 
 class SeasonSeed(BaseModel):
-    """seasons_demo.csv 中一条地区/月度季节窗口。"""
+    """一条来源可审计的采收季或消费者市场窗口。"""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -137,6 +162,18 @@ class SeasonSeed(BaseModel):
         default="unknown",
         pattern="^(available|unknown|unavailable)$",
     )
+    data_scope: str = Field(pattern="^(harvest|market)$")
+    data_quality: str = Field(pattern="^(high|medium|low|unverified)$")
+    cultivation_type: str = Field(
+        default="unknown",
+        pattern="^(open_field|protected|mixed|unknown)$",
+    )
+    source_note: str | None = Field(
+        default=None,
+        max_length=2000 - len(SEASON_SEED_SOURCE_PREFIX),
+    )
+    source_year: int | None = Field(default=None, ge=2000, le=2100)
+    is_scoring_enabled: bool = False
 
 
 class FruitFactSeed(BaseModel):
@@ -246,15 +283,35 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
         for item in read_csv(data_root / "nutrition_demo.csv")
     )
     season_rows = []
-    for item in read_csv(data_root / "seasons_demo.csv"):
+    for item in read_csv(data_root / "fruit_harvest_windows.csv"):
         row = dict(item)
-        region = row.get("region", "")
-        row.setdefault("region_level", "national" if region == "全国" else "area")
-        row.setdefault(
-            "availability_score",
-            "0.9" if region != "全国" else "0.8",
+        row["source_note"] = row.get("source_note", "").strip() or None
+        row["source_year"] = row.get("source_year", "").strip() or None
+        level = row.pop("season_level")
+        if level not in SEASON_LEVEL_SCORES:
+            raise ValueError(f"Unknown season level: {level}")
+        row.update(
+            data_scope="harvest",
+            season_score=SEASON_LEVEL_SCORES[level],
+            availability_score=Decimal("0.45"),
+            supply_status="unknown",
         )
-        row.setdefault("supply_status", "available")
+        season_rows.append(SeasonSeed.model_validate(row))
+    for item in read_csv(data_root / "fruit_market_availability.csv"):
+        row = dict(item)
+        row["source_note"] = row.get("source_note", "").strip() or None
+        row["source_year"] = row.get("source_year", "").strip() or None
+        level = row.pop("availability_level")
+        if level not in AVAILABILITY_LEVELS:
+            raise ValueError(f"Unknown availability level: {level}")
+        availability_score, supply_status = AVAILABILITY_LEVELS[level]
+        row.update(
+            data_scope="market",
+            cultivation_type="unknown",
+            season_score=Decimal("0.35"),
+            availability_score=availability_score,
+            supply_status=supply_status,
+        )
         season_rows.append(SeasonSeed.model_validate(row))
     seasons = tuple(season_rows)
     fact_payload = json.loads(
@@ -274,6 +331,7 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
     season_keys = [
         (
             item.fruit_name,
+            item.data_scope,
             item.region,
             item.start_month,
             item.end_month,
@@ -294,6 +352,22 @@ def load_seed_dataset(data_root: Path = DATA_ROOT) -> SeedDataset:
         raise ValueError("Nutrition rows must match fruit names exactly")
     if {item.fruit_name for item in seasons} != expected_names:
         raise ValueError("Every fruit must have season rows")
+    for scope in ("harvest", "market"):
+        if {item.fruit_name for item in seasons if item.data_scope == scope} != expected_names:
+            raise ValueError(f"Every fruit must have {scope} rows")
+    for item in seasons:
+        if (item.region == "全国") != (item.region_level == "national"):
+            raise ValueError("Season region and region_level must agree")
+        if item.is_scoring_enabled and (
+            item.data_quality not in {"high", "medium"}
+            or not item.source_note
+            or item.source_year is None
+        ):
+            raise ValueError(
+                "Scoring season rows require medium/high source evidence"
+            )
+        if item.data_quality == "unverified" and item.supply_status == "available":
+            raise ValueError("Unverified market rows cannot claim availability")
     expected_codes = set(fruit_codes)
     if {item.fruit_code for item in facts} != expected_codes:
         raise ValueError("Every fruit must have fact rows")
@@ -540,6 +614,7 @@ def build_nutrition_statement(dataset: SeedDataset) -> object:
 def season_values_table(dataset: SeedDataset) -> object:
     seed_values = values(
         column("fruit_name", String(100)),
+        column("data_scope", String(20)),
         column("region", String(100)),
         column("region_level", String(20)),
         column("start_month", FruitSeason.start_month.type),
@@ -547,12 +622,18 @@ def season_values_table(dataset: SeedDataset) -> object:
         column("season_score", FruitSeason.season_score.type),
         column("availability_score", FruitSeason.season_score.type),
         column("supply_status", String(20)),
+        column("data_quality", String(20)),
+        column("cultivation_type", String(20)),
+        column("source_note", FruitSeason.source_note.type),
+        column("source_year", FruitSeason.source_year.type),
+        column("is_scoring_enabled", FruitSeason.is_scoring_enabled.type),
         name="seed_season",
     )
     return seed_values.data(
         [
             (
                 item.fruit_name,
+                item.data_scope,
                 item.region,
                 item.region_level,
                 item.start_month,
@@ -560,6 +641,12 @@ def season_values_table(dataset: SeedDataset) -> object:
                 item.season_score,
                 item.availability_score,
                 item.supply_status,
+                item.data_quality,
+                item.cultivation_type,
+                SEASON_SEED_SOURCE_PREFIX
+                + (item.source_note or "no source supplied"),
+                item.source_year,
+                item.is_scoring_enabled,
             )
             for item in dataset.seasons
         ]
@@ -570,6 +657,7 @@ def build_season_statement(dataset: SeedDataset) -> object:
     seed_values = season_values_table(dataset)
     selected = select(
         Fruit.id,
+        seed_values.c.data_scope,
         seed_values.c.region,
         seed_values.c.region_level,
         seed_values.c.start_month,
@@ -577,10 +665,16 @@ def build_season_statement(dataset: SeedDataset) -> object:
         seed_values.c.season_score,
         seed_values.c.availability_score,
         seed_values.c.supply_status,
+        seed_values.c.data_quality,
+        seed_values.c.cultivation_type,
+        seed_values.c.source_note,
+        seed_values.c.source_year,
+        seed_values.c.is_scoring_enabled,
     ).join(seed_values, Fruit.name == seed_values.c.fruit_name)
     statement = insert(FruitSeason).from_select(
         (
             "fruit_id",
+            "data_scope",
             "region",
             "region_level",
             "start_month",
@@ -588,12 +682,18 @@ def build_season_statement(dataset: SeedDataset) -> object:
             "season_score",
             "availability_score",
             "supply_status",
+            "data_quality",
+            "cultivation_type",
+            "source_note",
+            "source_year",
+            "is_scoring_enabled",
         ),
         selected,
     )
     return statement.on_conflict_do_update(
         index_elements=[
             FruitSeason.fruit_id,
+            FruitSeason.data_scope,
             FruitSeason.region,
             FruitSeason.start_month,
             FruitSeason.end_month,
@@ -603,7 +703,26 @@ def build_season_statement(dataset: SeedDataset) -> object:
             "season_score": statement.excluded.season_score,
             "availability_score": statement.excluded.availability_score,
             "supply_status": statement.excluded.supply_status,
+            "data_quality": statement.excluded.data_quality,
+            "cultivation_type": statement.excluded.cultivation_type,
+            "source_note": statement.excluded.source_note,
+            "source_year": statement.excluded.source_year,
+            "is_scoring_enabled": statement.excluded.is_scoring_enabled,
         },
+    )
+
+
+def build_season_deactivation_statement() -> object:
+    """停用已不在当前 CSV 的受管窗口，不触碰人工维护记录。"""
+
+    return (
+        update(FruitSeason)
+        .where(
+            FruitSeason.data_scope.in_(("harvest", "market")),
+            FruitSeason.source_note.like(f"{SEASON_SEED_SOURCE_PREFIX}%"),
+            FruitSeason.is_scoring_enabled.is_(True),
+        )
+        .values(is_scoring_enabled=False)
     )
 
 
@@ -755,6 +874,7 @@ def seed_database(
         connection.execute(build_nutrition_statement(dataset))
         if before_seasons is not None:
             before_seasons()
+        connection.execute(build_season_deactivation_statement())
         connection.execute(build_season_statement(dataset))
 
     return SeedSummary(
@@ -783,6 +903,7 @@ def render_seed_sql(dataset: SeedDataset) -> str:
         build_selection_option_statement(dataset),
         build_fact_statement(dataset),
         build_nutrition_statement(dataset),
+        build_season_deactivation_statement(),
         build_season_statement(dataset),
     )
     return ";\n\n".join(compile_statement(item) for item in statements) + ";"
@@ -811,6 +932,32 @@ def create_checked_test_engine() -> Engine:
     return engine
 
 
+def _supabase_project_ref_from_origin(origin: str | None) -> str | None:
+    if not origin:
+        return None
+    hostname = (urlsplit(origin).hostname or "").lower()
+    if not hostname.endswith(".supabase.co"):
+        return None
+    project_ref = hostname.removesuffix(".supabase.co")
+    return project_ref if project_ref and "." not in project_ref else None
+
+
+def _supabase_project_ref_from_database_url(database_url: str) -> str | None:
+    parsed = urlsplit(database_url)
+    hostname = (parsed.hostname or "").lower()
+    if hostname.startswith("db.") and hostname.endswith(".supabase.co"):
+        project_ref = hostname[3:].removesuffix(".supabase.co")
+        if project_ref and "." not in project_ref:
+            return project_ref
+
+    username = unquote(parsed.username or "")
+    if username.startswith("postgres."):
+        project_ref = username.removeprefix("postgres.")
+        if project_ref and "." not in project_ref:
+            return project_ref.lower()
+    return None
+
+
 def create_checked_migration_engine() -> Engine:
     """创建仅用于明确授权的 Supabase migration seed engine。"""
 
@@ -826,6 +973,20 @@ def create_checked_migration_engine() -> Engine:
     if not _is_supabase_host(parsed.hostname or ""):
         raise RuntimeError(
             "Migration seed requires a confirmed Supabase migration database"
+        )
+    expected_project_ref = _supabase_project_ref_from_origin(
+        settings.supabase_url
+    )
+    database_project_ref = _supabase_project_ref_from_database_url(
+        database_url
+    )
+    if expected_project_ref is None or database_project_ref is None:
+        raise RuntimeError(
+            "Migration seed requires verifiable SUPABASE_URL project identity"
+        )
+    if database_project_ref != expected_project_ref:
+        raise RuntimeError(
+            "Migration database does not match the configured Supabase project"
         )
     engine = create_database_engine("migration", settings=settings)
     if engine is None:

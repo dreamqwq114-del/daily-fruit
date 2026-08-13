@@ -39,6 +39,12 @@ SupplyStatus = Annotated[
     str,
     Field(pattern="^(available|unknown|unavailable)$"),
 ]
+SeasonDataScope = Literal["harvest", "market", "legacy"]
+SeasonDataQuality = Annotated[
+    str,
+    Field(pattern="^(high|medium|low|unverified)$"),
+]
+CultivationType = Literal["open_field", "protected", "mixed", "unknown"]
 TypicalPurchaseStage = Literal["ready_to_eat", "needs_ripening", "variable"]
 
 
@@ -162,6 +168,12 @@ class FruitSeasonBase(ApiSchema):
     season_score: NormalizedScore
     availability_score: NormalizedScore = 0.45
     supply_status: SupplyStatus = "unknown"
+    data_scope: SeasonDataScope = "legacy"
+    data_quality: SeasonDataQuality = "unverified"
+    cultivation_type: CultivationType = "unknown"
+    source_note: Annotated[str, Field(max_length=2000)] | None = None
+    source_year: Annotated[int, Field(ge=2000, le=2100)] | None = None
+    is_scoring_enabled: bool = False
 
 
 class FruitSeasonRead(FruitSeasonBase):

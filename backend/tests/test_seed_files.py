@@ -2,12 +2,15 @@ import csv
 import json
 from pathlib import Path
 
+import pytest
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = PROJECT_ROOT / "data"
 FRUIT_FILE = DATA_ROOT / "fruits_seed.json"
 NUTRITION_FILE = DATA_ROOT / "nutrition_demo.csv"
-SEASON_FILE = DATA_ROOT / "seasons_demo.csv"
+HARVEST_FILE = DATA_ROOT / "fruit_harvest_windows.csv"
+MARKET_FILE = DATA_ROOT / "fruit_market_availability.csv"
 FACT_FILE = DATA_ROOT / "fruit_facts_seed.json"
 OPTION_FILE = DATA_ROOT / "fruit_selection_options_seed.json"
 REQUIRED_CODES = {
@@ -145,12 +148,15 @@ def test_nutrition_demo_uses_one_normalized_row_per_fruit() -> None:
         assert all(0 <= float(row[field]) <= 1 for field in NUTRITION_FIELDS)
 
 
-def test_seasons_have_valid_unique_natural_keys_and_cross_year_rows() -> None:
+def test_harvest_and_market_rows_have_explicit_evidence_semantics() -> None:
     fruit_names = {str(fruit["name"]) for fruit in load_fruits()}
-    rows = read_csv(SEASON_FILE)
+    harvest_rows = read_csv(HARVEST_FILE)
+    market_rows = read_csv(MARKET_FILE)
+    rows = harvest_rows + market_rows
     natural_keys = [
         (
             row["fruit_name"],
+            "harvest" if row in harvest_rows else "market",
             row["region"],
             int(row["start_month"]),
             int(row["end_month"]),
@@ -158,14 +164,43 @@ def test_seasons_have_valid_unique_natural_keys_and_cross_year_rows() -> None:
         for row in rows
     ]
 
-    assert {row["fruit_name"] for row in rows} == fruit_names
+    assert {row["fruit_name"] for row in harvest_rows} == fruit_names
+    assert {row["fruit_name"] for row in market_rows} == fruit_names
     assert len(natural_keys) == len(set(natural_keys))
-    assert any(start > end for _, _, start, end in natural_keys)
     for row in rows:
         assert row["region"].strip()
+        assert (row["region"] == "全国") == (row["region_level"] == "national")
         assert 1 <= int(row["start_month"]) <= 12
         assert 1 <= int(row["end_month"]) <= 12
-        assert 0 <= float(row["season_score"]) <= 1
+        assert row["data_quality"] in {"high", "medium", "low", "unverified"}
+        assert row["is_scoring_enabled"] in {"true", "false"}
+        if row["is_scoring_enabled"] == "true":
+            assert row["data_quality"] != "unverified"
+            assert "https://" in row["source_note"]
+            assert 2000 <= int(row["source_year"]) <= 2100
+
+    assert all(
+        row["availability_level"] == "unknown"
+        and row["data_quality"] == "unverified"
+        and row["is_scoring_enabled"] == "false"
+        for row in market_rows
+    )
+
+
+def test_corrected_harvest_examples_use_supported_production_regions() -> None:
+    rows = read_csv(HARVEST_FILE)
+
+    def matching(name: str) -> list[dict[str, str]]:
+        return [row for row in rows if row["fruit_name"] == name]
+
+    assert any(row["region"] == "西北" for row in matching("哈密瓜"))
+    assert any(row["region"] == "西北" for row in matching("猕猴桃"))
+    assert any(row["region"] == "西南" for row in matching("牛油果"))
+    assert any(row["region"] == "西南" for row in matching("柠檬"))
+    assert any(
+        row["region"] == "西南" and int(row["end_month"]) >= 10
+        for row in matching("芒果")
+    )
 
 
 def test_fruit_fact_seed_has_three_rows_per_fruit() -> None:
@@ -248,15 +283,61 @@ def test_emitted_seed_sql_casts_empty_alias_arrays() -> None:
     sql = render_seed_sql(load_seed_dataset())
     assert "ARRAY[]::VARCHAR(100)[]" in sql
     assert "ARRAY[]," not in sql
+    assert "update public.fruit_seasons" in sql.lower()
+    assert "[daily-fruit-seed]" in sql
+
+
+def test_migration_seed_rejects_a_different_supabase_project(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.seed import seed_fruits
+
+    monkeypatch.setenv("DAILY_FRUIT_ALLOW_MIGRATION_SEED", "yes")
+    monkeypatch.setenv(
+        "MIGRATION_DATABASE_URL",
+        "postgresql+psycopg://postgres:password@"
+        "db.wrongproject.supabase.co:5432/postgres?sslmode=require",
+    )
+    monkeypatch.setenv(
+        "SUPABASE_URL",
+        "https://expectedproject.supabase.co",
+    )
+
+    with pytest.raises(RuntimeError, match="does not match"):
+        seed_fruits.create_checked_migration_engine()
+
+
+def test_migration_seed_accepts_matching_direct_project_identity(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.seed import seed_fruits
+
+    sentinel = object()
+    monkeypatch.setenv("DAILY_FRUIT_ALLOW_MIGRATION_SEED", "yes")
+    monkeypatch.setenv(
+        "MIGRATION_DATABASE_URL",
+        "postgresql+psycopg://postgres:password@"
+        "db.expectedproject.supabase.co:5432/postgres?sslmode=require",
+    )
+    monkeypatch.setenv(
+        "SUPABASE_URL",
+        "https://expectedproject.supabase.co",
+    )
+    monkeypatch.setattr(
+        seed_fruits,
+        "create_database_engine",
+        lambda purpose, *, settings: sentinel,
+    )
+
+    assert seed_fruits.create_checked_migration_engine() is sentinel
 
 
 def test_readme_states_demo_scope_and_normalized_nutrition_contract() -> None:
     readme = (PROJECT_ROOT / "README.md").read_text(encoding="utf-8")
     normalized_readme = " ".join(readme.split())
 
-    assert (
-        "项目中的季节、价格和部分营养数据用于软件功能演示，"
-        "不构成医学或专业营养建议。"
-    ) in readme
+    assert "采收月份仍是月级粗粒度资料" in readme
+    assert "不代表实时库存、进口供应或用户附近商店一定可买到" in readme
+    assert "市场可得性保持中性未知" in readme
     assert "归一化演示分数" in readme
     assert "不表示每 100 克的真实克数或毫克数" in normalized_readme

@@ -67,10 +67,15 @@ def checked_test_url() -> str:
         )
 
     settings = Settings(_env_file=None, TEST_DATABASE_URL=database_url)
-    assert settings.test_database_url == database_url
+    if settings.test_database_url != database_url:
+        raise RuntimeError("refusing an unresolved destructive test database")
     parsed = urlsplit(database_url)
-    assert parsed.hostname in {"127.0.0.1", "localhost"}
-    assert parsed.path.strip("/") == "daily_fruit_test"
+    if parsed.hostname not in {"127.0.0.1", "localhost"}:
+        raise RuntimeError("security migration tests require localhost")
+    if parsed.path.strip("/") != "daily_fruit_test":
+        raise RuntimeError(
+            "security migration tests require daily_fruit_test"
+        )
     return database_url
 
 

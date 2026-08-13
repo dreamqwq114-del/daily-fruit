@@ -10,7 +10,11 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.pool import NullPool
 
 from app.config import Settings
-from app.seed.seed_fruits import load_seed_dataset, seed_database
+from app.seed.seed_fruits import (
+    SEASON_SEED_SOURCE_PREFIX,
+    load_seed_dataset,
+    seed_database,
+)
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -25,10 +29,13 @@ def checked_test_url() -> str:
             "DAILY_FRUIT_ALLOW_DESTRUCTIVE_TEST_DATABASE=yes is required"
         )
     settings = Settings(_env_file=None, TEST_DATABASE_URL=database_url)
-    assert settings.test_database_url == database_url
+    if settings.test_database_url != database_url:
+        raise RuntimeError("refusing an unresolved destructive test database")
     parsed = urlsplit(database_url)
-    assert parsed.hostname in {"127.0.0.1", "localhost"}
-    assert parsed.path.strip("/") == "daily_fruit_test"
+    if parsed.hostname not in {"127.0.0.1", "localhost"}:
+        raise RuntimeError("destructive seed tests require localhost")
+    if parsed.path.strip("/") != "daily_fruit_test":
+        raise RuntimeError("destructive seed tests require daily_fruit_test")
     return database_url
 
 
@@ -110,9 +117,75 @@ def test_seed_is_dry_run_transactional_and_idempotent() -> None:
 
         run_seed_cli(database_url=database_url)
         first_counts = counts(engine)
-        assert first_counts == (24, 72, 24, 48, 13)
+        assert first_counts == (24, 72, 24, len(dataset.seasons), 13)
 
         run_seed_cli(database_url=database_url)
+        assert counts(engine) == first_counts
+
+        with engine.begin() as connection:
+            apple_id = connection.execute(
+                text("SELECT id FROM public.fruits WHERE code='apple'")
+            ).scalar_one()
+            connection.execute(
+                text(
+                    """
+                    INSERT INTO public.fruit_seasons (
+                        fruit_id, region, region_level,
+                        start_month, end_month, season_score,
+                        availability_score, supply_status, data_scope,
+                        data_quality, cultivation_type, source_note,
+                        source_year, is_scoring_enabled
+                    ) VALUES (
+                        :fruit_id, '测试受管地区', 'area', 1, 1, 0.70,
+                        0.45, 'unknown', 'harvest', 'medium',
+                        'open_field', :managed_note, 2026, true
+                    ), (
+                        :fruit_id, '测试人工地区', 'area', 2, 2, 0.70,
+                        0.45, 'unknown', 'harvest', 'medium',
+                        'open_field', :manual_note, 2026, true
+                    )
+                    """
+                ),
+                {
+                    "fruit_id": apple_id,
+                    "managed_note": (
+                        f"{SEASON_SEED_SOURCE_PREFIX}obsolete test row"
+                    ),
+                    "manual_note": "manual test evidence",
+                },
+            )
+
+        run_seed_cli(database_url=database_url)
+        with engine.connect() as connection:
+            managed_enabled = connection.execute(
+                text(
+                    "SELECT is_scoring_enabled FROM public.fruit_seasons "
+                    "WHERE source_note=:note"
+                ),
+                {"note": f"{SEASON_SEED_SOURCE_PREFIX}obsolete test row"},
+            ).scalar_one()
+            manual_enabled = connection.execute(
+                text(
+                    "SELECT is_scoring_enabled FROM public.fruit_seasons "
+                    "WHERE source_note='manual test evidence'"
+                )
+            ).scalar_one()
+        assert managed_enabled is False
+        assert manual_enabled is True
+
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "DELETE FROM public.fruit_seasons "
+                    "WHERE source_note IN (:managed_note, :manual_note)"
+                ),
+                {
+                    "managed_note": (
+                        f"{SEASON_SEED_SOURCE_PREFIX}obsolete test row"
+                    ),
+                    "manual_note": "manual test evidence",
+                },
+            )
         assert counts(engine) == first_counts
 
         with engine.begin() as connection:
@@ -161,10 +234,31 @@ def test_seed_is_dry_run_transactional_and_idempotent() -> None:
                     + (SELECT count(*) - count(DISTINCT fruit_id)
                        FROM public.fruit_nutritions)
                     + (SELECT count(*) - count(DISTINCT
-                         (fruit_id, region, start_month, end_month))
+                         (fruit_id, data_scope, region, start_month, end_month))
                        FROM public.fruit_seasons)
                     + (SELECT count(*) - count(DISTINCT (fruit_id, code))
                        FROM public.fruit_selection_options)
+                    """
+                )
+            ).scalar_one() == 0
+            assert connection.execute(
+                text(
+                    """
+                    SELECT count(*) FROM public.fruit_seasons
+                    WHERE is_scoring_enabled
+                      AND (
+                        data_quality = 'unverified'
+                        OR source_note IS NULL
+                        OR source_year IS NULL
+                      )
+                    """
+                )
+            ).scalar_one() == 0
+            assert connection.execute(
+                text(
+                    """
+                    SELECT count(*) FROM public.fruit_seasons
+                    WHERE data_scope = 'market' AND is_scoring_enabled
                     """
                 )
             ).scalar_one() == 0

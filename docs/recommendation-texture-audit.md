@@ -12,20 +12,20 @@ V1 不再来自一份自报来源的 JSON：工具从固定 Git revision 解包�
 
 ## 当前观察
 
-- V1/V2 有序推荐组合变化：1/19，5.2632%；
-- V2 的第一名共有 4 种，有序组合共有 4 种；
-- `peach + papaya` 出现在 16/19 个画像中；
-- 生产单水果权重、组合权重和近优阈值 `0.03` 未在本阶段修改。
+- V1/V2 有序推荐组合变化：3/19，15.7895%；
+- V2 的第一名共有 3 种，有序组合共有 5 种；
+- `peach + papaya` 出现在 15/19 个画像中；
+- 本轮把采收季与市场可得性拆开并更换为来源化月份窗口；生产单水果权重、组合权重和近优阈值 `0.03` 未修改。
 
 机器可核对摘要：
 
-- `ordered_recommendation_change_count=1`
-- `ordered_recommendation_change_rate=0.052632`
-- `v2_unique_top1_count=4`
-- `v2_unique_ordered_pair_count=4`
-- `v2_largest_ordered_pair_share=0.842105`
+- `ordered_recommendation_change_count=3`
+- `ordered_recommendation_change_rate=0.157895`
+- `v2_unique_top1_count=3`
+- `v2_unique_ordered_pair_count=5`
+- `v2_largest_ordered_pair_share=0.789474`
 
-16/19 的集中度是业务审阅项。它可能表示 seed 数据和公式形成全局冠军，也可能反映
+15/19 的集中度仍是业务审阅项。它可能表示 seed 数据和公式形成全局冠军，也可能反映
 画像差异不足；仅凭单元测试无法作出业务接受决定。未取得验收标准前，不应为了让
 输出“看起来更多样”而随手调权或改阈值。
 

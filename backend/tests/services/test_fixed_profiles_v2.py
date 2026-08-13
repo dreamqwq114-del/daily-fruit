@@ -3,6 +3,7 @@ import json
 from datetime import date
 from pathlib import Path
 
+from app.seed.seed_fruits import load_seed_dataset
 from app.services import (
     FruitPreference,
     HistoryEvent,
@@ -75,20 +76,21 @@ def load_seed_fruits() -> list[RecommendationFruit]:
         )
     }
     seasons: dict[str, list[SeasonWindow]] = {row["name"]: [] for row in rows}
-    for row in csv.DictReader(
-        (ROOT / "data" / "seasons_demo.csv").open(
-            encoding="utf-8-sig", newline=""
-        )
-    ):
-        seasons[row["fruit_name"]].append(
+    for row in load_seed_dataset().seasons:
+        seasons[row.fruit_name].append(
             SeasonWindow(
-                region=row["region"],
-                region_level="national" if row["region"] == "全国" else "area",
-                start_month=int(row["start_month"]),
-                end_month=int(row["end_month"]),
-                season_score=float(row["season_score"]),
-                availability_score=0.8 if row["region"] == "全国" else 0.9,
-                supply_status="available",
+                region=row.region,
+                region_level=row.region_level,
+                start_month=row.start_month,
+                end_month=row.end_month,
+                season_score=float(row.season_score),
+                availability_score=float(row.availability_score),
+                supply_status=row.supply_status,
+                data_scope=row.data_scope,
+                data_quality=row.data_quality,
+                source_note=row.source_note,
+                source_year=row.source_year,
+                is_scoring_enabled=row.is_scoring_enabled,
             )
         )
     result = []

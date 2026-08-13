@@ -109,9 +109,9 @@ def _region_rank(window: SeasonWindow, *, city: str, region: str) -> int:
     """把季节记录映射为当前实现使用的地区优先级。
 
     当前顺序是 city=4、province=3、area=2、national=1；没有明确
-    ``region_level`` 的旧行会按地区文本做较低优先级兼容。这里先决定
-    最高地区层级，月份是否命中在 ``evaluate_season`` 的下一步判断，
-    因而“更具体但当月不命中”的记录不会自动退回更宽泛层级。
+    ``region_level`` 的旧行会按地区文本做较低优先级兼容。调用方先筛选
+    当前月份，再在命中记录中选择最高地区层级，因此更具体地区淡季时
+    可以退回同月有证据的全国记录。
     """
     if window.region == city and window.region_level == "city":
         return 4
@@ -128,6 +128,35 @@ def _region_rank(window: SeasonWindow, *, city: str, region: str) -> int:
     return 0
 
 
+_SEASON_QUALITY_RANK = {
+    "unverified": 0,
+    "low": 1,
+    "medium": 2,
+    "high": 3,
+}
+
+_SUPPLY_STATUS_CONSERVATISM_RANK = {
+    "available": 0,
+    "unknown": 1,
+    "unavailable": 2,
+}
+
+
+def _market_selection_key(season: SeasonWindow) -> tuple[object, ...]:
+    """稳定选择同层级冲突记录，先信证据、同质证据取保守状态。"""
+
+    return (
+        _SEASON_QUALITY_RANK[season.data_quality],
+        _SUPPLY_STATUS_CONSERVATISM_RANK[season.supply_status],
+        season.source_year or 0,
+        season.availability_score,
+        season.start_month,
+        season.end_month,
+        season.region,
+        season.source_note or "",
+    )
+
+
 def evaluate_season(
     seasons: Iterable[SeasonWindow],
     *,
@@ -135,14 +164,13 @@ def evaluate_season(
     month: int,
     city: str = "",
 ) -> SeasonEvaluation:
-    """按城市/地区/全国优先级选择季节窗口；缺失数据只降分。
+    """分别评估产地采收季与消费者市场可得性。
 
-    先筛出可匹配的地区记录，再取最高层级；在该层级内优先月份命中的
-    窗口，并按 ``season_score``、``availability_score`` 选最高者。已有
-    记录但当月不命中时返回 ``score=0``、``is_in_season=False``；完全没有
-    相关记录时返回 ``MISSING_SEASON_SCORE`` 和 ``supply_status=unknown``。
-    ``unavailable`` 与 off-season 不同：前者由候选过滤硬排除，后者仍可
-    进入评分，只是季节分为 0。
+    ``harvest`` 窗口描述生产端采收期，不按用户地区制造“本地可买到”优势；
+    ``market`` 窗口才按城市/区域/全国层级匹配，并且先寻找当前月份命中的
+    记录，所以具体区域淡季时可以回退到全国记录。缺少市场证据时使用 0.45
+    的中性可得性，只有当前月份命中的 ``unavailable`` 市场记录才会触发硬
+    过滤。迁移保留的 ``legacy`` 行必须停用，不能继续参与评分。
     """
 
     if not region.strip():
@@ -150,7 +178,8 @@ def evaluate_season(
     if not 1 <= month <= 12:
         raise InvalidRecommendationInputError("月份必须在 1 到 12 之间")
 
-    relevant: list[tuple[int, SeasonWindow]] = []
+    harvest_windows: list[SeasonWindow] = []
+    market_relevant: list[tuple[int, SeasonWindow]] = []
     for season in seasons:
         if not season.region.strip():
             raise InvalidRecommendationInputError("季节地区不能为空")
@@ -164,39 +193,144 @@ def evaluate_season(
         )
         if season.supply_status not in {"available", "unknown", "unavailable"}:
             raise InvalidRecommendationInputError("供应状态无效")
+        if season.data_scope not in {"harvest", "market", "legacy"}:
+            raise InvalidRecommendationInputError("季节数据范围无效")
+        if season.data_quality not in _SEASON_QUALITY_RANK:
+            raise InvalidRecommendationInputError("季节数据质量无效")
+        if season.cultivation_type not in {
+            "open_field",
+            "protected",
+            "mixed",
+            "unknown",
+        }:
+            raise InvalidRecommendationInputError("栽培类型无效")
+        if season.source_year is not None and not 2000 <= season.source_year <= 2100:
+            raise InvalidRecommendationInputError("季节来源年份无效")
+        if (season.region == "全国") != (season.region_level == "national"):
+            raise InvalidRecommendationInputError("季节地区与层级不一致")
+        if season.data_scope == "harvest" and (
+            not math.isclose(season.availability_score, 0.45)
+            or season.supply_status != "unknown"
+        ):
+            raise InvalidRecommendationInputError("采收季记录不能声明市场可得性")
+        if season.data_scope == "market" and not math.isclose(
+            season.season_score,
+            MISSING_SEASON_SCORE,
+        ):
+            raise InvalidRecommendationInputError("市场记录不能声明采收季分数")
+        if (
+            season.data_scope == "market"
+            and season.cultivation_type != "unknown"
+        ):
+            raise InvalidRecommendationInputError("市场记录不能声明栽培类型")
+        if not season.is_scoring_enabled:
+            continue
+        if season.data_scope == "legacy":
+            raise InvalidRecommendationInputError("旧季节记录必须停用")
+        if (
+            season.data_quality not in {"high", "medium"}
+            or not (season.source_note or "").strip()
+            or season.source_year is None
+        ):
+            raise InvalidRecommendationInputError(
+                "启用评分的季节记录必须包含中高质量来源证据"
+            )
+        if season.data_scope == "harvest":
+            harvest_windows.append(season)
+            continue
         rank = _region_rank(season, city=city, region=region)
         if rank:
-            relevant.append((rank, season))
+            market_relevant.append((rank, season))
 
-    if not relevant:
-        return SeasonEvaluation(
-            score=MISSING_SEASON_SCORE,
-            has_relevant_data=False,
-            is_in_season=False,
-            availability_score=0.45,
-            supply_status="unknown",
-        )
-
-    # 当前实现先按地区层级取最高 rank，再在该层级内看月份；这是稳定的
-    # 地区优先策略，但也意味着城市记录不命中月份时不会回退到省/区域记录。
-    best_rank = max(rank for rank, _ in relevant)
-    specific = [season for rank, season in relevant if rank == best_rank]
-    matching = [
+    harvest_matching = [
         season
-        for season in specific
+        for season in harvest_windows
         if month_is_in_range(month, season.start_month, season.end_month)
     ]
-    selected = max(
-        matching or specific,
-        key=lambda season: (season.season_score, season.availability_score),
+    selected_harvest = (
+        max(
+            harvest_matching or harvest_windows,
+            key=lambda season: (
+                season.season_score,
+                _SEASON_QUALITY_RANK[season.data_quality],
+                season.source_year or 0,
+                season.region,
+                season.start_month,
+                season.end_month,
+                season.source_note or "",
+            ),
+        )
+        if harvest_windows
+        else None
+    )
+    harvest_score = (
+        float(selected_harvest.season_score)
+        if selected_harvest is not None and harvest_matching
+        else (0.0 if selected_harvest is not None else MISSING_SEASON_SCORE)
+    )
+
+    market_matching = [
+        (rank, season)
+        for rank, season in market_relevant
+        if month_is_in_range(month, season.start_month, season.end_month)
+    ]
+    selected_market: SeasonWindow | None = None
+    selected_market_rank = 0
+    if market_matching:
+        selected_market_rank = max(rank for rank, _ in market_matching)
+        selected_market = max(
+            (
+                season
+                for rank, season in market_matching
+                if rank == selected_market_rank
+            ),
+            key=_market_selection_key,
+        )
+
+    market_region_matched = selected_market_rank >= 2
+    market_data_quality = (
+        selected_market.data_quality
+        if selected_market is not None
+        else "unverified"
     )
     return SeasonEvaluation(
-        score=float(selected.season_score) if matching else 0.0,
-        has_relevant_data=True,
-        is_in_season=bool(matching),
-        availability_score=float(selected.availability_score),
-        supply_status=selected.supply_status,
-        region_rank=best_rank,
+        score=harvest_score,
+        has_relevant_data=bool(harvest_windows or market_relevant),
+        is_in_season=bool(harvest_matching),
+        availability_score=(
+            float(selected_market.availability_score)
+            if selected_market is not None
+            else 0.45
+        ),
+        supply_status=(
+            selected_market.supply_status
+            if selected_market is not None
+            else "unknown"
+        ),
+        region_rank=selected_market_rank,
+        has_harvest_data=bool(harvest_windows),
+        has_market_data=bool(market_relevant),
+        harvest_data_quality=(
+            selected_harvest.data_quality
+            if selected_harvest is not None
+            else "unverified"
+        ),
+        market_data_quality=market_data_quality,
+        market_region_matched=market_region_matched,
+        used_market_fallback=(
+            selected_market is None or not market_region_matched
+        ),
+        season_reason_eligible=(
+            bool(harvest_matching)
+            and selected_harvest is not None
+            and selected_harvest.data_quality != "unverified"
+        ),
+        market_reason_eligible=(
+            selected_market is not None
+            and market_region_matched
+            and selected_market.supply_status == "available"
+            and market_data_quality in {"high", "medium"}
+        ),
     )
 
 def _nutrition_index_value(value: float | None) -> float | None:

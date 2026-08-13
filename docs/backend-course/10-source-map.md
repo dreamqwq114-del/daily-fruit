@@ -30,6 +30,8 @@
 | 消费子类型 | 类型是父水果内档案，不扩张顶层候选 | `backend/alembic/versions/0012_fruit_selection_options.py` | `upgrade` | migration 事实 | 02、05、06 |
 | 质地与历史快照 | 统一 texture 字段并冻结历史展示 | `backend/alembic/versions/0013_texture_preference_and_fruit_profile.py` | `upgrade` | migration 事实 | 02、05、06 |
 | 离散偏好 | 分数仅 `-1/0/1/2/NULL`，意愿仅用于明确没吃过 | `backend/alembic/versions/0014_enforce_discrete_fruit_preferences.py` | precheck、CHECK | migration 事实 | 02、06 |
+| 季节与市场证据 | 采收季和消费者可得性分 scope，旧行保留但停用 | `backend/alembic/versions/0015_season_availability_evidence.py` | evidence CHECK、scope unique key | migration 事实 | 02、05、06 |
+| 月份与区域回退 | 采收季不按用户地区加分；市场记录按当前月份匹配后回退 | `backend/app/services/recommendation_core/fruit_evaluation.py` | `evaluate_season` | 代码事实 | 05、07 |
 | 类型策略 | matching mode 与 score effect 由后端声明 | `backend/app/selection_option_policy.py` | `selection_matching_mode_for_code`、`selection_option_score_effect_for_code` | 代码事实 | 05 |
 | 旧算法重放 | 从固定 Git revision 解包并执行旧核心 | `backend/app/services/texture_baseline_replay.py` | `replay_v1_source_revision` | 代码/测试事实 | 05、07 |
 | 19 画像审计 | 反例、公式、排序变化与分布集中度 | `backend/app/services/texture_profile_report.py` | `build_audit_report` | 代码/测试事实 | 05、07 |

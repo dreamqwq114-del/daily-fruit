@@ -7,17 +7,18 @@ RLS 与 Python 校验的区别。
 
 ## 事实边界
 
-当前仓库可由 `0001` 到 `0014` 的 `down_revision` 链推导最终结构：
+当前仓库可由 `0001` 到 `0015` 的 `down_revision` 链推导最终结构：
 
 ```text
-0001 → 0002 → … → 0011 → 0012 → 0013 → 0014
+0001 → 0002 → … → 0011 → 0012 → 0013 → 0014 → 0015
 ```
 
 `0001` 创建八张业务表；`0002` 加入 RLS 和权限收紧；`0003` 绑定 Supabase Auth；
 `0004` 收紧 migration 表权限；`0005` 增加 V2 水果、熟悉度和推荐分字段；`0006`
 增加消费周期；`0007` 增加购买条件；`0008`～`0010` 增加冷知识、展示语义与产品反馈；
 `0011` 允许空偏好分；`0012` 增加消费子类型；`0013` 增加统一质地偏好、水果档案和
-历史快照；`0014` 收紧离散偏好与尝试意愿状态。本文不声称远程数据库当前版本，除非另有现场
+历史快照；`0014` 收紧离散偏好与尝试意愿状态；`0015` 把产地采收窗口与消费者
+市场可得性拆成不同证据范围，并停用旧混合语义行。本文不声称远程数据库当前版本，除非另有现场
 只读证据；这里的 schema 是仓库 migration 与 ORM 推导出的教学视图。
 
 ## 实体关系
@@ -48,7 +49,7 @@ erDiagram
 | `users` | `id` BIGINT identity、`auth_user_id` UUID、位置、口味、`discovery_level`、`consumption_horizon_days`、购买条件 | `auth_user_id` 唯一；口味/便利性 0～1；发现等级 0～2；消费周期 2/4/7；购买条件 1～3；推荐和反馈通过 `user_id` 关联 |
 | `fruits` | `id`、`code`、`name`、类别、口感、价格、便利性、份量元数据、供应/角色字段、`is_active` | `name` 和 `code` 唯一；多个演示分数有 0～1 检查；inactive 由算法过滤 |
 | `fruit_nutritions` | `fruit_id`、energy、vitamin C、fiber、potassium、folate、carotenoids | `fruit_id` 唯一并外键到 `fruits`；数值非负；当前 CSV 是无物理单位的 0～1 演示指数 |
-| `fruit_seasons` | `fruit_id`、region、region_level、start/end_month、season/availability、supply_status | 月份 1～12；季节窗口支持跨年；fruit/region/month 组合唯一 |
+| `fruit_seasons` | `fruit_id`、`data_scope`、region/level、start/end_month、season/availability、supply_status、证据质量/年份/说明、栽培类型、启用状态 | 月份 1～12；支持跨年；fruit/scope/region/month 组合唯一；启用行必须有中高质量证据；harvest 不声明市场供应，market 不声明采收季 |
 | `fruit_facts` | fruit、类型、文案、顺序、active、来源说明 | 同一水果的 sort order 唯一；只作当天稳定展示，不参与推荐评分 |
 | `user_fruit_preferences` | `user_id`、`fruit_id`、`preference_score`、`is_forbidden`、`has_tried`、`willing_to_try` | user/fruit 联合唯一；分数只能是 `-1/0/1/2` 或 `NULL`；意愿仅允许用于明确没吃过；用户删除时级联偏好 |
 | `fruit_selection_options` | 父水果、类型 code/name、可空口感/质地/便利/保存覆盖、版本与展示顺序 | 13 条 seed；类型是父水果内档案，不是新的顶层候选 |

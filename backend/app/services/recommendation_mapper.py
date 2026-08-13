@@ -145,6 +145,22 @@ def fruit_to_recommendation_input(fruit: Fruit) -> RecommendationFruit:
                 if item.supply_status is not None
                 else "unknown"
             ),
+            data_scope=(
+                item.data_scope if item.data_scope is not None else "legacy"
+            ),
+            data_quality=(
+                item.data_quality
+                if item.data_quality is not None
+                else "unverified"
+            ),
+            cultivation_type=(
+                item.cultivation_type
+                if item.cultivation_type is not None
+                else "unknown"
+            ),
+            source_note=item.source_note,
+            source_year=item.source_year,
+            is_scoring_enabled=bool(item.is_scoring_enabled),
         )
         for item in fruit.seasons
     )

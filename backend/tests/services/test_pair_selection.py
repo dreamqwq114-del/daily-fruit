@@ -20,6 +20,14 @@ from app.services.recommendation_service import _recently_shown_fruit_ids
 from app.services.recommendation_core import fruit_evaluation
 
 
+TEST_HARVEST_EVIDENCE = {
+    "data_quality": "high",
+    "source_note": "test harvest evidence",
+    "source_year": 2026,
+    "is_scoring_enabled": True,
+}
+
+
 def make_user(**changes: object) -> RecommendationUser:
     values: dict[str, object] = {
         "region": "华东",
@@ -50,7 +58,11 @@ def make_fruit(
         convenience_score=0.5,
         average_price_level=2,
         nutrition=nutrition,
-        seasons=(SeasonWindow("全国", 1, 12, season_score),),
+        seasons=(
+            SeasonWindow(
+                "全国", 1, 12, season_score, **TEST_HARVEST_EVIDENCE
+            ),
+        ),
     )
 
 
