@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.schemas import (
     FruitBase,
+    FruitRead,
     FruitNutritionBase,
     FruitSeasonBase,
     RecommendationCreate,
@@ -223,6 +224,57 @@ def test_fruit_preference_rejects_out_of_range_score(score: str) -> None:
         )
 
 
+@pytest.mark.parametrize("score", ["-0.99", "-0.50", "0.50", "1.50"])
+def test_fruit_preference_rejects_non_discrete_score(score: str) -> None:
+    with pytest.raises(ValidationError):
+        UserFruitPreferenceInput.model_validate(
+            {
+                "fruit_id": 1,
+                "preference_score": score,
+                "is_forbidden": False,
+            }
+        )
+
+
+@pytest.mark.parametrize("score", [-1, 0, 1, 2, None])
+def test_fruit_preference_accepts_discrete_or_unknown_score(score: int | None) -> None:
+    preference = UserFruitPreferenceInput.model_validate(
+        {"fruit_id": 1, "preference_score": score}
+    )
+    assert preference.preference_score == score
+
+
+def test_fruit_read_exposes_selection_matching_mode_contract() -> None:
+    field = FruitRead.model_fields["selection_matching_mode"]
+    assert field.default == "explicit-only"
+    effect = FruitRead.model_fields["selection_option_score_effect"]
+    assert effect.default == "profile-override"
+
+
+def test_fruit_read_derives_only_missing_policy_and_preserves_frozen_snapshot() -> None:
+    payload = {
+        **valid_fruit_data(),
+        "id": 1,
+        "code": "apple",
+        "created_at": datetime(2026, 8, 1, tzinfo=UTC),
+        "updated_at": datetime(2026, 8, 1, tzinfo=UTC),
+        "selection_options": [],
+    }
+    legacy_snapshot = FruitRead.model_validate(payload)
+    assert legacy_snapshot.selection_matching_mode == "texture"
+    assert legacy_snapshot.selection_option_score_effect == "profile-override"
+
+    frozen_snapshot = FruitRead.model_validate(
+        {
+            **payload,
+            "selection_matching_mode": "explicit-only",
+            "selection_option_score_effect": "filter-only",
+        }
+    )
+    assert frozen_snapshot.selection_matching_mode == "explicit-only"
+    assert frozen_snapshot.selection_option_score_effect == "filter-only"
+
+
 def test_fruit_preference_rejects_untried_favorite_combination() -> None:
     with pytest.raises(ValidationError, match="especially loved"):
         UserFruitPreferenceInput.model_validate(
@@ -241,6 +293,22 @@ def test_fruit_preference_rejects_favorite_forbidden_conflict() -> None:
                 "fruit_id": 1,
                 "preference_score": 2,
                 "is_forbidden": True,
+            }
+        )
+
+
+@pytest.mark.parametrize("has_tried", [None, True])
+@pytest.mark.parametrize("willing_to_try", [False, True])
+def test_fruit_preference_rejects_willingness_without_untried_state(
+    has_tried: bool | None,
+    willing_to_try: bool,
+) -> None:
+    with pytest.raises(ValidationError, match="willingness"):
+        UserFruitPreferenceInput.model_validate(
+            {
+                "fruit_id": 1,
+                "has_tried": has_tried,
+                "willing_to_try": willing_to_try,
             }
         )
 

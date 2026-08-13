@@ -84,9 +84,9 @@ active 推荐”两条不同调用路径。建议不要修改生产代码。
 | 路由调用 Application Service | `backend/app/routers/recommendations.py` | `get_today_recommendation` | 代码事实 |
 | 领域对象由 Mapper 构造 | `backend/app/services/recommendation_mapper.py` | `user_to_recommendation_input` | 代码事实 |
 | Facade 调用核心 | `backend/app/services/recommendation_service.py` | `recommend_fruits` | 代码事实 |
-| 迁移按 revision 链演进 | `backend/alembic/versions/0001...0007` | `revision/down_revision` | migration 事实 |
+| 迁移按 revision 链演进 | `backend/alembic/versions/0001...0015` | `revision/down_revision` | migration 事实 |
 
 ## 本章总结
 
 先掌握“请求经过哪些边界”，再学习每个边界内部的实现。后续章节都回到这张
-地图，而不是把文件当成互不相关的代码片段。`n
+地图，而不是把文件当成互不相关的代码片段。

@@ -24,6 +24,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     text,
+    false,
     true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -287,6 +288,7 @@ class Fruit(TimestampMixin, Base):
         back_populates="fruit",
         cascade="all, delete-orphan",
         passive_deletes=True,
+        order_by="FruitSeason.id",
     )
     user_preferences: Mapped[list[UserFruitPreference]] = relationship(
         back_populates="fruit",
@@ -418,10 +420,11 @@ class FruitSeason(CreatedAtMixin, Base):
     __table_args__ = (
         UniqueConstraint(
             "fruit_id",
+            "data_scope",
             "region",
             "start_month",
             "end_month",
-            name="uq_fruit_seasons_fruit_region_months",
+            name="uq_fruit_seasons_fruit_scope_region_months",
         ),
         CheckConstraint(
             "region_level IN ('city', 'province', 'area', 'national')",
@@ -434,6 +437,53 @@ class FruitSeason(CreatedAtMixin, Base):
         CheckConstraint(
             "supply_status IN ('available', 'unknown', 'unavailable')",
             name="ck_fruit_seasons_supply_status_values",
+        ),
+        CheckConstraint(
+            "data_scope IN ('harvest', 'market', 'legacy')",
+            name="ck_fruit_seasons_data_scope_values",
+        ),
+        CheckConstraint(
+            "data_quality IN ('high', 'medium', 'low', 'unverified')",
+            name="ck_fruit_seasons_data_quality_values",
+        ),
+        CheckConstraint(
+            "cultivation_type IN ('open_field', 'protected', 'mixed', 'unknown')",
+            name="ck_fruit_seasons_cultivation_type_values",
+        ),
+        CheckConstraint(
+            "source_year IS NULL OR source_year BETWEEN 2000 AND 2100",
+            name="ck_fruit_seasons_source_year_range",
+        ),
+        CheckConstraint(
+            "source_note IS NULL OR length(source_note) <= 2000",
+            name="ck_fruit_seasons_source_note_length",
+        ),
+        CheckConstraint(
+            "(region = '全国') = (region_level = 'national')",
+            name="ck_fruit_seasons_region_level_contract",
+        ),
+        CheckConstraint(
+            "NOT is_scoring_enabled OR (data_scope <> 'legacy' "
+            "AND data_quality IN ('high', 'medium') AND source_note IS NOT NULL "
+            "AND length(btrim(source_note)) > 0 AND source_year IS NOT NULL)",
+            name="ck_fruit_seasons_scoring_evidence",
+        ),
+        CheckConstraint(
+            "data_scope <> 'legacy' OR NOT is_scoring_enabled",
+            name="ck_fruit_seasons_legacy_disabled",
+        ),
+        CheckConstraint(
+            "data_scope = 'legacy' OR data_quality <> 'unverified' "
+            "OR supply_status <> 'available'",
+            name="ck_fruit_seasons_unverified_supply",
+        ),
+        CheckConstraint(
+            "data_scope = 'legacy' OR "
+            "(data_scope = 'harvest' AND availability_score = 0.45 "
+            "AND supply_status = 'unknown') OR "
+            "(data_scope = 'market' AND season_score = 0.35 "
+            "AND cultivation_type = 'unknown')",
+            name="ck_fruit_seasons_scope_semantics",
         ),
         CheckConstraint(
             "start_month BETWEEN 1 AND 12",
@@ -488,6 +538,32 @@ class FruitSeason(CreatedAtMixin, Base):
         nullable=False,
         default="unknown",
         server_default=text("'unknown'"),
+    )
+    data_scope: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="legacy",
+        server_default=text("'legacy'"),
+    )
+    data_quality: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="unverified",
+        server_default=text("'unverified'"),
+    )
+    cultivation_type: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="unknown",
+        server_default=text("'unknown'"),
+    )
+    source_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_year: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
+    is_scoring_enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default=false(),
     )
 
     fruit: Mapped[Fruit] = relationship(back_populates="seasons")

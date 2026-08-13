@@ -2,6 +2,13 @@ from typing import Annotated, Literal
 
 from pydantic import Field
 
+from app.selection_option_policy import (
+    SelectionMatchingMode,
+    SelectionOptionScoreEffect,
+    selection_matching_mode_for_code,
+    selection_option_score_effect_for_code,
+)
+
 from app.schemas.common import (
     ApiSchema,
     AwareDatetime,
@@ -32,6 +39,12 @@ SupplyStatus = Annotated[
     str,
     Field(pattern="^(available|unknown|unavailable)$"),
 ]
+SeasonDataScope = Literal["harvest", "market", "legacy"]
+SeasonDataQuality = Annotated[
+    str,
+    Field(pattern="^(high|medium|low|unverified)$"),
+]
+CultivationType = Literal["open_field", "protected", "mixed", "unknown"]
 TypicalPurchaseStage = Literal["ready_to_eat", "needs_ripening", "variable"]
 
 
@@ -79,7 +92,21 @@ class FruitRead(FruitBase):
     id: PositiveId
     created_at: AwareDatetime
     updated_at: AwareDatetime
+    # 默认值仅用于读取 0013 及更早的历史快照；字段缺失时按 code
+    # 推导，已冻结的新快照保持原值。浏览器不再检查覆盖字段猜模式。
+    selection_matching_mode: SelectionMatchingMode = "explicit-only"
+    selection_option_score_effect: SelectionOptionScoreEffect = "profile-override"
     selection_options: list["FruitSelectionOptionRead"] = Field(default_factory=list)
+
+    def model_post_init(self, __context: object) -> None:
+        # 0013 及更早的历史快照没有这两个字段；仅对缺失字段回退推导。
+        # 已保存的新快照必须保留当时值，不能随当前策略变化。
+        if "selection_matching_mode" not in self.model_fields_set:
+            self.selection_matching_mode = selection_matching_mode_for_code(self.code)
+        if "selection_option_score_effect" not in self.model_fields_set:
+            self.selection_option_score_effect = (
+                selection_option_score_effect_for_code(self.code)
+            )
 
 
 class FruitSelectionOptionRead(ApiSchema):
@@ -141,6 +168,12 @@ class FruitSeasonBase(ApiSchema):
     season_score: NormalizedScore
     availability_score: NormalizedScore = 0.45
     supply_status: SupplyStatus = "unknown"
+    data_scope: SeasonDataScope = "legacy"
+    data_quality: SeasonDataQuality = "unverified"
+    cultivation_type: CultivationType = "unknown"
+    source_note: Annotated[str, Field(max_length=2000)] | None = None
+    source_year: Annotated[int, Field(ge=2000, le=2100)] | None = None
+    is_scoring_enabled: bool = False
 
 
 class FruitSeasonRead(FruitSeasonBase):

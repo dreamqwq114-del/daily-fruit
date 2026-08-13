@@ -1,4 +1,9 @@
-# Recommendation V2 comparison and acceptance record
+# Historical Recommendation V2 comparison snapshot
+
+> 本文保留早期七画像结果，不能代表当前算法或远程环境状态。当前可执行事实以
+> `backend/app/services/texture_profile_report.py` 和
+> `backend/app/services/texture_baseline_replay.py` 为准：它们统一日期并真实重放旧
+> revision，覆盖 19 个画像。最新结论见 `docs/recommendation-texture-audit.md`。
 
 ## Scope
 
@@ -42,8 +47,8 @@ bounded penalty. History and feedback use date-based exponential decay.
 
 ## Fixed profile output
 
-> This seven-profile summary was regenerated with the current semantic-correction
-> code. The complete top-10 lists are in the next section.
+> This seven-profile summary was generated in the historical semantic-correction
+> snapshot. The historical top-10 lists are in the next section.
 
 | Profile | V1 pair | V2 pair | V2 total score | Notes |
 | --- | --- | --- | ---: | --- |
@@ -55,7 +60,7 @@ bounded penalty. History and feedback use date-based exponential decay.
 | not tried avocado and durian | 葡萄 + 木瓜 | 葡萄 + 木瓜 | 0.6362 | level 1 does not allow both explicit unfamiliar fruits |
 | cold start / no explicit preference | 葡萄 + 木瓜 | 葡萄 + 木瓜 | 0.6362 | default profile remains deterministic |
 
-The exact current individual scores for representative rows are:
+The exact individual scores recorded in that historical snapshot were:
 
 - low budget: 苹果 `0.6174`, 木瓜 `0.5423`;
 - sour-sweet: 桃 `0.6703`, 葡萄 `0.6701`;
@@ -68,7 +73,7 @@ seed chooses only inside the 0.03 near-optimal window.
 
 ## Seven-profile acceptance run
 
-The following table is the authoritative V2 run for all seven fixed profiles
+The following table was the seven-profile run recorded for that historical snapshot
 from the V1 baseline. It records the V2 base-score top 10 and the final pair;
 fruit names and scores are from the 24-row demonstration dataset, not a claim
 about real market or nutrition rankings.
@@ -93,7 +98,7 @@ being treated as “tried”.
 
 - The seed values are structured demonstration annotations. They are not
   authoritative seasonal, nutrition, or price data.
-- The current 48 season rows remain backward-compatible CSV rows; the loader
+- At that snapshot, the 48 season rows were backward-compatible CSV rows; the loader
   assigns `national`/`area` and demonstration availability defaults. A later
   data-curation task can replace those defaults with sourced regional data.
 - User familiarity is optional. Unknown answers are not treated as either
@@ -106,13 +111,13 @@ being treated as “tried”.
 - Static `exploration` roles are no longer valid. Exploration is a per-user
   state derived from `has_tried`, `willing_to_try`, and `discovery_level`.
 
-## Verification
+## Historical verification record (not current)
 
-- Backend: `207 passed, 30 skipped` with the repository's Python 3.11 environment.
+- The historical backend run recorded `207 passed, 30 skipped` with Python 3.11.
 - Frontend: `npm test` passed (23 Node tests, 25 component tests).
 - Frontend production build: `npm run build` passed.
-- Remote Supabase project `Daily Fruit` is at migration version `0009`; read-only
-  verification found 24 active fruits, 23 `main`, one `supporting`, complete
+- A historical remote read-only check recorded migration version `0009`, 24 active
+  fruits, 23 `main`, one `supporting`, complete
   display groups, 24 nutrition rows and 48 season rows. RLS remains enabled with
   no policies, and the existing security-advisor warning is outside this task.
 - The V2 seed ran twice after migration; both runs kept 24/24/48 rows and

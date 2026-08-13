@@ -30,6 +30,8 @@ const optionFruits = [
     name: '桃',
     code: 'peach',
     taste: '甜软',
+    selection_matching_mode: 'texture',
+    selection_option_score_effect: 'profile-override',
     selection_options: [
       { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', soft_score: 0.25, crisp_score: 0.9, is_active: true },
       { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', soft_score: 0.9, crisp_score: 0.25, is_active: true },
@@ -43,6 +45,8 @@ const peachAndKiwiOptionFruits = [
     name: '桃',
     code: 'peach',
     taste: '甜软',
+    selection_matching_mode: 'texture',
+    selection_option_score_effect: 'profile-override',
     selection_options: [
       { id: 101, fruit_id: 10, code: 'crisp', name: '脆桃型', soft_score: 0.25, crisp_score: 0.9, is_active: true },
       { id: 102, fruit_id: 10, code: 'soft', name: '软桃型', soft_score: 0.9, crisp_score: 0.25, is_active: true },
@@ -53,6 +57,8 @@ const peachAndKiwiOptionFruits = [
     name: '猕猴桃',
     code: 'kiwifruit',
     taste: '酸甜',
+    selection_matching_mode: 'sweet-sour',
+    selection_option_score_effect: 'profile-override',
     selection_options: [
       { id: 201, fruit_id: 20, code: 'green', name: '绿心', sweet_score: 0.55, sour_score: 0.85, is_active: true },
       { id: 202, fruit_id: 20, code: 'yellow', name: '黄心', sweet_score: 0.8, sour_score: 0.35, is_active: true },
@@ -66,6 +72,8 @@ const pomegranateOptionFruit = {
   name: '石榴',
   code: 'pomegranate',
   taste: '酸甜多汁',
+  selection_matching_mode: 'explicit-only',
+  selection_option_score_effect: 'filter-only',
   selection_options: [
     { id: 301, fruit_id: 30, code: 'soft_seed', name: '软籽型', is_active: true },
     { id: 302, fruit_id: 30, code: 'hard_seed', name: '硬籽型', is_active: true },

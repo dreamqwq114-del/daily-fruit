@@ -106,4 +106,4 @@ sequenceDiagram
 ## 本章总结
 
 Application Service 的价值在于把多个 Repository 调用、纯算法调用和事务状态组成
-一个可验证的业务操作；它不应该成为第二份推荐算法。`n
+一个可验证的业务操作；它不应该成为第二份推荐算法。

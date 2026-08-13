@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import NullPool
 
 from app.config import Settings
+from app.seed.seed_fruits import load_seed_dataset, seed_database
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +71,21 @@ EXPECTED_INDEXES = {
     },
 }
 
+DISPOSABLE_DATA_DELETE_ORDER = (
+    "recommendation_feedback",
+    "recommendation_items",
+    "recommendations",
+    "user_fruit_option_preferences",
+    "user_fruit_preferences",
+    "fruit_selection_options",
+    "fruit_facts",
+    "fruit_seasons",
+    "fruit_nutritions",
+    "product_feedback",
+    "users",
+    "fruits",
+)
+
 
 def invoke_alembic(
     *arguments: str,
@@ -103,6 +119,22 @@ def run_alembic(*arguments: str, database_url: str) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def clear_disposable_database_data(engine: Engine) -> None:
+    """Remove only known fixture data before testing migration round trips."""
+
+    with engine.begin() as connection:
+        public_tables = set(
+            inspect(connection).get_table_names(schema="public")
+        )
+        for table_name in DISPOSABLE_DATA_DELETE_ORDER:
+            if table_name in public_tables:
+                connection.execute(text(f"DELETE FROM public.{table_name}"))
+
+        auth_tables = set(inspect(connection).get_table_names(schema="auth"))
+        if "users" in auth_tables:
+            connection.execute(text("DELETE FROM auth.users"))
+
+
 @pytest.fixture(scope="module")
 def migrated_database() -> tuple[Engine, str]:
     database_url = os.getenv("TEST_DATABASE_URL", "").strip()
@@ -118,10 +150,15 @@ def migrated_database() -> tuple[Engine, str]:
         )
 
     settings = Settings(_env_file=None, TEST_DATABASE_URL=database_url)
-    assert settings.test_database_url == database_url
+    if settings.test_database_url != database_url:
+        raise RuntimeError("refusing an unresolved destructive test database")
     parsed = urlsplit(database_url)
-    assert parsed.hostname in {"127.0.0.1", "localhost"}
-    assert parsed.path.strip("/") == "daily_fruit_test"
+    if parsed.hostname not in {"127.0.0.1", "localhost"}:
+        raise RuntimeError("destructive migration tests require localhost")
+    if parsed.path.strip("/") != "daily_fruit_test":
+        raise RuntimeError(
+            "destructive migration tests require daily_fruit_test"
+        )
 
     engine = create_engine(database_url, poolclass=NullPool)
     with engine.begin() as connection:
@@ -129,9 +166,10 @@ def migrated_database() -> tuple[Engine, str]:
         if "auth" not in inspector.get_schema_names():
             connection.execute(text("CREATE SCHEMA auth"))
         auth_tables = set(inspect(connection).get_table_names(schema="auth"))
-        assert auth_tables <= {"users"}, (
-            f"refusing to alter unknown auth test tables: {auth_tables}"
-        )
+        if not auth_tables <= {"users"}:
+            raise RuntimeError(
+                f"refusing to alter unknown auth test tables: {auth_tables}"
+            )
         if "users" not in auth_tables:
             connection.execute(
                 text(
@@ -143,14 +181,22 @@ def migrated_database() -> tuple[Engine, str]:
     with engine.connect() as connection:
         existing = set(inspect(connection).get_table_names(schema="public"))
     unknown = existing - EXPECTED_TABLES - {"alembic_version"}
-    assert not unknown, f"refusing to alter unknown test tables: {unknown}"
+    if unknown:
+        raise RuntimeError(f"refusing to alter unknown test tables: {unknown}")
 
+    clear_disposable_database_data(engine)
     run_alembic("downgrade", "base", database_url=database_url)
     run_alembic("upgrade", "0001", database_url=database_url)
     try:
         yield engine, database_url
     finally:
-        engine.dispose()
+        try:
+            clear_disposable_database_data(engine)
+            run_alembic("downgrade", "base", database_url=database_url)
+            run_alembic("upgrade", "head", database_url=database_url)
+            seed_database(engine, load_seed_dataset())
+        finally:
+            engine.dispose()
 
 
 def insert_user(connection: object) -> int:
@@ -226,6 +272,10 @@ def test_upgrade_downgrade_upgrade_round_trip(
     migrated_database: tuple[Engine, str],
 ) -> None:
     engine, database_url = migrated_database
+    # Keep this test independent from whichever migration state a previous
+    # module test left behind.
+    run_alembic("downgrade", "base", database_url=database_url)
+    run_alembic("upgrade", "0001", database_url=database_url)
     with engine.connect() as connection:
         assert set(inspect(connection).get_table_names(schema="public")) == (
             INITIAL_TABLES | {"alembic_version"}
@@ -252,7 +302,7 @@ def test_upgrade_downgrade_upgrade_round_trip(
     with engine.connect() as connection:
         assert connection.execute(
             text("SELECT version_num FROM public.alembic_version")
-        ).scalar_one() == "0013"
+        ).scalar_one() == "0015"
         users_columns = {
             item["name"]
             for item in inspect(connection).get_columns(
@@ -487,6 +537,269 @@ def test_0013_unknown_fruit_fails_transactionally(
     run_alembic("upgrade", "head", database_url=database_url)
 
 
+def test_0014_refuses_invalid_history_without_rewriting_rows(
+    migrated_database: tuple[Engine, str],
+) -> None:
+    engine, database_url = migrated_database
+    run_alembic("upgrade", "head", database_url=database_url)
+    run_alembic("downgrade", "0013", database_url=database_url)
+    with engine.begin() as connection:
+        user_id = insert_user(connection)
+        fruit_id = insert_fruit(connection, "0014-invalid-history")
+        connection.execute(
+            text(
+                """
+                INSERT INTO public.user_fruit_preferences (
+                    user_id, fruit_id, preference_score, is_forbidden
+                ) VALUES (:user_id, :fruit_id, -0.50, false)
+                """
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        )
+
+    fractional = invoke_alembic("upgrade", "head", database_url=database_url)
+    assert fractional.returncode != 0
+    assert "non-discrete rows require an explicit data decision" in (
+        fractional.stdout + fractional.stderr
+    )
+    with engine.begin() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0013"
+        assert connection.execute(
+            text(
+                "SELECT preference_score FROM public.user_fruit_preferences "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        ).scalar_one() == pytest.approx(-0.5)
+        connection.execute(
+            text(
+                "UPDATE public.user_fruit_preferences "
+                "SET preference_score=0, has_tried=true, willing_to_try=false "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        )
+
+    willingness = invoke_alembic("upgrade", "head", database_url=database_url)
+    assert willingness.returncode != 0
+    assert "contradictory rows require an explicit data decision" in (
+        willingness.stdout + willingness.stderr
+    )
+    with engine.begin() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0013"
+        assert connection.execute(
+            text(
+                "SELECT willing_to_try FROM public.user_fruit_preferences "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        ).scalar_one() is False
+        connection.execute(
+            text(
+                "UPDATE public.user_fruit_preferences SET willing_to_try=NULL "
+                "WHERE user_id=:user_id AND fruit_id=:fruit_id"
+            ),
+            {"user_id": user_id, "fruit_id": fruit_id},
+        )
+
+    run_alembic("upgrade", "head", database_url=database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM public.users WHERE id=:user_id"),
+            {"user_id": user_id},
+        )
+        connection.execute(
+            text("DELETE FROM public.fruits WHERE id=:fruit_id"),
+            {"fruit_id": fruit_id},
+        )
+
+
+def test_0015_preserves_legacy_rows_and_rejects_invalid_region_transactionally(
+    migrated_database: tuple[Engine, str],
+) -> None:
+    engine, database_url = migrated_database
+    run_alembic("upgrade", "head", database_url=database_url)
+    run_alembic("downgrade", "0014", database_url=database_url)
+    with engine.begin() as connection:
+        fruit_id = insert_fruit(connection, "0015-legacy-season")
+        legacy_row = connection.execute(
+            text(
+                """
+                INSERT INTO public.fruit_seasons (
+                    fruit_id, region, region_level, start_month, end_month,
+                    season_score, availability_score, supply_status
+                ) VALUES (
+                    :fruit_id, '全国', 'area', 9, 11, 0.82, 0.61, 'available'
+                )
+                RETURNING id, created_at
+                """
+            ),
+            {"fruit_id": fruit_id},
+        ).one()
+
+    failed = invoke_alembic("upgrade", "head", database_url=database_url)
+    assert failed.returncode != 0
+    assert "explicit region-level decision" in failed.stdout + failed.stderr
+    with engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0014"
+        assert "data_scope" not in {
+            column["name"]
+            for column in inspect(connection).get_columns(
+                "fruit_seasons", schema="public"
+            )
+        }
+        assert connection.execute(
+            text("SELECT count(*) FROM public.fruit_seasons WHERE id=:id"),
+            {"id": legacy_row.id},
+        ).scalar_one() == 1
+
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "UPDATE public.fruit_seasons SET region_level='national' "
+                "WHERE id=:id"
+            ),
+            {"id": legacy_row.id},
+        )
+    run_alembic("upgrade", "head", database_url=database_url)
+    with engine.connect() as connection:
+        migrated = connection.execute(
+            text(
+                """
+                SELECT id, created_at, season_score, availability_score,
+                       supply_status, data_scope, data_quality,
+                       is_scoring_enabled
+                FROM public.fruit_seasons WHERE id=:id
+                """
+            ),
+            {"id": legacy_row.id},
+        ).mappings().one()
+        assert migrated["id"] == legacy_row.id
+        assert migrated["created_at"] == legacy_row.created_at
+        assert float(migrated["season_score"]) == pytest.approx(0.82)
+        assert float(migrated["availability_score"]) == pytest.approx(0.61)
+        assert migrated["supply_status"] == "available"
+        assert migrated["data_scope"] == "legacy"
+        assert migrated["data_quality"] == "unverified"
+        assert migrated["is_scoring_enabled"] is False
+
+    run_alembic("downgrade", "0014", database_url=database_url)
+    with engine.connect() as connection:
+        restored = connection.execute(
+            text(
+                """
+                SELECT id, created_at, season_score, availability_score,
+                       supply_status, region_level
+                FROM public.fruit_seasons WHERE id=:id
+                """
+            ),
+            {"id": legacy_row.id},
+        ).mappings().one()
+        assert restored["id"] == legacy_row.id
+        assert restored["created_at"] == legacy_row.created_at
+        assert float(restored["season_score"]) == pytest.approx(0.82)
+        assert float(restored["availability_score"]) == pytest.approx(0.61)
+        assert restored["supply_status"] == "available"
+        assert restored["region_level"] == "national"
+
+    run_alembic("upgrade", "head", database_url=database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM public.fruits WHERE id=:id"),
+            {"id": fruit_id},
+        )
+
+
+def test_0015_scope_uniqueness_and_downgrade_guard_are_transactional(
+    migrated_database: tuple[Engine, str],
+) -> None:
+    engine, database_url = migrated_database
+    run_alembic("upgrade", "head", database_url=database_url)
+    with engine.begin() as connection:
+        fruit_id = insert_fruit(connection, "0015-evidence-season")
+        connection.execute(
+            text(
+                """
+                INSERT INTO public.fruit_seasons (
+                    fruit_id, region, region_level, start_month, end_month,
+                    season_score, availability_score, supply_status,
+                    data_scope, data_quality, cultivation_type,
+                    source_note, source_year, is_scoring_enabled
+                ) VALUES (
+                    :fruit_id, '华东', 'area', 6, 8,
+                    0.90, 0.45, 'unknown', 'harvest', 'high',
+                    'open_field', 'test harvest evidence', 2026, true
+                ), (
+                    :fruit_id, '华东', 'area', 6, 8,
+                    0.35, 0.70, 'available', 'market', 'medium',
+                    'unknown', 'test market evidence', 2026, true
+                )
+                """
+            ),
+            {"fruit_id": fruit_id},
+        )
+        assert connection.execute(
+            text(
+                "SELECT count(*) FROM public.fruit_seasons "
+                "WHERE fruit_id=:fruit_id"
+            ),
+            {"fruit_id": fruit_id},
+        ).scalar_one() == 2
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO public.fruit_seasons (
+                            fruit_id, region, region_level,
+                            start_month, end_month, season_score,
+                            availability_score, supply_status, data_scope,
+                            data_quality, cultivation_type, source_note,
+                            source_year, is_scoring_enabled
+                        ) VALUES (
+                            :fruit_id, '华东', 'area', 6, 8, 0.80,
+                            0.45, 'unknown', 'harvest', 'medium',
+                            'open_field', 'duplicate evidence', 2026, true
+                        )
+                        """
+                    ),
+                    {"fruit_id": fruit_id},
+                )
+
+    failed = invoke_alembic("downgrade", "0014", database_url=database_url)
+    assert failed.returncode != 0
+    assert "without discarding evidence" in failed.stdout + failed.stderr
+    with engine.connect() as connection:
+        assert connection.execute(
+            text("SELECT version_num FROM public.alembic_version")
+        ).scalar_one() == "0015"
+        assert connection.execute(
+            text(
+                "SELECT count(*) FROM public.fruit_seasons "
+                "WHERE fruit_id=:fruit_id"
+            ),
+            {"fruit_id": fruit_id},
+        ).scalar_one() == 2
+        assert "data_scope" in {
+            column["name"]
+            for column in inspect(connection).get_columns(
+                "fruit_seasons", schema="public"
+            )
+        }
+
+    with engine.begin() as connection:
+        connection.execute(
+            text("DELETE FROM public.fruits WHERE id=:id"),
+            {"id": fruit_id},
+        )
+
+
 def test_actual_indexes_and_foreign_key_delete_rules(
     migrated_database: tuple[Engine, str],
 ) -> None:
@@ -670,12 +983,48 @@ def test_database_constraints_and_cascades_are_enforced(
             ),
             {"fruit_id": fruit_id},
         )
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO public.fruit_seasons (
+                            fruit_id, region, region_level,
+                            start_month, end_month, season_score,
+                            data_scope, data_quality, is_scoring_enabled
+                        ) VALUES (
+                            :fruit_id, '西北', 'area', 9, 10, 0.9,
+                            'harvest', 'high', true
+                        )
+                        """
+                    ),
+                    {"fruit_id": fruit_id},
+                )
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO public.fruit_seasons (
+                            fruit_id, region, region_level,
+                            start_month, end_month, season_score,
+                            availability_score, supply_status,
+                            data_scope, data_quality, is_scoring_enabled
+                        ) VALUES (
+                            :fruit_id, '全国', 'national', 1, 12, 0.35,
+                            0.9, 'available', 'market', 'unverified', false
+                        )
+                        """
+                    ),
+                    {"fruit_id": fruit_id},
+                )
         connection.execute(
             text(
                 """
                 INSERT INTO public.fruit_seasons (
-                    fruit_id, region, start_month, end_month, season_score
-                ) VALUES (:fruit_id, '华东', 12, 4, 0.9)
+                    fruit_id, region, region_level,
+                    start_month, end_month, season_score
+                ) VALUES (:fruit_id, '华东', 'area', 12, 4, 0.9)
                 """
             ),
             {"fruit_id": fruit_id},
@@ -690,6 +1039,31 @@ def test_database_constraints_and_cascades_are_enforced(
             ),
             {"user_id": user_id, "fruit_id": fruit_id},
         )
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO public.user_fruit_preferences (
+                            user_id, fruit_id, preference_score, is_forbidden
+                        ) VALUES (:user_id, :fruit_id, -0.50, false)
+                        """
+                    ),
+                    {"user_id": user_id, "fruit_id": second_fruit_id},
+                )
+        with pytest.raises(IntegrityError):
+            with connection.begin_nested():
+                connection.execute(
+                    text(
+                        """
+                        INSERT INTO public.user_fruit_preferences (
+                            user_id, fruit_id, preference_score, is_forbidden,
+                            has_tried, willing_to_try
+                        ) VALUES (:user_id, :fruit_id, 0, false, true, false)
+                        """
+                    ),
+                    {"user_id": user_id, "fruit_id": second_fruit_id},
+                )
         recommendation_id = connection.execute(
             text(
                 """

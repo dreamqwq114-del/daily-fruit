@@ -3,6 +3,7 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+from app.seed.seed_fruits import load_seed_dataset
 from app.services import (
     NutritionProfile,
     RecommendationContext,
@@ -30,19 +31,23 @@ def load_demo_fruits() -> list[RecommendationFruit]:
             row["fruit_name"]: row for row in csv.DictReader(file)
         }
     seasons_by_name: dict[str, list[SeasonWindow]] = defaultdict(list)
-    with (PROJECT_ROOT / "data" / "seasons_demo.csv").open(
-        encoding="utf-8-sig",
-        newline="",
-    ) as file:
-        for row in csv.DictReader(file):
-            seasons_by_name[row["fruit_name"]].append(
-                SeasonWindow(
-                    region=row["region"],
-                    start_month=int(row["start_month"]),
-                    end_month=int(row["end_month"]),
-                    season_score=float(row["season_score"]),
-                )
+    for row in load_seed_dataset().seasons:
+        seasons_by_name[row.fruit_name].append(
+            SeasonWindow(
+                region=row.region,
+                start_month=row.start_month,
+                end_month=row.end_month,
+                season_score=float(row.season_score),
+                region_level=row.region_level,
+                availability_score=float(row.availability_score),
+                supply_status=row.supply_status,
+                data_scope=row.data_scope,
+                data_quality=row.data_quality,
+                source_note=row.source_note,
+                source_year=row.source_year,
+                is_scoring_enabled=row.is_scoring_enabled,
             )
+        )
 
     fruits: list[RecommendationFruit] = []
     for fruit_id, row in enumerate(fruits_data, start=1):

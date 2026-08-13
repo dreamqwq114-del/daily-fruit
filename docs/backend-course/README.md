@@ -16,6 +16,10 @@
 
 主要学习 Python 后端、数据库和推荐核心；Vue 只作为集成上下文阅读。
 
+如果目前只完成了 IOM103 Python/SQL 基础，先走
+[IOM103、SQL 与 Daily Fruit 衔接路线](../learning-path/README.md)，补齐类型合同、
+pytest 工程测试、PostgreSQL、SQLAlchemy 与 Alembic，再进入本源码课。
+
 ## 推荐学习顺序
 
 1. [学习地图](00-learning-map.md)：建立目录和对象演进的全局图；
@@ -62,6 +66,11 @@ SQL 示例默认只读；若是简化示例，会明确标记“不可直接执�
 来源表。参数、冷却天数、演示营养指数和权重都只是当前项目的启发式实现，不是
 行业标准，也不是机器学习模型的训练结果。
 
+本轮教材已核对到 migration `0015`。当前偏好分是离散的 `-1/0/1/2` 或 `NULL`，
+`willing_to_try` 只允许出现在 `has_tried=False` 的记录上；水果子类型还带有明确的
+匹配模式和分数作用。`fruit_seasons` 已把产地采收期与消费者市场可得性分开，只有
+中高质量且带来源的行可以启用评分。远程 Supabase 的实际 head 不由教材推断，执行前仍需现场核对。
+
 ## 个人贡献边界提醒
 
 阅读整套材料可以理解完整工程，但“读懂”不等于“实现”。面试回答应区分：项目
@@ -81,4 +90,4 @@ SQL 示例默认只读；若是简化示例，会明确标记“不可直接执�
 - [08-guided-exercises](08-guided-exercises.md) / [solutions](solutions/08-guided-exercises-solutions.md)
 - [09-interview-questions](09-interview-questions.md)
 - [10-source-map](10-source-map.md)
-- [glossary](glossary.md)`n
+- [glossary](glossary.md)

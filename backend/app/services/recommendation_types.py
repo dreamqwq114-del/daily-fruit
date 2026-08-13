@@ -49,6 +49,12 @@ class SeasonWindow:
     region_level: str = "national"
     availability_score: float = 0.45
     supply_status: str = "unknown"
+    data_scope: str = "harvest"
+    data_quality: str = "unverified"
+    cultivation_type: str = "unknown"
+    source_note: str | None = None
+    source_year: int | None = None
+    is_scoring_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -263,6 +269,14 @@ class SeasonEvaluation:
     availability_score: float = 0.45
     supply_status: str = "unknown"
     region_rank: int = 0
+    has_harvest_data: bool = False
+    has_market_data: bool = False
+    harvest_data_quality: str = "unverified"
+    market_data_quality: str = "unverified"
+    market_region_matched: bool = False
+    used_market_fallback: bool = False
+    season_reason_eligible: bool = False
+    market_reason_eligible: bool = False
 
 
 @dataclass(frozen=True, slots=True)

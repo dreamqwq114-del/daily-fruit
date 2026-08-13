@@ -82,4 +82,4 @@ ORM `User` 有 relationship 和 SQLAlchemy 状态，不能直接传给纯算法�
 ## 本章总结
 
 Repository 是数据库查询边界，不是业务规则仓库；Session 是事务上下文，不是每个
-函数都可以随意提交的全局对象。预加载和明确的 flush/commit 让调用链可解释。`n
+函数都可以随意提交的全局对象。预加载和明确的 flush/commit 让调用链可解释。

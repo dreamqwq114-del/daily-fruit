@@ -19,6 +19,14 @@ from app.services.recommendation_core.common import NoRecommendationCandidatesEr
 from app.services.recommendation_core.selection_options import matching_dimensions_for
 
 
+TEST_HARVEST_EVIDENCE = {
+    "data_quality": "high",
+    "source_note": "test harvest evidence",
+    "source_year": 2026,
+    "is_scoring_enabled": True,
+}
+
+
 def make_user(*, discovery_level: int = 1, preferences: dict[int, FruitPreference] | None = None) -> RecommendationUser:
     return RecommendationUser(
         region="华东",
@@ -47,7 +55,9 @@ def make_fruit(fruit_id: int, *, category: str = "A", role: str = "main") -> Rec
         convenience_score=0.5,
         average_price_level=2,
         daily_recommendation_role=role,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
     )
 
 

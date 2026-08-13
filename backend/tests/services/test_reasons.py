@@ -17,6 +17,14 @@ from app.services import (
 from app.services.recommendation_core.reasons import _build_reasons
 
 
+TEST_HARVEST_EVIDENCE = {
+    "data_quality": "high",
+    "source_note": "test harvest evidence",
+    "source_year": 2026,
+    "is_scoring_enabled": True,
+}
+
+
 def make_user() -> RecommendationUser:
     return RecommendationUser(
         region="华东",
@@ -45,7 +53,7 @@ def make_fruit(
         convenience_score=0.8,
         average_price_level=2,
         nutrition=nutrition,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),)
+        seasons=(SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),)
         if seasons is None
         else seasons,
     )
@@ -93,7 +101,16 @@ def test_in_season_reason_only_appears_for_actual_in_season_data() -> None:
     fruits[0] = make_fruit(
         1,
         fruits[0].nutrition,
-        seasons=(SeasonWindow("华南", 1, 12, 1.0, region_level="area"),),
+        seasons=(
+            SeasonWindow(
+                "华南",
+                1,
+                3,
+                1.0,
+                region_level="area",
+                **TEST_HARVEST_EVIDENCE,
+            ),
+        ),
     )
     result = recommend_fruits(
         fruits,
@@ -104,9 +121,45 @@ def test_in_season_reason_only_appears_for_actual_in_season_data() -> None:
     for item in result.items:
         reason_codes = {reason.code for reason in item.reasons}
         if item.fruit.id == 1:
-            assert "availability" not in reason_codes
-        else:
-            assert "availability" in reason_codes
+            assert "in_season" not in reason_codes
+
+
+def test_harvest_reason_does_not_claim_local_market_availability() -> None:
+    fruit = sample_fruits()[0]
+    scored = ScoredFruit(
+        fruit=fruit,
+        base_score=0.5,
+        scores=ScoreBreakdown(
+            explicit_preference=0.0,
+            taste_match=0.0,
+            availability_and_season=0.65,
+            price_match_score=0.0,
+            convenience_score=0.0,
+            history_diversity_score=0.0,
+            season_score=0.9,
+            availability_score=0.45,
+        ),
+        season=SeasonEvaluation(
+            0.9,
+            True,
+            True,
+            season_reason_eligible=True,
+            has_harvest_data=True,
+        ),
+    )
+    reasons = _build_reasons(
+        scored,
+        make_user(),
+        PairSelection(scored, scored, 0.0, 0.0),
+    )
+
+    season_reasons = [
+        reason
+        for reason in reasons
+        if reason.code == "in_season"
+    ]
+    assert season_reasons
+    assert all("所在地区" not in reason.message for reason in season_reasons)
 
 
 def test_recent_fruit_does_not_claim_it_was_not_recently_recommended() -> None:

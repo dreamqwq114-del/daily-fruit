@@ -125,4 +125,4 @@ downgrade 在隔离库验证；旧数据和回滚丢失风险。不要只新增�
 
 答案主要依据 `backend/app/services/`、`backend/app/models/`、
 `backend/alembic/versions/` 和 `backend/tests/`；通用事务和测试解释是通用知识，
-没有把它们伪装成当前项目独有规则。`n
+没有把它们伪装成当前项目独有规则。

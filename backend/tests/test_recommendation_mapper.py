@@ -3,6 +3,7 @@ from decimal import Decimal
 from app.models import (
     Fruit,
     FruitNutrition,
+    FruitSelectionOption,
     FruitSeason,
     User,
     UserFruitPreference,
@@ -24,6 +25,8 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
         sour_preference=Decimal("0.2"),
         soft_preference=Decimal("0.4"),
         crisp_preference=Decimal("0.9"),
+        texture_preference=Decimal("0.85"),
+        texture_preference_source="explicit_new",
         price_level=2,
         convenience_preference=Decimal("0.7"),
     )
@@ -32,6 +35,8 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
             fruit_id=3,
             preference_score=Decimal("2"),
             is_forbidden=False,
+            has_tried=True,
+            willing_to_try=None,
         )
     ]
     fruit = Fruit(
@@ -43,7 +48,11 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
         sour_score=Decimal("0.3"),
         soft_score=Decimal("0.2"),
         crisp_score=Decimal("0.9"),
+        texture_score=Decimal("0.85"),
         convenience_score=Decimal("0.8"),
+        ripe_storage_score=Decimal("0.30"),
+        typical_purchase_stage="ready_to_eat",
+        ripening_note="成熟后尽快食用",
         average_price_level=2,
         default_portion="1个",
         description="测试水果",
@@ -62,8 +71,30 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
             region="华东",
             start_month=8,
             end_month=12,
-            season_score=Decimal("0.95"),
+            season_score=Decimal("0.35"),
             availability_score=Decimal("0"),
+            supply_status="unavailable",
+            data_scope="market",
+            data_quality="medium",
+            source_note="mapper test evidence",
+            source_year=2026,
+            is_scoring_enabled=True,
+        )
+    ]
+    fruit.selection_options = [
+        FruitSelectionOption(
+            id=31,
+            fruit_id=3,
+            code="powdery",
+            name="粉面型",
+            texture_score=Decimal("0.25"),
+            ripe_storage_score=Decimal("0.10"),
+            convenience_score=Decimal("0.70"),
+            is_default=False,
+            is_active=True,
+            display_order=2,
+            data_quality="low",
+            data_source_note="mapper test",
         )
     ]
 
@@ -71,10 +102,25 @@ def test_mapper_converts_loaded_orm_graph_without_session() -> None:
     mapped_fruit = fruit_to_recommendation_input(fruit)
 
     assert mapped_user.fruit_preferences[3].preference_score == 2
+    assert mapped_user.fruit_preferences[3].has_tried is True
+    assert mapped_user.fruit_preferences[3].willing_to_try is None
+    assert mapped_user.texture_preference == 0.85
     assert mapped_fruit.nutrition is not None
     assert mapped_fruit.nutrition.folate == 0.6
-    assert mapped_fruit.seasons[0].season_score == 0.95
+    assert mapped_fruit.seasons[0].season_score == 0.35
     assert mapped_fruit.seasons[0].availability_score == 0
+    assert mapped_fruit.seasons[0].data_scope == "market"
+    assert mapped_fruit.seasons[0].data_quality == "medium"
+    assert mapped_fruit.seasons[0].source_year == 2026
+    assert mapped_fruit.seasons[0].is_scoring_enabled is True
+    assert mapped_fruit.texture_score == 0.85
+    assert mapped_fruit.ripe_storage_score == 0.3
+    assert mapped_fruit.typical_purchase_stage == "ready_to_eat"
+    assert mapped_fruit.ripening_note == "成熟后尽快食用"
+    assert len(mapped_fruit.selection_options) == 1
+    assert mapped_fruit.selection_options[0].texture_score == 0.25
+    assert mapped_fruit.selection_options[0].ripe_storage_score == 0.1
+    assert mapped_fruit.selection_options[0].convenience_score == 0.7
 
 
 def test_mapper_preserves_explicit_zero_v2_identity_values() -> None:

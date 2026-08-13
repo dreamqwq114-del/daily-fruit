@@ -30,7 +30,7 @@ NormalizedScore = Annotated[
 ]
 PreferenceScore = Annotated[
     Decimal,
-    Field(ge=-1, le=2, max_digits=4, decimal_places=2),
+    Field(ge=-1, le=2, multiple_of=1, max_digits=4, decimal_places=2),
     DecimalAsNumber,
 ]
 OptionalPreferenceScore = PreferenceScore | None

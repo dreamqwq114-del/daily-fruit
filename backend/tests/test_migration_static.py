@@ -17,6 +17,12 @@ MIGRATION_0009_PATH = (
     / "versions"
     / "0009_fruit_display_semantics.py"
 )
+MIGRATION_0015_PATH = (
+    BACKEND_ROOT
+    / "alembic"
+    / "versions"
+    / "0015_season_availability_evidence.py"
+)
 MIGRATION_PATH = (
     BACKEND_ROOT
     / "alembic"
@@ -52,7 +58,11 @@ V2_COLUMNS = {
         "texture_score", "ripe_storage_score", "typical_purchase_stage",
         "ripening_note",
     },
-    "fruit_seasons": {"region_level", "availability_score", "supply_status"},
+    "fruit_seasons": {
+        "region_level", "availability_score", "supply_status",
+        "data_scope", "data_quality", "source_note", "source_year",
+        "is_scoring_enabled", "cultivation_type",
+    },
     "users": {
         "discovery_level",
         "consumption_horizon_days",
@@ -95,6 +105,18 @@ V2_CONSTRAINTS = {
     "ck_fruit_seasons_region_level_values",
     "ck_fruit_seasons_availability_score_range",
     "ck_fruit_seasons_supply_status_values",
+    "uq_fruit_seasons_fruit_region_months",
+    "uq_fruit_seasons_fruit_scope_region_months",
+    "ck_fruit_seasons_data_scope_values",
+    "ck_fruit_seasons_data_quality_values",
+    "ck_fruit_seasons_cultivation_type_values",
+    "ck_fruit_seasons_source_year_range",
+    "ck_fruit_seasons_source_note_length",
+    "ck_fruit_seasons_region_level_contract",
+    "ck_fruit_seasons_scoring_evidence",
+    "ck_fruit_seasons_legacy_disabled",
+    "ck_fruit_seasons_unverified_supply",
+    "ck_fruit_seasons_scope_semantics",
     "ck_users_discovery_level_range",
     "ck_users_consumption_horizon_days_values",
     "ck_users_market_access_level_range",
@@ -102,6 +124,7 @@ V2_CONSTRAINTS = {
     "ck_recommendation_items_pair_score_range",
     "ck_recommendation_items_nutrition_pair_score_range",
     "ck_user_fruit_preferences_score_range",
+    "ck_user_fruit_preferences_willingness_state",
     "ck_users_sweet_preference_range",
     "ck_users_sour_preference_range",
     "ck_users_soft_preference_range",
@@ -326,3 +349,30 @@ def test_migration_0009_has_stable_display_semantics_contract() -> None:
     assert "'main', 'exploration', 'supporting'" in source
     assert "code = 'lemon'" in source
     assert "code IN ('papaya', 'avocado')" in source
+
+
+def test_migration_0015_preserves_legacy_rows_and_requires_evidence() -> None:
+    source = MIGRATION_0015_PATH.read_text(encoding="utf-8")
+    lowered = source.lower()
+
+    assert 'revision: str = "0015"' in source
+    assert 'down_revision: str | None = "0014"' in source
+    for token in (
+        "data_scope",
+        "data_quality",
+        "cultivation_type",
+        "source_note",
+        "source_year",
+        "is_scoring_enabled",
+        "ck_fruit_seasons_scoring_evidence",
+        "ck_fruit_seasons_region_level_contract",
+        "ck_fruit_seasons_source_note_length",
+        "uq_fruit_seasons_fruit_scope_region_months",
+        "duplicate legacy natural keys",
+        "non-legacy rows exist",
+    ):
+        assert token in source
+    assert "server_default=sa.text(\"'legacy'\")" in source
+    assert "server_default=sa.false()" in source
+    for forbidden in ("delete from", "update public", "truncate "):
+        assert forbidden not in lowered

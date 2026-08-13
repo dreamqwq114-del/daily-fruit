@@ -217,7 +217,7 @@ def test_nutrition_and_season_constraints_match_design() -> None:
 
     seasons = table("fruit_seasons")
     assert unique_column_sets(seasons) == {
-        ("fruit_id", "region", "start_month", "end_month")
+        ("fruit_id", "data_scope", "region", "start_month", "end_month")
     }
     assert set(check_sql(seasons)) == {
         "ck_fruit_seasons_start_month_range",
@@ -226,6 +226,16 @@ def test_nutrition_and_season_constraints_match_design() -> None:
         "ck_fruit_seasons_region_level_values",
         "ck_fruit_seasons_availability_score_range",
         "ck_fruit_seasons_supply_status_values",
+        "ck_fruit_seasons_data_scope_values",
+        "ck_fruit_seasons_data_quality_values",
+        "ck_fruit_seasons_cultivation_type_values",
+        "ck_fruit_seasons_source_year_range",
+        "ck_fruit_seasons_source_note_length",
+        "ck_fruit_seasons_region_level_contract",
+        "ck_fruit_seasons_scoring_evidence",
+        "ck_fruit_seasons_legacy_disabled",
+        "ck_fruit_seasons_unverified_supply",
+        "ck_fruit_seasons_scope_semantics",
     }
     assert {
         index.name: index_expression_names(index)
@@ -255,6 +265,18 @@ def test_preference_recommendation_and_feedback_constraints() -> None:
     preferences = table("user_fruit_preferences")
     assert unique_column_sets(preferences) == {("user_id", "fruit_id")}
     assert "ck_user_fruit_preferences_score_range" in check_sql(preferences)
+    score_constraint = next(
+        constraint.sqltext.text
+        for constraint in preferences.constraints
+        if constraint.name == "ck_user_fruit_preferences_score_range"
+    )
+    assert "IN (-1, 0, 1, 2)" in score_constraint
+    willingness_constraint = next(
+        constraint.sqltext.text
+        for constraint in preferences.constraints
+        if constraint.name == "ck_user_fruit_preferences_willingness_state"
+    )
+    assert "willing_to_try IS NULL OR has_tried IS FALSE" in willingness_constraint
     assert preferences.c.preference_score.nullable is True
     assert preferences.c.has_tried.nullable is True
     assert preferences.c.willing_to_try.nullable is True

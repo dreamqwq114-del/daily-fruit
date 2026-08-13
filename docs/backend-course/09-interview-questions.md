@@ -107,4 +107,4 @@
 
 `backend/app/services/recommendation_application_service.py`、
 `backend/app/services/recommendation_core/`、`backend/app/services/recommendation_mapper.py`、
-`backend/tests/` 和 `backend/alembic/versions/`。`n
+`backend/tests/` 和 `backend/alembic/versions/`。

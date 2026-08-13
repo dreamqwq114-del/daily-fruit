@@ -213,8 +213,12 @@ class UserFruitPreference(TimestampMixin, Base):
             name="uq_user_fruit_preferences_user_fruit",
         ),
         CheckConstraint(
-            "preference_score IS NULL OR preference_score BETWEEN -1 AND 2",
+            "preference_score IS NULL OR preference_score IN (-1, 0, 1, 2)",
             name="ck_user_fruit_preferences_score_range",
+        ),
+        CheckConstraint(
+            "willing_to_try IS NULL OR has_tried IS FALSE",
+            name="ck_user_fruit_preferences_willingness_state",
         ),
         Index(
             "ix_user_fruit_preferences_fruit_id",

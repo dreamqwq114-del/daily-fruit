@@ -113,6 +113,10 @@ class UserFruitPreferenceInput(ApiSchema):
             raise ValueError(
                 "A fruit cannot be both especially loved and forbidden"
             )
+        if self.willing_to_try is not None and self.has_tried is not False:
+            raise ValueError(
+                "Fruit willingness may only be provided when has_tried is false"
+            )
         return self
 
 

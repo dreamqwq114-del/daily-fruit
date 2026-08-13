@@ -1,0 +1,25 @@
+fruit_name,region,region_level,start_month,end_month,availability_level,data_quality,source_note,source_year,is_scoring_enabled
+苹果,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+香蕉,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+橙子,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+橘子,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+葡萄,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+猕猴桃,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+草莓,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+蓝莓,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+西瓜,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+哈密瓜,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+桃,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+梨,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+芒果,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+菠萝,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+火龙果,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+荔枝,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+龙眼,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+樱桃,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+石榴,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+柚子,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+木瓜,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+榴莲,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+柠檬,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false
+牛油果,全国,national,1,12,unknown,unverified,未接入可验证的消费者区域库存或市场监测来源；保持中性回退且不生成本地易购理由。, ,false

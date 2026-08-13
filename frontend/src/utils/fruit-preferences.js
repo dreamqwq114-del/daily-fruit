@@ -88,6 +88,7 @@ export function selectionToPreferences(selection) {
       fruit_id: id,
       preference_score: 2,
       is_forbidden: false,
+      has_tried: true,
     })
   }
 

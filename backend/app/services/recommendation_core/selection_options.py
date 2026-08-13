@@ -8,6 +8,12 @@ from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 
+from app.selection_option_policy import (
+    EXPLICIT_ONLY_OPTION_FRUITS,
+    MATCHING_DIMENSIONS_BY_FRUIT_CODE,
+    matching_dimensions_for_code,
+)
+
 from app.services.recommendation_types import (
     FruitPreference,
     RecommendationFruit,
@@ -24,24 +30,14 @@ from .common import (
 )
 
 
-# matching_dimensions 是父水果的消费体验配置，不是数据库中的新全局评分字段。
-MATCHING_DIMENSIONS: Mapping[str, tuple[str, ...]] = {
-    "peach": ("texture_score",),
-    "kiwifruit": ("sweet_score", "sour_score"),
-    "apple": ("texture_score",),
-    "grape": ("texture_score",),
-}
-
-# 石榴籽的硬度属于籽本身，不等于果肉的 texture_score。它只能由用户
-# 明确喜欢/避开来约束候选，不能被全局软脆偏好自动推断，也不能产生
-# 默认类型文案。
-EXPLICIT_ONLY_OPTION_FRUITS = frozenset({"pomegranate"})
+# 兼容既有公开导入；真实单一来源位于 app.selection_option_policy。
+MATCHING_DIMENSIONS = MATCHING_DIMENSIONS_BY_FRUIT_CODE
 
 
 def matching_dimensions_for(fruit: RecommendationFruit) -> tuple[str, ...]:
     """返回同一父水果所有兄弟选项共同使用的匹配维度。"""
 
-    return MATCHING_DIMENSIONS.get(fruit.code, ())
+    return matching_dimensions_for_code(fruit.code)
 
 
 def _complete_option_profile(

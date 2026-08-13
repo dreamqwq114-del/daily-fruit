@@ -59,6 +59,9 @@
 **idempotency**：重复执行同一操作不会产生额外不一致。当前反馈由
 `(recommendation_item_id, user_id, feedback_type)` 唯一约束和 service 检查共同保护。
 
+**characterization baseline**：在重构前冻结同一输入下的可观察行为。可靠基线必须能
+追溯并执行对应源版本；JSON 自称来自某个 commit 不是充分证据。
+
 ## 相似对象对比
 
 | 对象 A | 对象 B | 关键区别 |
@@ -78,6 +81,9 @@
 - `excluded_pair`：本次换组的上一组，永远不能恢复；它不是普通历史降分。
 - `has_tried=None`：未知；`has_tried=False`：明确没吃过；不能把 NULL 批量写成 false。
 - `preference_score`：显式喜欢/不喜欢程度；`is_forbidden`：禁止推荐，优先级更高。
+- 当前 `preference_score` 只允许 `-1/0/1/2` 或 `NULL`；`2` 表示特别喜欢并要求已吃过。
+- `selection matching mode` 决定怎样选父水果内类型；`score effect` 决定类型是否改变评分，
+  两者不是同一个概念。
 - `eaten`：一次反馈事件，不等于永久 liked；`unavailable`：供应/购买问题，不等于口味 dislike。
 - `change_requested`：换组事件，不自动转化为水果长期负反馈。
 
@@ -90,4 +96,4 @@ ETag 或冲突重试合同，因此只能作为未来设计概念，不能说项
 ## 最后提醒
 
 当前权重、冷却天数、三级放宽顺序、0～1 演示营养指数和水果数量都是项目启发式参数。
-它们不是行业标准、概率、医学分数或机器学习模型。`n
+它们不是行业标准、概率、医学分数或机器学习模型。

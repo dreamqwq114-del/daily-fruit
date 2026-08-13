@@ -1,8 +1,9 @@
 """用户 ORM 查询与偏好持久化。
 
 Repository 只操作 SQLAlchemy Session，不处理 HTTP、JWT 或推荐评分。偏好
-更新采用 merge：页面管理的 score/forbidden 可以清空，但 has_tried 和
-willing_to_try 只有在请求显式提供时才覆盖。
+更新采用 merge：页面管理的 score/forbidden 可以清空。熟悉度通常只在
+显式提供时覆盖，但特别喜欢会推导 has_tried=true，不适用的尝试意愿会
+被清为 null。
 """
 
 from __future__ import annotations
@@ -94,9 +95,10 @@ def replace_preferences(
 ) -> list[UserFruitPreference]:
     """合并页面管理字段，同时保留熟悉度数据。
 
-    设置页面负责 ``preference_score`` 和 ``is_forbidden``；熟悉度字段只有
-    旧客户端明确提交时才修改。保留空偏好行可以避免用户清空设置后丢失
-    将来算法可能使用的熟悉度信号。
+    设置页面负责 ``preference_score`` 和 ``is_forbidden``。除两项状态机
+    规则外，熟悉度字段只在旧客户端明确提交时修改：特别喜欢会推导
+    ``has_tried=True``；最终状态不是明确没吃过时会清除无意义的
+    ``willing_to_try``。保留空偏好行可以避免清空设置后丢失合法熟悉度。
     """
     existing = {
         item.fruit_id: item
@@ -116,27 +118,34 @@ def replace_preferences(
         submitted_ids.add(fruit_id)
         item = existing.get(fruit_id)
         if item is None:
+            final_has_tried = (
+                True
+                if preference_score == 2
+                else has_tried if has_tried_provided else None
+            )
             item = UserFruitPreference(
                 user_id=user_id,
                 fruit_id=fruit_id,
                 preference_score=preference_score,
                 is_forbidden=is_forbidden,
-                has_tried=(
-                    True
-                    if preference_score == 2 and not has_tried_provided
-                    else has_tried
-                ),
+                has_tried=final_has_tried,
                 willing_to_try=(
-                    willing_to_try if willing_to_try_provided else None
+                    willing_to_try
+                    if final_has_tried is False and willing_to_try_provided
+                    else None
                 ),
             )
             session.add(item)
         else:
             item.preference_score = preference_score
             item.is_forbidden = is_forbidden
-            if has_tried_provided and preference_score != 2:
+            if preference_score == 2:
+                item.has_tried = True
+            elif has_tried_provided:
                 item.has_tried = has_tried
-            if willing_to_try_provided:
+            if item.has_tried is not False:
+                item.willing_to_try = None
+            elif willing_to_try_provided:
                 item.willing_to_try = willing_to_try
             item.updated_at = now
 

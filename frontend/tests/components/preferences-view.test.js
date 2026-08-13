@@ -82,7 +82,12 @@ describe('PreferencesView fruit preference saving', () => {
 
     expect(userApi.updateUser).toHaveBeenCalledTimes(1)
     expect(userApi.replaceFruitPreferences).toHaveBeenCalledWith([
-      { fruit_id: 1, preference_score: 2, is_forbidden: false },
+      {
+        fruit_id: 1,
+        preference_score: 2,
+        is_forbidden: false,
+        has_tried: true,
+      },
     ])
     expect(userApi.updateUser.mock.invocationCallOrder[0]).toBeLessThan(
       userApi.replaceFruitPreferences.mock.invocationCallOrder[0],

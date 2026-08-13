@@ -112,6 +112,26 @@
 - **运行**：否。
 - **修改生产代码**：不允许。
 
+### M7：偏好状态表
+
+- **目标**：区分离散态度、熟悉度、意愿与禁止。
+- **难度**：中级。
+- **阅读**：`schemas/user.py`、`user_repository.py`、`0014_enforce_discrete_fruit_preferences.py`。
+- **任务**：为 `preference_score`、`has_tried`、`willing_to_try`、`is_forbidden` 画合法状态表，
+  并标出 API、Repository 和数据库各保护哪一层。
+- **运行**：可运行相关 schema/repository 测试。
+- **修改生产代码**：不允许。
+
+### M8：消费类型为何不等于新水果
+
+- **目标**：理解父水果与选项档案。
+- **难度**：中级。
+- **阅读**：`selection_option_policy.py`、`recommendation_core/selection_options.py`、
+  `data/fruit_selection_options_seed.json`。
+- **任务**：比较石榴与火龙果的 matching mode 和 score effect，并说明为何 API 必须显式返回它们。
+- **运行**：可运行 selection option 测试。
+- **修改生产代码**：不允许。
+
 ## 高级练习
 
 ### A1：刷新失败回滚测试
@@ -171,10 +191,20 @@
 - **运行**：可运行静态测试，但不要连接远程数据库。
 - **修改生产代码**：不允许。
 
+### A7：审计固定画像是否塌缩
+
+- **目标**：区分回归合同与业务质量。
+- **难度**：高级。
+- **阅读**：`texture_profile_report.py`、`texture_baseline_replay.py`。
+- **任务**：运行只读报告，记录最大 top-1 与有序组合占比；写出你建议的业务验收问题，
+  但不要修改权重或 `PAIR_NEAR_TOP_THRESHOLD`。
+- **运行**：允许运行纯算法报告；不连接数据库。
+- **修改生产代码**：不允许。
+
 ## 本章事实来源
 
 | 教学结论 | 源文件 | 事实类型 |
 | --- | --- | --- |
 | 练习入口来自当前服务边界 | `backend/app/services/` | 代码事实 |
 | migration 练习基于真实 revision | `backend/alembic/versions/` | migration 事实 |
-| 测试练习引用真实行为保护 | `backend/tests/` | 测试事实 |`n
+| 测试练习引用真实行为保护 | `backend/tests/` | 测试事实 |

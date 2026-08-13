@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from typing import get_type_hints
 
 import pytest
+
+import app.services.recommendation_core.selection_options as selection_options_module
 
 from app.services import (
     FruitPreference,
@@ -18,6 +21,14 @@ from app.services.recommendation_core.selection_options import (
     resolve_selection_option,
 )
 from app.services.recommendation_core.common import InvalidRecommendationInputError
+
+
+TEST_HARVEST_EVIDENCE = {
+    "data_quality": "high",
+    "source_note": "test harvest evidence",
+    "source_year": 2026,
+    "is_scoring_enabled": True,
+}
 
 
 def make_user(**changes: object) -> RecommendationUser:
@@ -47,7 +58,9 @@ def make_peach() -> RecommendationFruit:
         convenience_score=0.6,
         average_price_level=2,
         texture_score=0.8,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
         selection_options=(
             SelectionOption(
                 id=101,
@@ -86,7 +99,9 @@ def make_kiwifruit() -> RecommendationFruit:
         convenience_score=0.6,
         average_price_level=2,
         texture_score=0.25,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
         selection_options=(
             SelectionOption(
                 id=201,
@@ -118,6 +133,70 @@ def make_kiwifruit() -> RecommendationFruit:
     )
 
 
+def make_dragon_fruit() -> RecommendationFruit:
+    return RecommendationFruit(
+        id=40,
+        code="dragon_fruit",
+        name="火龙果",
+        sweet_score=0.55,
+        sour_score=0.18,
+        soft_score=0.72,
+        crisp_score=0.28,
+        texture_score=0.28,
+        convenience_score=0.8,
+        average_price_level=2,
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
+        selection_options=(
+            SelectionOption(
+                id=401,
+                fruit_id=40,
+                code="red",
+                name="红心",
+                is_default=True,
+                display_order=1,
+            ),
+            SelectionOption(
+                id=402,
+                fruit_id=40,
+                code="white",
+                name="白心",
+                sweet_score=0.50,
+                sour_score=0.05,
+                texture_score=0.40,
+                display_order=2,
+            ),
+        ),
+    )
+
+
+def test_selection_option_public_exports_and_annotations_resolve() -> None:
+    assert selection_options_module.MATCHING_DIMENSIONS["apple"] == (
+        "texture_score",
+    )
+    assert get_type_hints(
+        selection_options_module._option_preferences_for
+    )["preferences"]
+
+
+def test_dragon_fruit_explicit_white_selection_overrides_score_profile() -> None:
+    fruit = make_dragon_fruit()
+    resolved = resolve_selection_option(
+        fruit,
+        fruit.selection_options,
+        None,
+        (SelectionOptionPreference(1, 40, 402, "liked"),),
+        make_user(),
+    )
+
+    assert resolved is not None
+    assert resolved.resolution_source == "explicit"
+    assert resolved.resolved_option_code == "white"
+    assert resolved.effective_sour_score == pytest.approx(0.05)
+    assert resolved.effective_texture_score == pytest.approx(0.40)
+
+
 def make_pomegranate() -> RecommendationFruit:
     return RecommendationFruit(
         id=30,
@@ -130,7 +209,9 @@ def make_pomegranate() -> RecommendationFruit:
         convenience_score=0.6,
         average_price_level=2,
         texture_score=0.35,
-        seasons=(SeasonWindow("全国", 1, 12, 0.9),),
+        seasons=(
+            SeasonWindow("全国", 1, 12, 0.9, **TEST_HARVEST_EVIDENCE),
+        ),
         selection_options=(
             SelectionOption(
                 id=301,
